@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>沙漠行动 DUNE STRIKE — 团队死亡竞技</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- ===== HUD ===== -->
+    <div id="hud" class="hidden">
+      <!-- crosshair -->
+      <div id="crosshair">
+        <div class="ch-line ch-t"></div>
+        <div class="ch-line ch-b"></div>
+        <div class="ch-line ch-l"></div>
+        <div class="ch-line ch-r"></div>
+        <div class="ch-dot"></div>
+      </div>
+      <div id="hitmarker">
+        <div class="hm-line hm-1"></div><div class="hm-line hm-2"></div>
+        <div class="hm-line hm-3"></div><div class="hm-line hm-4"></div>
+      </div>
+
+      <!-- top center: score -->
+      <div id="scorebar">
+        <div class="team-score alpha"><span class="team-name">ALPHA 沙暴</span><span id="score-alpha">0</span></div>
+        <div id="round-timer">5:00</div>
+        <div class="team-score bravo"><span id="score-bravo">0</span><span class="team-name">BRAVO 毒蝎</span></div>
+      </div>
+      <div id="score-target">先夺 40 杀获胜</div>
+
+      <!-- killfeed -->
+      <div id="killfeed"></div>
+
+      <!-- minimap -->
+      <canvas id="minimap" width="200" height="170"></canvas>
+
+      <!-- bottom left: health -->
+      <div id="health-panel">
+        <div id="hp-row">
+          <div id="hp-icon">✚</div>
+          <div id="hp-bar-wrap"><div id="hp-bar"></div></div>
+          <div id="hp-num">100</div>
+        </div>
+        <div id="buff-row"><span id="spawn-protect" class="hidden">🛡 出生保护</span></div>
+      </div>
+
+      <!-- bottom right: ammo -->
+      <div id="ammo-panel">
+        <div id="weapon-name">MK-4 卡宾枪</div>
+        <div id="ammo-row"><span id="ammo-mag">30</span><span id="ammo-sep">/</span><span id="ammo-reserve">120</span></div>
+        <div id="fire-mode">全自动</div>
+      </div>
+
+      <!-- damage vignette -->
+      <div id="damage-vignette"></div>
+      <div id="lowhp-vignette"></div>
+
+      <!-- damage direction indicators -->
+      <div id="dmg-dir"></div>
+
+      <!-- kill confirm banner -->
+      <div id="kill-banner" class="hidden"></div>
+
+      <!-- respawn overlay -->
+      <div id="respawn-overlay" class="hidden">
+        <div id="death-cause">被 敌人 击杀</div>
+        <div id="respawn-timer">3.0</div>
+        <div class="respawn-hint">重新部署中…</div>
+      </div>
+
+      <!-- hit direction flash text for low hp warning -->
+      <div id="hint-bar">WASD 移动 · Shift 疾跑 · 空格 跳跃 · 左键 射击 · R 换弹 · ESC 暂停</div>
+    </div>
+
+    <!-- ===== Menu ===== -->
+    <div id="menu-overlay">
+      <div class="menu-inner">
+        <div class="menu-tag">原创地图 · 沙漠军事基地</div>
+        <h1>沙漠行动 <span>DUNE STRIKE</span></h1>
+        <div class="menu-sub">团队死亡竞技 · 5 v 5 · 先夺 40 杀获胜</div>
+        <div class="menu-map-info">
+          <div><b>地图：</b>黄沙基地（原创）</div>
+          <div><b>区域：</b>A 区 · B 区 · 中路 · 长廊 · 隧道</div>
+          <div><b>进攻路线：</b>中路 / 长廊 / 隧道 / 东区（共 5 条）</div>
+        </div>
+        <div class="controls-grid">
+          <div><kbd>W A S D</kbd> 移动</div>
+          <div><kbd>Shift</kbd> 疾跑</div>
+          <div><kbd>空格</kbd> 跳跃</div>
+          <div><kbd>鼠标左键</kbd> 射击</div>
+          <div><kbd>R</kbd> 换弹</div>
+          <div><kbd>ESC</kbd> 暂停</div>
+        </div>
+        <button id="btn-start">点击开始战斗</button>
+        <div class="menu-note">建议使用 Chrome / Edge 浏览器 · 需要键盘鼠标</div>
+      </div>
+    </div>
+
+    <!-- ===== Pause ===== -->
+    <div id="pause-overlay" class="hidden">
+      <div class="menu-inner">
+        <h1>已暂停</h1>
+        <div class="menu-sub">PAUSED</div>
+        <button id="btn-resume">继续战斗</button>
+        <button id="btn-restart-pause" class="btn-secondary">重新开始</button>
+      </div>
+    </div>
+
+    <!-- ===== Round end ===== -->
+    <div id="end-overlay" class="hidden">
+      <div class="menu-inner">
+        <h1 id="end-title">胜利</h1>
+        <div id="end-score" class="menu-sub"></div>
+        <button id="btn-restart-end">再来一局</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
