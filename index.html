@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LongCat 复现集</title>
+<meta name="description" content="LongCat 亮点 case 自动复现：原帖 vs 复现产出，含复现 query、评分与完整执行轨迹">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#f3f4f0;--panel:#ffffff;--sunk:#eceee8;--ink:#17191b;--muted:#676c70;--line:#dfe1da;
+  --accent:#f5c400;--on-accent:#17191b;--link:#7a5c00;
+  --pass:#1d8249;--partial:#b0701a;--fail:#c33f38;
+  --tool:#3563c9;--think:#8254c8;
+  --display:"Bricolage Grotesque","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,"PingFang SC",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#111210;--panel:#1a1b19;--sunk:#222420;--ink:#ecece6;--muted:#9a9d95;--line:#2d2f2a;
+  --accent:#f5c400;--on-accent:#17191b;--link:#f5c400;
+  --pass:#4cc57f;--partial:#e3a44b;--fail:#f06b62;--tool:#7ea2ff;--think:#b893f5;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --ground:#111210;--panel:#1a1b19;--sunk:#222420;--ink:#ecece6;--muted:#9a9d95;--line:#2d2f2a;
+  --accent:#f5c400;--on-accent:#17191b;--link:#f5c400;
+  --pass:#4cc57f;--partial:#e3a44b;--fail:#f06b62;--tool:#7ea2ff;--think:#b893f5;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font:15px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+img{max-width:100%}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+.label{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* masthead */
+.mast{padding-block:44px 28px;border-bottom:1px solid var(--line)}
+.mast .brand{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.mast .brand i{width:12px;height:12px;background:var(--accent);border-radius:3px;display:inline-block}
+.mast h1{font-size:clamp(30px,5vw,52px);line-height:1.08;margin-top:14px;font-weight:700;letter-spacing:-.01em}
+.mast p{max-width:62ch;margin:12px 0 0;color:var(--muted)}
+.figs{display:flex;flex-wrap:wrap;gap:12px 36px;margin-top:26px}
+.fig b{display:block;font-family:var(--display);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.fig span{font-size:12.5px;color:var(--muted)}
+
+/* filters */
+.bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding-block:18px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:inherit;font-size:13px;border:0;background:none;color:var(--ink);padding:6px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.bar .count{margin-left:auto;font-size:13px;color:var(--muted)}
+
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px;padding-bottom:60px}
+.card{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;color:inherit;transition:transform .15s,border-color .15s}
+.card:hover{text-decoration:none;border-color:var(--ink);transform:translateY(-2px)}
+.card .shot{aspect-ratio:16/10;background:var(--sunk);position:relative;overflow:hidden}
+.card .shot img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.card .shot .noimg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.card .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.card .hl{font-size:14.5px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .q{font-family:var(--mono);font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;border-top:1px dashed var(--line);padding-top:8px;margin-top:auto}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);font-size:12px;white-space:nowrap;background:var(--panel)}
+.score{position:absolute;top:10px;left:10px;display:flex;align-items:baseline;gap:6px;background:var(--panel);border-radius:8px;padding:3px 9px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.score b{font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.v-pass{color:var(--pass)}.v-partial{color:var(--partial)}.v-fail{color:var(--fail)}
+.vdot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+
+/* detail */
+.crumb{padding-block:22px 0;font-size:13.5px}
+.head{display:grid;grid-template-columns:1fr auto;gap:24px 40px;padding-block:16px 26px;border-bottom:1px solid var(--line);align-items:end}
+.head h1{font-size:clamp(22px,3vw,32px);line-height:1.3;font-weight:700;max-width:40ch}
+.head .meta{margin-top:12px}
+.big{display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap}
+.big .tot b{font-family:var(--display);font-size:56px;line-height:1;font-variant-numeric:tabular-nums}
+.big .tot span{font-size:13px}
+.dims{display:grid;grid-template-columns:auto 110px auto;gap:4px 10px;align-items:center;font-size:12.5px}
+.dims .tr{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}.dims .tr i{display:block;height:100%}
+.dims .n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.sec{padding-block:30px;border-bottom:1px solid var(--line)}
+.sec>h2{font-size:21px;font-weight:700;margin-bottom:16px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.sec>h2 small{font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted)}
+.vs{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:22px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.pane h3{font-size:16px;margin-bottom:12px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.pane h3 .src{font-family:var(--body);font-weight:400;font-size:13px}
+.txt{white-space:pre-wrap;word-break:break-word;font-size:14px}
+.kv{display:grid;grid-template-columns:88px minmax(0,1fr);gap:10px 14px;margin-top:14px;font-size:14px}
+.kv>dt{color:var(--muted);font-size:12.5px;padding-top:2px}.kv>dd{margin:0;min-width:0}
+.thumbs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.thumbs img{height:96px;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;flex:none;background:var(--sunk)}
+.frame{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;aspect-ratio:16/10;max-width:100%}
+.frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.frame .cover{position:absolute;inset:0;display:grid;place-items:center;background:var(--sunk);cursor:pointer}
+.frame .cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:.55}
+.frame .cover span{position:relative;background:var(--accent);color:var(--on-accent);font-weight:600;padding:9px 18px;border-radius:999px;font-size:14px}
+.btn{font:inherit;font-size:13px;padding:5px 12px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--ink);text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.files{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;margin-top:10px;font-family:var(--mono)}
+
+.query{position:relative;background:var(--ink);color:var(--ground);border-radius:12px;padding:18px 20px;font:14px/1.7 var(--mono);white-space:pre-wrap;word-break:break-word}
+.query .btn{position:absolute;top:10px;right:10px;background:transparent;color:var(--ground);border-color:color-mix(in srgb,var(--ground) 30%,transparent)}
+.query .qlabel{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin-bottom:6px;font-family:var(--body)}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+.tab{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.tab[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.tab .mono{font-size:12.5px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:18px}
+.crit{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.crit li{display:grid;grid-template-columns:20px 1fr;gap:6px}
+.crit .ev{font-size:12.5px;color:var(--muted);grid-column:2}
+.mark{font-weight:700}.mark.y{color:var(--pass)}.mark.n{color:var(--fail)}
+ul.flaws{margin:0;padding-left:18px;font-size:14px}
+.note{background:var(--sunk);border-radius:8px;padding:12px 14px;font-size:14px}
+.note+.note{margin-top:10px}
+
+/* trajectory */
+.tstats{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted);margin-bottom:12px}
+.tstats b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.tl{position:relative;padding-left:22px;border-left:2px solid var(--line);margin-left:6px;display:flex;flex-direction:column;gap:8px}
+.e{position:relative;font-size:13.5px;min-width:0}
+.e::before{content:"";position:absolute;left:-28px;top:7px;width:10px;height:10px;border-radius:50%;background:var(--panel);border:2px solid var(--muted)}
+.e.tool::before{border-color:var(--tool);background:var(--tool)}
+.e.thinking::before{border-color:var(--think)}
+.e.text::before{border-color:var(--pass);background:var(--pass)}
+.e.segment::before,.e.final::before{border-color:var(--accent);background:var(--accent);border-radius:2px}
+.e.result{margin-top:-4px}.e.result::before{display:none}
+.e .h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.e .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;flex:none}
+.e.tool .k{color:var(--tool)}.e.thinking .k{color:var(--think)}
+.e .brief{font-family:var(--mono);font-size:12.5px;word-break:break-all;min-width:0}
+.e details summary{cursor:pointer;color:var(--muted);font-size:12.5px;list-style:none}
+.e details summary::-webkit-details-marker{display:none}
+.e details summary::before{content:"▸ ";}.e details[open] summary::before{content:"▾ ";}
+.e pre{background:var(--sunk);border-radius:6px;padding:10px 12px;margin:6px 0 0;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
+.e.result pre{max-height:260px}
+.e.result.err summary{color:var(--fail)}
+.e.result.hid{font-size:12.5px;color:var(--muted);font-style:italic}
+.e.text .body{white-space:pre-wrap;word-break:break-word;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px}
+.more{margin-top:12px}
+
+#zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;cursor:zoom-out;padding:16px}
+#zoom img{max-width:100%;max-height:100%}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.empty{padding:60px 0;text-align:center;color:var(--muted)}
+footer{padding-block:28px 40px;font-size:12.5px;color:var(--muted)}
+
+@media (max-width:860px){
+  .vs,.cols{grid-template-columns:1fr}
+  .head{grid-template-columns:1fr}
+  .bar .count{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"><div class="wrap empty">加载中…</div></div>
+<div id="zoom" hidden onclick="this.hidden=true"><img alt=""></div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const VERDICT = {pass:'达标', partial:'部分达标', fail:'未达标'};
+const TYPE = {single_gen:'单次生成', agent:'Agent 任务', multi_turn:'多轮'};
+const DIMS = [['task_completion','完成度'],['fidelity','还原度'],['highlight_shown','亮点展示'],['craftsmanship','精细度']];
+const fmt = n => n == null ? '—' : (+n).toFixed(1);
+const dur = s => { if (s == null) return '—'; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60); return h ? `${h}h${m}m` : m ? `${m}m${s%60}s` : `${s}s`; };
+let INDEX = null; const CACHE = {}; const FILTER = {v:'all', t:'all', p:'all'};
+
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('on'), 1800); }
+function zoom(src){ const z = $('#zoom'); z.querySelector('img').src = src; z.hidden = false; }
+async function getJSON(p){ const r = await fetch(p); if (!r.ok) throw new Error(`${p} ${r.status}`); return r.json(); }
+async function copy(text, btn){
+  try { await navigator.clipboard.writeText(text); toast('已复制'); }
+  catch { const r = document.createRange(); r.selectNodeContents(btn.parentElement.querySelector('.qtext')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('已选中，按 ⌘C 复制'); }
+}
+function vchip(v){ return `<span class="chip v-${esc(v)}"><span class="vdot"></span>${VERDICT[v]||esc(v)||'—'}</span>`; }
+
+/* ---------- 列表 ---------- */
+function renderIndex(){
+  const d = INDEX, cs = d.cases;
+  const pass = cs.filter(c=>c.passed).length;
+  const avg = cs.length ? cs.reduce((a,c)=>a+(+c.total||0),0)/cs.length : 0;
+  const plats = [...new Set(cs.map(c=>c.platform))];
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v,l])=>`<button aria-pressed="${FILTER[key]===v}" onclick="setF('${key}','${v}')">${l}</button>`).join('')}</div>`;
+  const shown = cs.filter(c => (FILTER.v==='all' || (FILTER.v==='pass' ? c.passed : !c.passed))
+    && (FILTER.t==='all' || c.task_type===FILTER.t) && (FILTER.p==='all' || c.platform===FILTER.p));
+  const gen = new Date(d.generated_at*1000).toLocaleString('zh-CN',{hour12:false});
+  $('#app').innerHTML = `
+  <header class="mast"><div class="wrap">
+    <div class="brand"><i></i>LongCat · 亮点 case 自动复现</div>
+    <h1>社交媒体上的亮点 case，<br>LongCat 能复现几成？</h1>
+    <p>从 X、小红书等平台收集别人晒出的模型作品，自动抓原帖、反推 query，交给 LongCat 在 Claude Code 里从零执行，再由独立模型对照原帖打分。每个 case 展示得分最高的一轮，附完整 query 和执行轨迹。</p>
+    <div class="figs">
+      <div class="fig"><b>${cs.length}</b><span>已评分 case（共 ${d.total_cases} 个在跑）</span></div>
+      <div class="fig"><b>${pass}</b><span>达标（总分 ≥ ${d.pass_total}）</span></div>
+      <div class="fig"><b>${fmt(avg)}</b><span>平均最佳分 / 10</span></div>
+      <div class="fig"><b class="mono" style="font-size:17px;line-height:2.1">${esc(d.model)}</b><span>执行模型 · 评审 ${esc(d.judge_model)}</span></div>
+    </div>
+  </div></header>
+  <main class="wrap">
+    <div class="bar">
+      ${seg('v',[['all','全部'],['pass','达标'],['partial','未完全达标']])}
+      ${seg('t',[['all','全部类型'],['single_gen','单次生成'],['agent','Agent 任务']])}
+      ${plats.length>1?seg('p',[['all','全部平台'],...plats.map(p=>[p,p])]):''}
+      <span class="count">显示 ${shown.length} 个 · 数据更新于 ${gen}</span>
+    </div>
+    ${shown.length ? `<div class="grid">${shown.map(card).join('')}</div>` : '<div class="empty">没有符合条件的 case</div>'}
+  </main>`;
+}
+function card(c){
+  return `<a class="card" href="#${esc(c.id)}">
+    <div class="shot">${c.shot?`<img src="${esc(c.shot)}" alt="" loading="lazy">`:'<div class="noimg">无截图</div>'}
+      <div class="score"><b class="v-${esc(c.verdict)}">${fmt(c.total)}</b><span class="small muted">R${c.best_round}</span></div></div>
+    <div class="body">
+      <div class="meta"><span class="chip">${esc(c.platform)}</span><span class="chip">${TYPE[c.task_type]||esc(c.task_type)}</span>${vchip(c.verdict)}</div>
+      <div class="hl">${esc(c.highlight)}</div>
+      <div class="q">› ${esc(c.query)}</div>
+    </div></a>`;
+}
+function setF(k, v){ FILTER[k] = v; renderIndex(); }
+
+/* ---------- 详情 ---------- */
+function dims(s){
+  return `<div class="dims">${DIMS.map(([k,l])=>{ const v = +(s||{})[k]||0, col = v>=7?'var(--pass)':v>=4?'var(--partial)':'var(--fail)';
+    return `<span class="muted">${l}</span><span class="tr"><i style="width:${v*10}%;background:${col}"></i></span><span class="n">${fmt((s||{})[k])}</span>`; }).join('')}</div>`;
+}
+function renderPost(c){
+  const p = c.post || {};
+  const media = [...(p.images||[]), ...(p.frames||[])];
+  return `<div class="pane">
+    <h3>原帖 <a class="src" href="${esc(c.url)}" target="_blank" rel="noopener">在 ${esc(c.platform)} 查看 ↗</a></h3>
+    <div class="txt">${esc(p.text) || '<span class="muted">（无正文）</span>'}</div>
+    ${media.length?`<div class="thumbs" style="margin-top:12px">${media.map(u=>`<img src="${esc(u)}" alt="" loading="lazy" onclick="zoom(this.src)">`).join('')}</div>
+      ${p.frames&&p.frames.length?`<div class="small muted" style="margin-top:4px">${p.images.length?`${p.images.length} 张图片 + `:''}${p.frames.length} 张视频截帧</div>`:''}`:''}
+    <dl class="kv">
+      <dt>亮点</dt><dd><b>${esc(c.highlight)}</b></dd>
+      <dt>作者 prompt</dt><dd>${c.original_prompt?`<div class="txt mono small">${esc(c.original_prompt)}</div>`:'<span class="muted">原帖未公开，复现 query 由 LongCat 根据素材反推</span>'}</dd>
+      ${p.quoted_text?`<dt>引用帖</dt><dd class="txt small">${esc(p.quoted_text)}</dd>`:''}
+      ${p.transcript?`<dt>口播字幕</dt><dd><details><summary class="small muted">展开</summary><div class="txt small">${esc(p.transcript)}</div></details></dd>`:''}
+      <dt>预期产出</dt><dd class="small">${esc(c.expected_output)}</dd>
+      <dt>达标标准</dt><dd><ol class="small" style="margin:0;padding-left:18px">${(c.criteria||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></dd>
+    </dl></div>`;
+}
+function renderProduct(c, r){
+  const pr = r.product;
+  const shot = (r.shots||[])[0];
+  if (!pr) return `<div class="pane"><h3>复现产出 · R${r.round}</h3>${shotsBlock(r)}</div>`;
+  return `<div class="pane">
+    <h3>复现产出 · R${r.round}${pr.open?` <a class="btn primary" href="${esc(pr.open)}" target="_blank" rel="noopener">新窗口打开 ↗</a>`:''}</h3>
+    ${pr.open?`<div class="frame" id="frame"><div class="cover" onclick="loadFrame('${esc(pr.open)}')">${shot?`<img src="${esc(shot)}" alt="">`:''}<span>▶ 在这里试玩</span></div></div>`:''}
+    <div style="margin-top:12px">${shotsBlock(r)}</div>
+    ${pr.files.length>1?`<div class="files">${pr.files.map(f=>`<a href="${esc(f)}" target="_blank" rel="noopener">${esc(f.split('/product/')[1])}</a>`).join('')}</div>`:''}
+  </div>`;
+}
+function shotsBlock(r){
+  const s = r.shots||[];
+  return s.length ? `<div class="label" style="margin-bottom:6px">自动截图</div><div class="thumbs">${s.map(u=>`<img src="${esc(u)}" alt="" loading="lazy" onclick="zoom(this.src)">`).join('')}</div>` : '<div class="small muted">无截图</div>';
+}
+function loadFrame(src){ $('#frame').innerHTML = `<iframe src="${esc(src)}" title="复现产出" allow="fullscreen; autoplay" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>`; }
+
+function renderRound(c, r){
+  const j = r.judge||{}, st = r.stats||{};
+  const crit = j.criteria||[];
+  return `
+    <div class="query"><span class="qlabel">第 ${r.round} 轮 query</span><span class="qtext">${esc(r.query)}</span><button class="btn" onclick="copy(CUR.rounds.find(x=>x.round===${r.round}).query,this)">复制</button></div>
+    <div class="cols">
+      <div>
+        <div class="label" style="margin-bottom:8px">评审 · ${esc(j.judge_model||'')}</div>
+        <div class="big" style="margin-bottom:14px"><div class="tot"><b class="v-${esc(j.verdict)}">${fmt(j.total)}</b> <span class="muted">/ 10</span></div>${dims(j.scores)}</div>
+        ${crit.length?`<div class="label" style="margin:14px 0 8px">逐条核对 ${crit.filter(x=>x.met).length}/${crit.length}</div>
+          <ul class="crit">${crit.map(x=>`<li><span class="mark ${x.met?'y':'n'}">${x.met?'✓':'✕'}</span><span>${esc(x.item)}</span><span class="ev">${esc(x.evidence)}</span></li>`).join('')}</ul>`:''}
+      </div>
+      <div>
+        ${j.gap?`<div class="label" style="margin-bottom:8px">与原帖的差距</div><div class="note">${esc(j.gap)}</div>`:''}
+        ${(j.flaws||[]).length?`<div class="label" style="margin:16px 0 8px">瑕疵</div><ul class="flaws">${j.flaws.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:''}
+        ${j.fix_hint?`<div class="label" style="margin:16px 0 8px">下一轮改进方向</div><div class="note">${esc(j.fix_hint)}</div>`:''}
+        ${r.round!==c.best_round?`<div style="margin-top:16px">${shotsBlock(r)}</div>`:''}
+      </div>
+    </div>
+    <div class="label" style="margin:28px 0 10px">执行轨迹 · Claude Code × ${esc(st.model||'LongCat')}</div>
+    <div class="tstats">
+      <span>工具调用 <b>${st.tool_calls??0}</b></span><span>模型消息 <b>${st.assistant_msgs??0}</b></span>
+      <span>思考 ≈ <b>${(st.thinking_tokens||0).toLocaleString()}</b> tok</span>
+      ${r.elapsed?`<span>耗时 <b>${dur(r.elapsed)}</b></span>`:(st.started&&st.ended?`<span>耗时 <b>${dur(st.ended-st.started)}</b></span>`:'')}
+      ${r.status?`<span>结束 <b style="color:${r.status==='ok'?'var(--pass)':'var(--partial)'}">${esc(r.status)}</b>${r.stop_reason?' · '+esc(r.stop_reason):''}</span>`:''}
+      ${st.hidden?`<span>${st.hidden} 步访问本机环境的结果已隐去</span>`:''}
+    </div>
+    ${(r.resumes||[]).length?`<div class="note small" style="margin-bottom:12px">${r.resumes.map(x=>`<div><b>模型反问：</b>${esc(x.q||'（注入提示）')}</div><div><b>自动代答：</b>${esc(x.a)}</div>`).join('<hr style="border:0;border-top:1px solid var(--line)">')}</div>`:''}
+    ${r.page_errors?`<details class="small" style="margin-bottom:12px"><summary style="color:var(--fail)">页面 JS 报错</summary><pre class="mono">${esc(r.page_errors)}</pre></details>`:''}
+    <div id="traj"><div class="muted small">加载轨迹…</div></div>`;
+}
+const KIND = {segment:'启动', thinking:'思考', tool:'工具', result:'结果', text:'回复', user:'系统', final:'结束'};
+const PAGE = 150;
+function evHTML(e){
+  if (e.k==='segment') return `<div class="e segment"><div class="h"><span class="k">${e.resume?'续跑':'启动'}</span><span class="small muted">${e.resume?'在同一会话里继续':'把 query 交给 Claude Code'}</span></div><details><summary>发送的内容</summary><pre>${esc(e.text)}</pre></details></div>`;
+  if (e.k==='thinking') return `<div class="e thinking"><div class="h"><span class="k">思考</span><span class="small muted">${e.len.toLocaleString()} 字</span></div><details><summary>${esc(e.text.slice(0,90).replace(/\s+/g,' '))}…</summary><pre>${esc(e.text)}</pre></details></div>`;
+  if (e.k==='tool') return `<div class="e tool"><div class="h"><span class="k">${esc(e.name)}</span><span class="brief">${esc(e.brief)}</span>${e.lines?`<span class="small muted">${e.lines} 行</span>`:''}</div><details><summary>参数</summary><pre>${esc(e.text)}</pre></details></div>`;
+  if (e.k==='result') return e.hidden ? `<div class="e result hid">↳ ${esc(e.text)}</div>`
+    : `<div class="e result ${e.error?'err':''}"><details><summary>↳ ${e.error?'出错：':''}${esc((e.text||'').split('\n')[0].slice(0,110))||'（空）'}</summary><pre>${esc(e.text)}</pre></details></div>`;
+  if (e.k==='text') return `<div class="e text"><div class="h"><span class="k">回复</span></div><div class="body">${esc(e.text)}</div></div>`;
+  if (e.k==='user') return `<div class="e"><div class="h"><span class="k">系统</span></div><details><summary>${esc(e.text.slice(0,90))}</summary><pre>${esc(e.text)}</pre></details></div>`;
+  if (e.k==='final') return `<div class="e final"><div class="h"><span class="k">结束</span><span class="small muted">${esc(e.sub)}</span></div>${e.text?`<details><summary>最终回复</summary><pre>${esc(e.text)}</pre></details>`:''}</div>`;
+  return '';
+}
+async function loadTraj(r){
+  const box = $('#traj'); if (!box) return;
+  let ev;
+  try { ev = CACHE[r.traj] || (CACHE[r.traj] = await getJSON(r.traj)); } catch { box.innerHTML = '<div class="muted small">轨迹加载失败</div>'; return; }
+  if (!ev.length){ box.innerHTML = '<div class="muted small">没有记录到事件</div>'; return; }
+  let n = PAGE;
+  const draw = () => {
+    box.innerHTML = `<div class="tl">${ev.slice(0,n).map(evHTML).join('')}</div>` +
+      (n < ev.length ? `<div class="more"><button class="btn" id="more">再显示 ${Math.min(PAGE, ev.length-n)} 步（共 ${ev.length}）</button></div>` : '');
+    const b = $('#more'); if (b) b.onclick = () => { n += PAGE; draw(); };
+  };
+  draw();
+}
+let CUR = null;
+async function renderCase(id, roundNo){
+  let c;
+  try { c = CACHE[id] || (CACHE[id] = await getJSON(`data/cases/${id}.json`)); }
+  catch { $('#app').innerHTML = `<div class="wrap empty">找不到这个 case。<a href="#">返回列表</a></div>`; return; }
+  CUR = c;
+  const r = c.rounds.find(x=>x.round===roundNo) || c.rounds.find(x=>x.round===c.best_round);
+  const best = c.rounds.find(x=>x.round===c.best_round), bj = best.judge||{};
+  document.title = `${c.highlight.slice(0,24)}… · LongCat 复现集`;
+  $('#app').innerHTML = `<div class="wrap">
+    <div class="crumb"><a href="#">← 全部 case</a></div>
+    <section class="head">
+      <div>
+        <div class="label">${esc(c.platform)} · ${TYPE[c.task_type]||esc(c.task_type)} · <span class="mono">${esc(c.id)}</span></div>
+        <h1 style="margin-top:8px">${esc(c.highlight)}</h1>
+        <div class="meta">${vchip(bj.verdict)}<span>最佳为第 ${c.best_round} 轮 / 共 ${c.rounds.length} 轮已评分</span></div>
+      </div>
+      <div class="big"><div class="tot"><div class="label">最佳分</div><b class="v-${esc(bj.verdict)}">${fmt(bj.total)}</b> <span class="muted">/ 10</span></div>${dims(bj.scores)}</div>
+    </section>
+    <section class="sec"><h2>原帖 vs 复现 <small>左边是别人晒的，右边是 LongCat 做的</small></h2>
+      <div class="vs">${renderPost(c)}${renderProduct(c, best)}</div>
+    </section>
+    <section class="sec" id="rounds"><h2>复现过程 <small>每轮根据评审意见改写 query 再跑一次</small></h2>
+      <div class="tabs" role="tablist">${c.rounds.map(x=>`<button class="tab" role="tab" aria-selected="${x.round===r.round}" onclick="location.hash='${esc(c.id)}~r${x.round}'">第 ${x.round} 轮 <span class="mono v-${esc((x.judge||{}).verdict)}">${fmt((x.judge||{}).total)}</span>${x.round===c.best_round?'<span class="small muted">最佳</span>':''}</button>`).join('')}</div>
+      <div id="round">${renderRound(c, r)}</div>
+    </section>
+    <footer>数据由 longcat-repro 自动生成。原帖素材版权归原作者所有，仅作复现对照。轨迹中的本机路径与密钥已打码。</footer>
+  </div>`;
+  loadTraj(r);
+}
+
+/* ---------- 路由 ---------- */
+async function route(){
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (!INDEX) INDEX = await getJSON('data/index.json');
+  if (!h){ document.title = 'LongCat 复现集'; renderIndex(); window.scrollTo(0, +sessionStorageGet('y')||0); return; }
+  const m = h.match(/^(.+?)(?:~r(\d+))?$/);
+  if (CUR && CUR.id === m[1] && $('#round')){  // 同一 case 切轮次：只换下半部分，保留正在试玩的产出
+    const r = CUR.rounds.find(x=>x.round===+m[2]) || CUR.rounds.find(x=>x.round===CUR.best_round);
+    document.querySelectorAll('.tab').forEach((t,i)=>t.setAttribute('aria-selected', CUR.rounds[i].round===r.round));
+    $('#round').innerHTML = renderRound(CUR, r); loadTraj(r);
+    return;
+  }
+  await renderCase(m[1], m[2] ? +m[2] : null);
+  window.scrollTo(0,0);
+}
+function sessionStorageGet(k){ try { return sessionStorage.getItem(k); } catch { return null; } }
+window.addEventListener('scroll', () => { if (!location.hash) try { sessionStorage.setItem('y', scrollY); } catch {} }, {passive:true});
+window.addEventListener('hashchange', route);
+route().catch(e => { $('#app').innerHTML = `<div class="wrap empty">加载失败：${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proc Planet — Procedural World Engine</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #030612;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #dbe6f5;
+  }
+  #scene { position: fixed; inset: 0; display: block; }
+
+  .panel {
+    position: fixed; top: 16px; left: 16px; width: 276px;
+    max-height: calc(100% - 32px); overflow-y: auto;
+    padding: 18px; border-radius: 16px;
+    background: rgba(8, 12, 24, 0.72);
+    border: 1px solid rgba(140, 170, 255, 0.14);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    user-select: none;
+  }
+  .panel::-webkit-scrollbar { width: 6px; }
+  .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .dot {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 35% 35%, #7fe8ff, #2f6fed 70%);
+    box-shadow: 0 0 12px rgba(84, 176, 255, 0.8);
+  }
+  .brand h1 {
+    margin: 0; font-size: 16px; letter-spacing: 2.5px; font-weight: 800;
+    background: linear-gradient(90deg, #8fc4ff, #6ef0d8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .brand p { margin: 2px 0 0; font-size: 10.5px; letter-spacing: 1.2px; color: #7d8db0; text-transform: uppercase; }
+
+  .stats { display: flex; gap: 8px; margin: 12px 0 4px; }
+  .chip {
+    flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; padding: 6px 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(140,170,255,0.12);
+    color: #a9c3e8; text-align: center;
+  }
+  .chip b { color: #eaf2ff; font-weight: 600; }
+
+  .section-label {
+    margin: 14px 0 8px; font-size: 10px; letter-spacing: 1.6px;
+    text-transform: uppercase; color: #6f7fa3;
+  }
+
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1; padding: 8px 4px; font-size: 11.5px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(140,170,255,0.15); background: rgba(255,255,255,0.04);
+    color: #aebdd6; transition: all .15s;
+  }
+  .seg button:hover { background: rgba(255,255,255,0.09); color: #fff; }
+  .seg button.active {
+    background: linear-gradient(135deg, #2f6fed, #54d0ff);
+    border-color: transparent; color: #fff; font-weight: 700;
+  }
+
+  .legend { margin-top: 10px; }
+  .legend-item { display: none; }
+  .legend-item.show { display: block; }
+  .legend-item span { font-size: 11px; color: #9fb2d4; }
+  .bar { height: 9px; border-radius: 5px; margin-top: 5px; }
+  .bar.temp  { background: linear-gradient(90deg, #0d26a6, #1a8cc0, #40bf73, #f2d940, #f27326, #bf1a1f); }
+  .bar.humid { background: linear-gradient(90deg, #cc9f6b, #8c9e59, #389452, #1f7394); }
+  .scale { display: flex; justify-content: space-between; font-size: 10px; color: #6f7fa3; margin-top: 3px; }
+
+  .ctl { margin-bottom: 10px; }
+  .ctl .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .ctl label { font-size: 12.5px; color: #c4d2e8; }
+  .ctl .val { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: #6ef0d8; }
+  input[type="range"] { width: 100%; accent-color: #54d0ff; height: 22px; cursor: pointer; background: transparent; }
+
+  .toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; padding: 6px 0; cursor: pointer; color: #c4d2e8;
+  }
+  .toggle input { display: none; }
+  .toggle .track {
+    width: 34px; height: 19px; border-radius: 999px; position: relative; flex: none;
+    background: rgba(255,255,255,0.12); transition: background .2s;
+  }
+  .toggle .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #8fa3c8; transition: all .2s;
+  }
+  .toggle input:checked + .track { background: #2f6fed; }
+  .toggle input:checked + .track::after { left: 17px; background: #fff; }
+
+  .primary {
+    width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 11px;
+    font-size: 14px; font-weight: 800; letter-spacing: 0.4px; cursor: pointer;
+    color: #04101f; background: linear-gradient(135deg, #54b0ff, #6ef0d8);
+    transition: transform .08s, filter .2s;
+  }
+  .primary:hover { filter: brightness(1.1); }
+  .primary:active { transform: scale(0.98); }
+
+  .hint { margin: 12px 0 0; font-size: 10.5px; line-height: 1.6; color: #66738f; text-align: center; }
+  kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 9.5px; padding: 1px 5px;
+    border-radius: 4px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+  }
+
+  @media (max-width: 560px) {
+    .panel { top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-height: 52%;
+      border-radius: 18px 18px 0 0; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div class="panel">
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <h1>PROC·PLANET</h1>
+      <p>procedural world engine</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="chip" id="seedChip">Seed <b id="seedVal">—</b></div>
+    <div class="chip">Land <b id="landVal">—</b></div>
+  </div>
+
+  <div class="section-label">Shading mode</div>
+  <div class="seg" id="modeSeg">
+    <button data-mode="0" class="active">Day–Night</button>
+    <button data-mode="1">Temp</button>
+    <button data-mode="2">Humidity</button>
+  </div>
+
+  <div class="legend" id="legend">
+    <div class="legend-item" data-mode="1">
+      <span>Temperature</span>
+      <div class="bar temp"></div>
+      <div class="scale"><span>polar / cold</span><span>equatorial / hot</span></div>
+    </div>
+    <div class="legend-item" data-mode="2">
+      <span>Humidity</span>
+      <div class="bar humid"></div>
+      <div class="scale"><span>arid</span><span>humid</span></div>
+    </div>
+  </div>
+
+  <div class="section-label">Terrain</div>
+  <div class="ctl">
+    <div class="row"><label for="rough">Roughness</label><span class="val" id="roughVal">0.50</span></div>
+    <input type="range" id="rough" min="0.05" max="0.90" step="0.01" value="0.50">
+  </div>
+  <div class="ctl">
+    <div class="row"><label for="sea">Sea level</label><span class="val" id="seaVal">0.030</span></div>
+    <input type="range" id="sea" min="-0.25" max="0.45" step="0.005" value="0.03">
+  </div>
+  <div class="ctl">
+    <div class="row"><label for="rot">Rotation speed</label><span class="val" id="rotVal">0.40×</span></div>
+    <input type="range" id="rot" min="0" max="2" step="0.05" value="0.40">
+  </div>
+
+  <div class="section-label">Effects</div>
+  <label class="toggle">
+    Day–night cycle
+    <input type="checkbox" id="cycleToggle" checked><span class="track"></span>
+  </label>
+  <label class="toggle">
+    Atmosphere
+    <input type="checkbox" id="atmoToggle" checked><span class="track"></span>
+  </label>
+
+  <button class="primary" id="regenBtn">⟳&nbsp; Regenerate Planet</button>
+
+  <p class="hint">Drag to orbit · Scroll to zoom<br><kbd>R</kbd> regenerate · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> shading modes</p>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ Seeded RNG + Perlin noise (improved Perlin 3D) ============ */
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const GRAD3 = [
+  [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+  [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+  [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
+];
+
+function makePerlin3D(seed) {
+  const rand = mulberry32(seed);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = (rand() * (i + 1)) | 0;
+    const t = p[i]; p[i] = p[j]; p[j] = t;
+  }
+  const perm = new Uint8Array(512);
+  const permMod12 = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) {
+    perm[i] = p[i & 255];
+    permMod12[i] = perm[i] % 12;
+  }
+  const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+  const lerp = (t, a, b) => a + t * (b - a);
+  const grad = (h, dx, dy, dz) => {
+    const g = GRAD3[h];
+    return g[0] * dx + g[1] * dy + g[2] * dz;
+  };
+  return function noise3(x, y, z) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+    const u = fade(x), v = fade(y), w = fade(z);
+    const A = perm[X] + Y, AA = perm[A] + Z, AB = perm[A + 1] + Z;
+    const B = perm[X + 1] + Y, BA = perm[B] + Z, BB = perm[B + 1] + Z;
+    return lerp(w,
+      lerp(v,
+        lerp(u, grad(permMod12[AA], x, y, z),     grad(permMod12[BA], x - 1, y, z)),
+        lerp(u, grad(permMod12[AB], x, y - 1, z), grad(permMod12[BB], x - 1, y - 1, z))),
+      lerp(v,
+        lerp(u, grad(permMod12[AA + 1], x, y, z - 1),     grad(permMod12[BA + 1], x - 1, y, z - 1)),
+        lerp(u, grad(permMod12[AB + 1], x, y - 1, z - 1), grad(permMod12[BB + 1], x - 1, y - 1, z - 1)))
+    );
+  };
+}
+
+/* Fractal Brownian motion — stacked Perlin octaves, normalized to ~[-1, 1] */
+function fbm(noise, x, y, z, octaves, gain, lacunarity) {
+  let amp = 1, freq = 1, sum = 0, norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += amp * noise(x * freq, y * freq, z * freq);
+    norm += amp;
+    amp *= gain;
+    freq *= lacunarity;
+  }
+  return sum / norm;
+}
+
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+
+/* ============ State ============ */
+
+const state = {
+  seed: (Math.random() * 1e9) | 0,
+  roughness: 0.5,
+  seaLevel: 0.03,
+  rotSpeed: 0.4,
+  mode: 0,
+  cycle: true,
+  sunAngle: 0.6,
+};
+
+const ELEV_FREQ = 1.4, ELEV_OCT = 5, ELEV_LAC = 2.0;
+let noiseElev = null, noiseTemp = null, noiseHumid = null;
+let elevations = null; // kept for cheap land-fraction stats
+
+function elevationAt(x, y, z) {
+  let e = fbm(noiseElev, x * ELEV_FREQ, y * ELEV_FREQ, z * ELEV_FREQ, ELEV_OCT, state.roughness, ELEV_LAC);
+  e = Math.sign(e) * Math.pow(Math.min(Math.abs(e), 1), 1.2); // sharpen continents
+  if (e > 0.02) { // ridged detail for mountain ranges
+    const r = 1 - Math.abs(fbm(noiseElev, x * 3.4 + 11.3, y * 3.4 + 11.3, z * 3.4 + 11.3, 4, 0.55, 2.1));
+    e = Math.min(1, e + r * r * 0.22);
+  }
+  return Math.max(-1, Math.min(1, e));
+}
+
+/* ============ Renderer / scene ============ */
+
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030612);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 0.7, 3.4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 1.6;
+controls.maxDistance = 12;
+
+/* ============ Planet shaders ============ */
+
+const planetUniforms = {
+  uSunDir:   { value: new THREE.Vector3(1, 0.2, 0.3).normalize() },
+  uSeaLevel: { value: state.seaLevel },
+  uMode:     { value: 0 },
+};
+
+const planetVert = /* glsl */`
+  attribute float aElev;
+  attribute float aTemp;
+  attribute float aHumid;
+  varying float vElev;
+  varying float vTemp;
+  varying float vHumid;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+  void main() {
+    vElev = aElev; vTemp = aTemp; vHumid = aHumid;
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vPosW = wp.xyz;
+    vNormalW = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+const planetFrag = /* glsl */`
+  uniform vec3 uSunDir;
+  uniform float uSeaLevel;
+  uniform float uMode; // 0 = day-night, 1 = temperature, 2 = humidity
+  varying float vElev;
+  varying float vTemp;
+  varying float vHumid;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+
+  vec3 tempRamp(float t) {
+    t = clamp(t, 0.0, 1.0);
+    vec3 c = vec3(0.05, 0.15, 0.65);
+    c = mix(c, vec3(0.10, 0.55, 0.80), smoothstep(0.00, 0.25, t));
+    c = mix(c, vec3(0.25, 0.75, 0.45), smoothstep(0.25, 0.45, t));
+    c = mix(c, vec3(0.95, 0.85, 0.25), smoothstep(0.45, 0.65, t));
+    c = mix(c, vec3(0.95, 0.45, 0.15), smoothstep(0.65, 0.82, t));
+    c = mix(c, vec3(0.75, 0.10, 0.12), smoothstep(0.82, 1.00, t));
+    return c;
+  }
+
+  vec3 humidRamp(float h) {
+    h = clamp(h, 0.0, 1.0);
+    vec3 c = vec3(0.80, 0.66, 0.42);
+    c = mix(c, vec3(0.55, 0.62, 0.35), smoothstep(0.10, 0.35, h));
+    c = mix(c, vec3(0.22, 0.58, 0.32), smoothstep(0.35, 0.60, h));
+    c = mix(c, vec3(0.12, 0.45, 0.58), smoothstep(0.60, 0.85, h));
+    return c;
+  }
+
+  void main() {
+    vec3 n = normalize(vNormalW);
+    vec3 vdir = normalize(cameraPosition - vPosW);
+    vec3 dir = normalize(vPosW);
+    float ndl = dot(n, uSunDir);
+    float day = smoothstep(-0.18, 0.28, ndl);
+    float ice = smoothstep(0.80, 0.875, abs(dir.y));
+
+    vec3 albedo;
+    float spec = 0.0;
+
+    if (uMode < 0.5) {
+      /* ---- day-night map ---- */
+      if (vElev < uSeaLevel) {
+        float depth = clamp((uSeaLevel - vElev) / 0.55, 0.0, 1.0);
+        albedo = mix(vec3(0.16, 0.52, 0.63), vec3(0.02, 0.10, 0.30), depth);
+        vec3 h = normalize(uSunDir + vdir);
+        spec = pow(max(dot(n, h), 0.0), 140.0) * day;
+        albedo = mix(albedo, vec3(0.88, 0.93, 0.97), ice); // polar ice caps
+        spec *= 1.0 - ice * 0.85;
+      } else {
+        float m = clamp(vElev / 0.55, 0.0, 1.0);
+        vec3 sand   = vec3(0.78, 0.71, 0.50);
+        vec3 grass  = vec3(0.23, 0.50, 0.20);
+        vec3 forest = vec3(0.11, 0.30, 0.13);
+        vec3 rock   = vec3(0.40, 0.36, 0.33);
+        vec3 snow   = vec3(0.93, 0.95, 0.98);
+        albedo = mix(sand,  grass,  smoothstep(0.004, 0.06, m));
+        albedo = mix(albedo, forest, smoothstep(0.06, 0.17, m));
+        albedo = mix(albedo, rock,   smoothstep(0.17, 0.36, m));
+        albedo = mix(albedo, snow,   smoothstep(0.38, 0.56, m));
+        albedo = mix(albedo, albedo * vec3(0.72, 0.95, 0.72),
+                     vHumid * 0.35 * (1.0 - smoothstep(0.05, 0.30, m))); // lush lowlands
+        albedo = mix(albedo, snow, smoothstep(0.88, 0.93, abs(dir.y)));  // polar caps
+      }
+      vec3 dayCol   = albedo * (0.10 + 1.08 * max(ndl, 0.0));
+      vec3 nightCol = albedo * vec3(0.045, 0.07, 0.15);
+      vec3 col = mix(nightCol, dayCol, day);
+      col += spec * vec3(1.0, 0.96, 0.82) * 1.4;                       // sun glint on ocean
+      col += vec3(0.10, 0.04, 0.01) * smoothstep(0.22, 0.0, abs(ndl)) * 0.6; // warm terminator
+      float fres = pow(1.0 - max(dot(n, vdir), 0.0), 3.0);
+      col += fres * day * vec3(0.16, 0.36, 0.62) * 0.5;               // limb haze
+      gl_FragColor = vec4(col, 1.0);
+    } else if (uMode < 1.5) {
+      /* ---- temperature map ---- */
+      albedo = (vElev < uSeaLevel)
+        ? mix(vec3(0.03, 0.16, 0.38), vec3(0.85, 0.92, 0.97), ice)
+        : tempRamp(vTemp);
+      gl_FragColor = vec4(albedo * (0.72 + 0.45 * max(ndl, 0.0)), 1.0);
+    } else {
+      /* ---- humidity map ---- */
+      albedo = (vElev < uSeaLevel)
+        ? vec3(0.05, 0.30, 0.60)
+        : humidRamp(vHumid);
+      gl_FragColor = vec4(albedo * (0.72 + 0.45 * max(ndl, 0.0)), 1.0);
+    }
+  }
+`;
+
+const planetGroup = new THREE.Group(); // tilted axis for style
+planetGroup.rotation.z = 0.12;
+scene.add(planetGroup);
+
+const planetMat = new THREE.ShaderMaterial({
+  uniforms: planetUniforms,
+  vertexShader: planetVert,
+  fragmentShader: planetFrag,
+});
+
+let planetMesh = null;
+
+function rebuildPlanet() {
+  noiseElev = makePerlin3D(state.seed);
+  noiseTemp  = makePerlin3D(state.seed ^ 0x9e3779b9);
+  noiseHumid = makePerlin3D(state.seed ^ 0x51ab3d51);
+
+  const geo = new THREE.SphereGeometry(1, 256, 256);
+  const pos = geo.attributes.position;
+  const count = pos.count;
+  const elev = new Float32Array(count);
+  const temp = new Float32Array(count);
+  const humid = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const len = Math.hypot(x, y, z) || 1;
+    x /= len; y /= len; z /= len;
+
+    const e = elevationAt(x, y, z);
+    const h = e > 0 ? e * 0.08 : e * 0.035; // mountains taller than ocean depth
+    pos.setXYZ(i, x * (1 + h), y * (1 + h), z * (1 + h));
+    elev[i] = e;
+
+    const lat = Math.abs(y);
+    let t = 1.0 - Math.pow(lat, 1.35) * 1.08 - Math.max(0, e) * 0.85
+          + fbm(noiseTemp, x * 2.3 + 7.3, y * 2.3 + 7.3, z * 2.3 + 7.3, 4, 0.5, 2.0) * 0.14;
+    temp[i] = clamp01(t);
+
+    let hu = 0.5 + 0.5 * fbm(noiseHumid, x * 2.9 + 3.1, y * 2.9 + 3.1, z * 2.9 + 3.1, 5, 0.55, 2.0);
+    hu *= e < state.seaLevel ? 1.18 : 0.88; // wetter near the coasts
+    humid[i] = clamp01(hu);
+  }
+
+  geo.setAttribute('aElev',  new THREE.BufferAttribute(elev, 1));
+  geo.setAttribute('aTemp',  new THREE.BufferAttribute(temp, 1));
+  geo.setAttribute('aHumid', new THREE.BufferAttribute(humid, 1));
+  geo.computeVertexNormals();
+
+  elevations = elev;
+
+  if (planetMesh) {
+    planetMesh.geometry.dispose();
+    planetMesh.geometry = geo;
+  } else {
+    planetMesh = new THREE.Mesh(geo, planetMat);
+    planetGroup.add(planetMesh);
+  }
+  updateStats();
+}
+
+/* ============ Atmosphere (fresnel halo) ============ */
+
+const atmoUniforms = {
+  uSunDir: { value: planetUniforms.uSunDir.value },
+};
+
+const atmoMat = new THREE.ShaderMaterial({
+  uniforms: atmoUniforms,
+  vertexShader: /* glsl */`
+    varying vec3 vNormalW;
+    varying vec3 vPosW;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vPosW = wp.xyz;
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform vec3 uSunDir;
+    varying vec3 vNormalW;
+    varying vec3 vPosW;
+    void main() {
+      vec3 n = normalize(vNormalW);
+      vec3 v = normalize(cameraPosition - vPosW);
+      float rim = pow(1.0 - abs(dot(n, v)), 2.8);
+      float day = smoothstep(-0.35, 0.5, dot(n, uSunDir));
+      vec3 col = mix(vec3(0.02, 0.04, 0.10), vec3(0.35, 0.55, 0.95), day);
+      gl_FragColor = vec4(col * rim * 1.7, 1.0);
+    }
+  `,
+  side: THREE.BackSide,
+  blending: THREE.AdditiveBlending,
+  transparent: true,
+  depthWrite: false,
+});
+
+const atmoMesh = new THREE.Mesh(new THREE.SphereGeometry(1.30, 64, 64), atmoMat);
+atmoMesh.renderOrder = 2;
+scene.add(atmoMesh);
+
+/* ============ Sun (glow sprite) ============ */
+
+function makeSunTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  g.addColorStop(0.0, 'rgba(255,245,220,1)');
+  g.addColorStop(0.2, 'rgba(255,220,150,0.8)');
+  g.addColorStop(0.5, 'rgba(255,180,80,0.25)');
+  g.addColorStop(1.0, 'rgba(255,160,60,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: makeSunTexture(),
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+}));
+sunSprite.scale.set(9, 9, 1);
+sunSprite.renderOrder = 3;
+scene.add(sunSprite);
+
+/* ============ Starfield ============ */
+
+function buildStars() {
+  const N = 2500;
+  const positions = new Float32Array(N * 3);
+  const rand = mulberry32(0xC0FFEE);
+  for (let i = 0; i < N; i++) {
+    const v = new THREE.Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1)
+      .normalize().multiplyScalar(40 + rand() * 50);
+    positions.set([v.x, v.y, v.z], i * 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.4, sizeAttenuation: true,
+    transparent: true, opacity: 0.9, depthWrite: false,
+  });
+  scene.add(new THREE.Points(geo, mat));
+}
+buildStars();
+
+/* ============ UI wiring ============ */
+
+const $ = id => document.getElementById(id);
+let rebuildPending = false;
+
+function updateStats() {
+  $('seedVal').textContent = state.seed;
+  $('landVal').textContent = (landFraction() * 100).toFixed(1) + '%';
+}
+
+function landFraction() {
+  if (!elevations) return 0;
+  let c = 0;
+  for (let i = 0; i < elevations.length; i++) if (elevations[i] > state.seaLevel) c++;
+  return c / elevations.length;
+}
+
+function setMode(m) {
+  state.mode = m;
+  planetUniforms.uMode.value = m;
+  document.querySelectorAll('#modeSeg button').forEach(b =>
+    b.classList.toggle('active', +b.dataset.mode === m));
+  document.querySelectorAll('.legend-item').forEach(el =>
+    el.classList.toggle('show', +el.dataset.mode === m));
+}
+
+function regenerate() {
+  state.seed = (Math.random() * 1e9) | 0;
+  rebuildPlanet();
+}
+
+$('regenBtn').addEventListener('click', regenerate);
+
+$('rough').addEventListener('input', e => {
+  state.roughness = +e.target.value;
+  $('roughVal').textContent = state.roughness.toFixed(2);
+  rebuildPending = true; // roughness reshapes terrain; applied once per frame
+});
+
+$('sea').addEventListener('input', e => {
+  state.seaLevel = +e.target.value;
+  $('seaVal').textContent = state.seaLevel.toFixed(3);
+  planetUniforms.uSeaLevel.value = state.seaLevel;
+  updateStats();
+});
+
+$('rot').addEventListener('input', e => {
+  state.rotSpeed = +e.target.value;
+  $('rotVal').textContent = state.rotSpeed.toFixed(2) + '×';
+});
+
+$('cycleToggle').addEventListener('change', e => { state.cycle = e.target.checked; });
+$('atmoToggle').addEventListener('change', e => { atmoMesh.visible = e.target.checked; });
+
+document.querySelectorAll('#modeSeg button').forEach(b =>
+  b.addEventListener('click', () => setMode(+b.dataset.mode)));
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') regenerate();
+  if (e.key === '1') setMode(0);
+  if (e.key === '2') setMode(1);
+  if (e.key === '3') setMode(2);
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ============ Animation loop ============ */
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (rebuildPending) { // terrain morph, at most once per frame
+    rebuildPending = false;
+    rebuildPlanet();
+  }
+
+  // rotation
+  planetGroup.rotation.y += dt * 0.12 * state.rotSpeed;
+
+  // day–night cycle: orbit the sun around the equator plane
+  if (state.cycle) state.sunAngle += dt * 0.3;
+  const sunDir = planetUniforms.uSunDir.value;
+  sunDir.set(Math.cos(state.sunAngle), 0.22, Math.sin(state.sunAngle)).normalize();
+  sunSprite.position.copy(sunDir).multiplyScalar(28);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+rebuildPlanet();
+animate();
+</script>
+</body>
+</html>

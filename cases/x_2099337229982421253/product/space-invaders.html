@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Space Invaders · 太空侵略者</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(ellipse at center, #0a0f1e 0%, #000 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Courier New", monospace;
+    overflow: hidden;
+  }
+  #wrap { position: relative; }
+  canvas {
+    background: #000;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 0 50px rgba(57, 255, 106, 0.18), 0 0 0 2px #123a24;
+    border-radius: 6px;
+    max-width: 96vw;
+    max-height: 86vh;
+  }
+  /* CRT 扫描线效果 */
+  #wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 6px;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px);
+  }
+  #hint {
+    color: #39ff6a;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 10px;
+    opacity: 0.65;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px rgba(57,255,106,0.5);
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="800" height="600"></canvas>
+  <div id="hint">← → / A D 移动 · SPACE 射击 · P 暂停 · M 静音</div>
+</div>
+
+<script>
+'use strict';
+
+/* ================= 基础工具 ================= */
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const rand  = (a, b) => a + Math.random() * (b - a);
+const irand = (a, b) => Math.floor(rand(a, b + 1));
+const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/* ================= 画布 ================= */
+const W = 800, H = 600;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+/* ================= 音效（WebAudio 合成，无外部资源） ================= */
+let AC = null, muted = false;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f0, f1, dur, type, vol) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g).connect(ac.destination);
+  o.start();
+  o.stop(ac.currentTime + dur);
+}
+const sfx = {
+  shoot:     () => tone(900, 200, 0.12, 'square',   0.04),
+  invHit:    () => tone(400, 60,  0.15, 'sawtooth', 0.05),
+  playerHit: () => tone(220, 40,  0.50, 'sawtooth', 0.07),
+  ufo:       () => tone(1200, 900, 0.30, 'sine',     0.03),
+  step: i => tone([100, 95, 90, 85][i % 4], 50, 0.07, 'square', 0.035),
+};
+
+/* ================= 像素精灵 ================= */
+const PX = 3; // 每个精灵像素对应 3x3 画布像素
+const SPRITES = {
+  squid1: [
+    '...XX...',
+    '..XXXX..',
+    '.XXXXXX.',
+    'XX.XX.XX',
+    'XXXXXXXX',
+    '..X..X..',
+    '.X.XX.X.',
+    'X.X..X.X',
+  ],
+  squid2: [
+    '...XX...',
+    '..XXXX..',
+    '.XXXXXX.',
+    'XX.XX.XX',
+    'XXXXXXXX',
+    '.X.XX.X.',
+    'X......X',
+    '.X....X.',
+  ],
+  crab1: [
+    '..X.....X..',
+    '...X...X...',
+    '..XXXXXXX..',
+    '.XX.XXX.XX.',
+    'XXXXXXXXXXX',
+    'X.XXXXXXX.X',
+    'X.X.....X.X',
+    '...XX.XX...',
+  ],
+  crab2: [
+    '..X.....X..',
+    'X..X...X..X',
+    'X.XXXXXXX.X',
+    'XXX.XXX.XXX',
+    'XXXXXXXXXXX',
+    '.XXXXXXXXX.',
+    '..X.....X..',
+    '.X.......X.',
+  ],
+  octo1: [
+    '....XXXX....',
+    '.XXXXXXXXXX.',
+    'XXXXXXXXXXXX',
+    'XXX..XX..XXX',
+    'XXXXXXXXXXXX',
+    '...XX..XX...',
+    '..XX.XX.XX..',
+    'XX........XX',
+  ],
+  octo2: [
+    '....XXXX....',
+    '.XXXXXXXXXX.',
+    'XXXXXXXXXXXX',
+    'XXX..XX..XXX',
+    'XXXXXXXXXXXX',
+    '..XXX..XXX..',
+    '.XX..XX..XX.',
+    '..XX....XX..',
+  ],
+  player: [
+    '......X......',
+    '.....XXX.....',
+    '.....XXX.....',
+    '.XXXXXXXXXXX.',
+    'XXXXXXXXXXXXX',
+    'XXXXXXXXXXXXX',
+    'XXXXXXXXXXXXX',
+    'XXXXXXXXXXXXX',
+  ],
+  ufo1: [
+    '.....XXXX.....',
+    '...XXXXXXX....',
+    '..XXXXXXXXX...',
+    '.XX.XX.XX.XX..',
+    'XXXXXXXXXXXXX.',
+    '..XXX...XXX...',
+  ],
+};
+function drawSprite(map, x, y, color) {
+  ctx.fillStyle = color;
+  for (let r = 0; r < map.length; r++) {
+    const row = map[r];
+    for (let c = 0; c < row.length; c++) {
+      if (row[c] === 'X') ctx.fillRect(x + c * PX, y + r * PX, PX, PX);
+    }
+  }
+}
+
+/* ================= 游戏状态 ================= */
+const G = {
+  state: 'menu',        // menu | playing | dying | levelclear | paused | gameover
+  score: 0,
+  hi: +(localStorage.getItem('si-hi') || 0),
+  lives: 3,
+  level: 1,
+  t: 0, stateT: 0,
+  shake: 0,
+  stepIdx: 0,
+  newRecord: false,
+};
+
+/* ================= 玩家 ================= */
+const PLAYER_Y = 556, LAND_LINE = 548;
+const player = { x: W / 2 - 19, y: PLAYER_Y, w: 39, h: 24, speed: 320, inv: 0, alive: true };
+let playerBullet = null;
+let alienBullets = [];
+
+/* ================= 外星人军团 ================= */
+const ROWS = 5, COLS = 11, TOTAL = ROWS * COLS;
+const AX = 48, AY = 36;                 // 网格间距
+const ROW_PTS  = [30, 20, 20, 10, 10];
+const ROW_TYPE = ['squid', 'crab', 'crab', 'octo', 'octo'];
+const ROW_COLOR = ['#ff5fa2', '#b26bff', '#3dff73', '#3dff73', '#4dd8ff'];
+const rowColor = r => ROW_COLOR[r];
+
+let aliens = [];
+let gridX = 0, gridY = 100, gridDir = 1, animFrame = 0, moveTimer = 0, shootT = 1;
+
+function makeAliens() {
+  aliens = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const type = ROW_TYPE[r];
+      const map = SPRITES[type + '1'];
+      aliens.push({
+        row: r, col: c, type,
+        pts: ROW_PTS[r],
+        w: map[0].length * PX, h: map.length * PX,
+        alive: true,
+      });
+    }
+  }
+  gridX = (W - (COLS - 1) * AX) / 2;
+  gridY = 100;
+  gridDir = 1;
+  animFrame = 0;
+  moveTimer = 0;
+}
+function alienPos(a) {
+  // 精灵在 36px 宽的格子内居中
+  return { x: gridX + a.col * AX + (36 - a.w) / 2, y: gridY + a.row * AY };
+}
+function alienInterval() {
+  const alive = aliens.reduce((n, a) => n + (a.alive ? 1 : 0), 0);
+  const base = Math.max(0.3, 0.95 - (G.level - 1) * 0.07);
+  return Math.max(0.02, base * Math.pow(alive / TOTAL, 1.15));
+}
+function stepAliens() {
+  animFrame ^= 1;
+  sfx.step(G.stepIdx++);
+  const alive = aliens.filter(a => a.alive);
+  if (!alive.length) return;
+  let minX = 1e9, maxX = -1e9;
+  for (const a of alive) {
+    const p = alienPos(a);
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x + a.w);
+  }
+  const step = gridDir * 12;
+  if ((gridDir > 0 && maxX + step > W - 10) || (gridDir < 0 && minX + step < 10)) {
+    gridDir *= -1;
+    gridY += 18; // 触底边则下坠并转向
+  } else {
+    gridX += step;
+  }
+  // 外星人碾过掩体时将其啃掉
+  for (const a of alive) {
+    const p = alienPos(a);
+    if (p.y + a.h > BUNKER_TOP) bunkerEatRect(p.x, p.y, a.w, a.h);
+  }
+}
+function fireAlienBullet() {
+  const byCol = new Map();
+  for (const a of aliens) {
+    if (!a.alive) continue;
+    const cur = byCol.get(a.col);
+    if (!cur || a.row > cur.row) byCol.set(a.col, a.col === a.col ? a : a);
+    if (!cur || a.row > cur.row) byCol.set(a.col, a);
+  }
+  if (!byCol.size) return;
+  const shooters = [...byCol.values()];
+  const a = shooters[irand(0, shooters.length - 1)];
+  const p = alienPos(a);
+  alienBullets.push({
+    x: p.x + a.w / 2 - 1.5, y: p.y + a.h,
+    w: 3, h: 10,
+    vy: 170 + G.level * 12,
+  });
+}
+function shootInterval() {
+  const alive = aliens.reduce((n, a) => n + (a.alive ? 1 : 0), 0);
+  const f = 0.5 + 0.5 * (alive / TOTAL);
+  return Math.max(0.22, rand(0.45, 1.2) * f * Math.max(0.35, 1 - (G.level - 1) * 0.08));
+}
+function maxAlienBullets() { return Math.min(6, 3 + G.level); }
+
+/* ================= 掩体（4 个，可被逐格摧毁） ================= */
+const BUNKER_TOP = 500, BUNKER_CELL = 3, BUNKER_COLS = 22, BUNKER_ROWS = 14;
+let bunkers = [];
+function makeBunkers() {
+  bunkers = [];
+  for (let b = 0; b < 4; b++) {
+    const grid = new Uint8Array(BUNKER_COLS * BUNKER_ROWS);
+    for (let r = 0; r < BUNKER_ROWS; r++) {
+      for (let c = 0; c < BUNKER_COLS; c++) {
+        const cx = BUNKER_COLS / 2 - 0.5;
+        if (r > 9 && Math.abs(c - cx) < (r - 8)) continue; // 底部拱形缺口
+        grid[r * BUNKER_COLS + c] = 1;
+      }
+    }
+    const cv = document.createElement('canvas');
+    cv.width = BUNKER_COLS * BUNKER_CELL;
+    cv.height = BUNKER_ROWS * BUNKER_CELL;
+    bunkers.push({ x: 90 + b * 170, y: BUNKER_TOP, grid, cv, dirty: true });
+  }
+}
+function redrawBunker(b) {
+  const c = b.cv.getContext('2d');
+  c.clearRect(0, 0, b.cv.width, b.cv.height);
+  c.fillStyle = '#39ff6a';
+  for (let r = 0; r < BUNKER_ROWS; r++) {
+    for (let col = 0; col < BUNKER_COLS; col++) {
+      if (b.grid[r * BUNKER_COLS + col]) c.fillRect(col * BUNKER_CELL, r * BUNKER_CELL, BUNKER_CELL, BUNKER_CELL);
+    }
+  }
+}
+function bunkerEatRect(x, y, w, h) { // 外星矩形碾过，整片清除
+  for (const b of bunkers) {
+    const c0 = Math.max(0, Math.floor((x - b.x) / BUNKER_CELL));
+    const c1 = Math.min(BUNKER_COLS - 1, Math.floor((x + w - b.x) / BUNKER_CELL));
+    const r0 = Math.max(0, Math.floor((y - b.y) / BUNKER_CELL));
+    const r1 = Math.min(BUNKER_ROWS - 1, Math.floor((y + h - b.y) / BUNKER_CELL));
+    let dirty = false;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      if (b.grid[r * BUNKER_COLS + c]) { b.grid[r * BUNKER_COLS + c] = 0; dirty = true; }
+    }
+    if (dirty) b.dirty = true;
+  }
+}
+function bunkerHitAt(px, py, rad) { // 子弹点伤害，rad 以格为单位
+  for (const b of bunkers) {
+    const ccx = (px - b.x) / BUNKER_CELL, ccy = (py - b.y) / BUNKER_CELL;
+    const r0 = Math.max(0, Math.floor(ccy - rad)), r1 = Math.min(BUNKER_ROWS - 1, Math.ceil(ccy + rad));
+    const c0 = Math.max(0, Math.floor(ccx - rad)), c1 = Math.min(BUNKER_COLS - 1, Math.ceil(ccx + rad));
+    let dirty = false;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const dx = c + 0.5 - ccx, dy = r + 0.5 - ccy;
+      if (dx * dx + dy * dy <= rad * rad && b.grid[r * BUNKER_COLS + c]) {
+        b.grid[r * BUNKER_COLS + c] = 0; dirty = true;
+      }
+    }
+    if (dirty) b.dirty = true;
+  }
+}
+
+/* ================= UFO 奖励船 ================= */
+const ufo = { active: false, spawnT: rand(15, 25), x: 0, y: 44, w: 42, h: 18, dir: 1, bonus: 100 };
+function updateUfo(dt) {
+  if (!ufo.active) {
+    ufo.spawnT -= dt;
+    if (ufo.spawnT <= 0) {
+      ufo.active = true;
+      ufo.dir = Math.random() < 0.5 ? 1 : -1;
+      ufo.x = ufo.dir > 0 ? -ufo.w : W;
+      ufo.bonus = [50, 100, 100, 150, 300][irand(0, 4)];
+      sfx.ufo();
+    }
+  } else {
+    ufo.x += ufo.dir * 130 * dt;
+    if (ufo.x < -ufo.w - 10 || ufo.x > W + 10) { ufo.active = false; ufo.spawnT = rand(18, 26); }
+  }
+}
+
+/* ================= 粒子 & 飘字 ================= */
+let particles = [], texts = [];
+function explode(x, y, color, n, power = 220) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), sp = rand(30, power);
+    const life = rand(0.3, 0.8);
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, life, max: life, color, size: irand(2, 4) });
+  }
+}
+function addScore(pts, x, y) {
+  G.score += pts;
+  texts.push({ x, y, txt: '+' + pts, life: 1, color: '#fff' });
+  if (G.score > G.hi) { G.hi = G.score; localStorage.setItem('si-hi', G.hi); }
+}
+
+/* ================= 流程控制 ================= */
+function startGame() {
+  G.score = 0; G.lives = 3; G.level = 1;
+  makeAliens(); makeBunkers();
+  player.x = W / 2 - player.w / 2; player.alive = true; player.inv = 0;
+  playerBullet = null; alienBullets = [];
+  particles = []; texts = [];
+  ufo.active = false; ufo.spawnT = rand(15, 25);
+  shootT = 1; moveTimer = 0;
+  G.shake = 0; G.newRecord = false;
+  G.state = 'playing'; G.stateT = 0;
+}
+function levelClear() {
+  playerBullet = null;
+  G.state = 'levelclear'; G.stateT = 0;
+}
+function playerDie() {
+  explode(player.x + player.w / 2, player.y + player.h / 2, '#39ff6a', 30, 260);
+  explode(player.x + player.w / 2, player.y + player.h / 2, '#ffffff', 12, 180);
+  sfx.playerHit();
+  G.shake = 0.5;
+  G.lives--;
+  alienBullets = [];
+  player.alive = false;
+  G.state = 'dying'; G.stateT = 0;
+}
+function gameOver() {
+  G.newRecord = G.score > 0 && G.score >= G.hi;
+  G.state = 'gameover'; G.stateT = 0;
+}
+
+/* ================= 更新逻辑 ================= */
+function updatePlaying(dt) {
+  // 玩家移动
+  if (player.alive) {
+    if (keys['ArrowLeft'] || keys['KeyA']) player.x -= player.speed * dt;
+    if (keys['ArrowRight'] || keys['KeyD']) player.x += player.speed * dt;
+    player.x = clamp(player.x, 8, W - 8 - player.w);
+    if (player.inv > 0) player.inv -= dt;
+    if (keys['Space'] && !playerBullet) {
+      playerBullet = { x: player.x + player.w / 2 - 1.5, y: player.y - 12, w: 3, h: 12, vy: -560 };
+      sfx.shoot();
+    }
+  }
+
+  // 外星人步进（越少越快）
+  moveTimer += dt;
+  const iv = alienInterval();
+  let guard = 0;
+  while (moveTimer >= iv && guard++ < 5) {
+    moveTimer -= iv;
+    stepAliens();
+    if (G.state !== 'playing') return;
+  }
+
+  // 着陆判定
+  let maxB = 0;
+  for (const a of aliens) {
+    if (!a.alive) continue;
+    const p = alienPos(a);
+    if (p.y + a.h > maxB) maxB = p.y + a.h;
+  }
+  if (maxB >= LAND_LINE) { gameOver(); return; }
+
+  // 外星人开火（每列最底部的外星人）
+  shootT -= dt;
+  if (shootT <= 0) {
+    if (alienBullets.length < maxAlienBullets()) fireAlienBullet();
+    shootT = shootInterval();
+  }
+
+  // 玩家子弹
+  if (playerBullet) {
+    const b = playerBullet;
+    b.y += b.vy * dt;
+    if (b.y + b.h < 0) {
+      playerBullet = null;
+    } else {
+      for (const a of aliens) { // 命中外星人
+        if (!a.alive) continue;
+        const p = alienPos(a);
+        if (overlap(b, { x: p.x, y: p.y, w: a.w, h: a.h })) {
+          a.alive = false;
+          playerBullet = null;
+          addScore(a.pts, p.x + a.w / 2, p.y);
+          explode(p.x + a.w / 2, p.y + a.h / 2, rowColor(a.row), 14);
+          sfx.invHit();
+          if (aliens.every(x => !x.alive)) levelClear();
+          break;
+        }
+      }
+      if (playerBullet && ufo.active && overlap(b, ufo)) { // 命中 UFO
+        playerBullet = null;
+        addScore(ufo.bonus, ufo.x + ufo.w / 2, ufo.y);
+        explode(ufo.x + ufo.w / 2, ufo.y + ufo.h / 2, '#ff5fa2', 20);
+        sfx.ufo();
+        ufo.active = false; ufo.spawnT = rand(18, 26);
+      }
+      if (playerBullet && bunkerHitAt(b.x + b.w / 2, b.y, 2.5)) playerBullet = null;
+      if (playerBullet) { // 子弹对撞抵消
+        for (let i = alienBullets.length - 1; i >= 0; i--) {
+          if (overlap(b, alienBullets[i])) {
+            explode(b.x, b.y, '#ffffff', 6, 80);
+            alienBullets.splice(i, 1);
+            playerBullet = null;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 清场等同帧内不再处理剩余子弹，避免状态被覆盖导致软卡死
+  if (G.state !== 'playing') return;
+
+  // 外星子弹
+  for (let i = alienBullets.length - 1; i >= 0; i--) {
+    const b = alienBullets[i];
+    b.y += b.vy * dt;
+    if (b.y > H + 20) { alienBullets.splice(i, 1); continue; }
+    if (bunkerHitAt(b.x + b.w / 2, b.y + b.h, 2.5)) { alienBullets.splice(i, 1); continue; }
+    if (player.alive && player.inv <= 0 && overlap(b, player)) {
+      alienBullets.splice(i, 1);
+      playerDie();
+      return;
+    }
+  }
+
+  updateUfo(dt);
+}
+
+function update(dt) {
+  G.t += dt;
+  G.stateT += dt;
+  if (G.shake > 0) G.shake -= dt * 1.5;
+
+  switch (G.state) {
+    case 'playing':
+      updatePlaying(dt);
+      break;
+    case 'dying':
+      if (G.stateT > 1.4) {
+        if (G.lives <= 0) gameOver();
+        else {
+          player.alive = true;
+          player.x = W / 2 - player.w / 2;
+          player.inv = 2.5;
+          G.state = 'playing';
+        }
+      }
+      break;
+    case 'levelclear':
+      if (G.stateT > 2.2) {
+        G.level++;
+        makeAliens();
+        makeBunkers();
+        player.x = W / 2 - player.w / 2;
+        playerBullet = null;
+        G.state = 'playing';
+      }
+      break;
+    default:
+      break;
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 300 * dt;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const t = texts[i];
+    t.y -= 24 * dt;
+    t.life -= dt;
+    if (t.life <= 0) texts.splice(i, 1);
+  }
+}
+
+/* ================= 渲染 ================= */
+const stars = [];
+for (let i = 0; i < 90; i++) {
+  stars.push({ x: rand(0, W), y: rand(0, H), z: Math.random() < 0.8 ? 1 : 2, tw: rand(0.5, 2), ph: rand(0, 6.28) });
+}
+
+function drawAliens() {
+  for (const a of aliens) {
+    if (!a.alive) continue;
+    const p = alienPos(a);
+    drawSprite(SPRITES[a.type + (animFrame + 1)], p.x, p.y, rowColor(a.row));
+  }
+}
+function drawPlayer() {
+  if (!player.alive) return;
+  if (player.inv > 0 && Math.floor(G.t * 12) % 2 === 0) return; // 无敌闪烁
+  drawSprite(SPRITES.player, player.x, player.y, '#39ff6a');
+}
+function drawBullets() {
+  if (playerBullet) {
+    const b = playerBullet;
+    ctx.fillStyle = '#eaffea';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = '#39ff6a';
+    ctx.fillRect(b.x + 1, b.y + 2, 1, b.h - 4);
+  }
+  ctx.fillStyle = '#ff5f5f';
+  const ph = Math.floor(G.t * 12) % 2;
+  for (const b of alienBullets) {
+    ctx.fillRect(b.x + (ph ? 1 : -1), b.y, 3, 3);
+    ctx.fillRect(b.x - (ph ? 1 : -1) + 1, b.y + 3, 3, 3);
+    ctx.fillRect(b.x + (ph ? 1 : -1), b.y + 6, 3, 3);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawTexts() {
+  ctx.font = 'bold 13px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const t of texts) {
+    ctx.globalAlpha = clamp(t.life, 0, 1);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.txt, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawHUD() {
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 16px "Courier New", monospace';
+  ctx.fillStyle = '#eaffea';
+  ctx.textAlign = 'left';
+  ctx.fillText('SCORE', 30, 12);
+  ctx.fillText(String(G.score).padStart(5, '0'), 30, 32);
+  ctx.textAlign = 'center';
+  ctx.fillText('HI-SCORE', W / 2, 12);
+  ctx.fillText(String(G.hi).padStart(5, '0'), W / 2, 32);
+  ctx.textAlign = 'right';
+  ctx.fillText('WAVE', W - 30, 12);
+  ctx.fillText(String(G.level).padStart(2, '0'), W - 30, 32);
+  for (let i = 0; i < G.lives; i++) drawSprite(SPRITES.player, 30 + i * 48, H - 26, '#39ff6a');
+}
+function drawCenter(title, sub) {
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#39ff6a';
+  ctx.font = 'bold 32px "Courier New", monospace';
+  ctx.fillText(title, W / 2, H / 2 - 30);
+  ctx.fillStyle = '#eaffea';
+  ctx.font = '16px "Courier New", monospace';
+  ctx.fillText(sub, W / 2, H / 2 + 16);
+}
+function drawMenu() {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#39ff6a';
+  ctx.font = 'bold 44px "Courier New", monospace';
+  ctx.fillText('SPACE', W / 2, 100);
+  ctx.fillText('INVADERS', W / 2, 152);
+  ctx.font = 'bold 15px "Courier New", monospace';
+  ctx.fillStyle = '#eaffea';
+  ctx.fillText('* SCORE ADVANCE TABLE *', W / 2, 226);
+  const rows = [
+    ['ufo1',   '=? MYSTERY',  '#ff5fa2'],
+    ['squid1', '= 30 POINTS', '#ff5fa2'],
+    ['crab1',  '= 20 POINTS', '#b26bff'],
+    ['octo1',  '= 10 POINTS', '#4dd8ff'],
+  ];
+  let y = 266;
+  for (const [spr, label, col] of rows) {
+    drawSprite(SPRITES[spr], W / 2 - 150, y, col);
+    ctx.fillStyle = col;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, W / 2 - 104, y + 4);
+    y += 42;
+  }
+  ctx.textAlign = 'center';
+  if (Math.floor(G.t * 2) % 2 === 0) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px "Courier New", monospace';
+    ctx.fillText('PRESS ENTER OR SPACE TO START', W / 2, y + 36);
+  }
+  ctx.fillStyle = '#39ff6a';
+  ctx.font = '12px "Courier New", monospace';
+  ctx.fillText('← → / A D 移动 · SPACE 射击 · P 暂停 · M 静音', W / 2, H - 28);
+}
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ff5f5f';
+  ctx.font = 'bold 40px "Courier New", monospace';
+  ctx.fillText('GAME OVER', W / 2, 210);
+  ctx.fillStyle = '#eaffea';
+  ctx.font = '18px "Courier New", monospace';
+  ctx.fillText('SCORE  ' + G.score, W / 2, 292);
+  ctx.fillText('HI-SCORE  ' + G.hi, W / 2, 322);
+  if (G.newRecord && Math.floor(G.t * 2) % 2 === 0) {
+    ctx.fillStyle = '#ffd23f';
+    ctx.font = 'bold 18px "Courier New", monospace';
+    ctx.fillText('★ NEW RECORD ★', W / 2, 356);
+  }
+  if (Math.floor(G.t * 2) % 2 === 0) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px "Courier New", monospace';
+    ctx.fillText('PRESS ENTER TO PLAY AGAIN', W / 2, 430);
+  }
+}
+
+function render() {
+  ctx.save();
+  if (G.shake > 0) {
+    const s = G.shake * 8;
+    ctx.translate(rand(-s, s), rand(-s, s));
+  }
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-20, -20, W + 40, H + 40);
+
+  for (const s of stars) { // 闪烁星空
+    const a = 0.25 + 0.55 * Math.abs(Math.sin(G.t * s.tw + s.ph));
+    ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
+    ctx.fillRect(s.x, s.y, s.z, s.z);
+  }
+
+  if (G.state !== 'menu') {
+    for (const b of bunkers) {
+      if (b.dirty) { redrawBunker(b); b.dirty = false; }
+      ctx.drawImage(b.cv, b.x, b.y);
+    }
+    if (ufo.active) drawSprite(SPRITES.ufo1, ufo.x, ufo.y, '#ff5fa2');
+    drawAliens();
+    drawPlayer();
+    drawBullets();
+  }
+  drawParticles();
+  drawTexts();
+  if (G.state !== 'menu') drawHUD();
+
+  if (G.state === 'menu') drawMenu();
+  else if (G.state === 'gameover') drawGameOver();
+  else if (G.state === 'paused') drawCenter('PAUSED', '按 P 继续游戏');
+  else if (G.state === 'levelclear') drawCenter('SECTOR CLEAR!', 'WAVE ' + (G.level + 1) + ' INCOMING');
+
+  ctx.restore();
+}
+
+/* ================= 输入 ================= */
+const keys = {};
+addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keys[e.code] = true;
+  audio(); // 首次按键解锁 AudioContext
+  if (e.code === 'KeyM') {
+    muted = !muted;
+  } else if (e.code === 'KeyP') {
+    if (G.state === 'playing') G.state = 'paused';
+    else if (G.state === 'paused') G.state = 'playing';
+  } else if (e.code === 'Enter' || e.code === 'Space') {
+    if (G.state === 'menu' || G.state === 'gameover') startGame();
+  }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ================= 主循环 ================= */
+let last = performance.now();
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  dt = Math.min(dt, 0.05);
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
