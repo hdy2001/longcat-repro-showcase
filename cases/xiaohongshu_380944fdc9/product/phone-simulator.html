@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>手机模拟器 · PhoneOS</title>
+<style>
+:root{
+  --bg0:#04120c; --bg1:#0a2a1b;
+  --panel:rgba(11,36,25,.80); --line:rgba(125,240,178,.16);
+  --mint:#7df0b2; --mint2:#4ade80; --gold:#d9b45b;
+  --ink:#e8f5ec; --ink-dim:#9db8a8; --red:#e05c5c; --green:#3ddc84;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(1100px 750px at 82% -12%, #11452d 0%, transparent 60%),
+    radial-gradient(900px 650px at -8% 112%, #0d3f2b 0%, transparent 55%),
+    linear-gradient(160deg,var(--bg1),var(--bg0));
+  overflow:hidden;
+}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(125,240,178,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(125,240,178,.045) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse at 50% 40%,black 30%,transparent 78%);
+}
+.page{display:flex;height:100vh;gap:26px;padding:26px;max-width:1340px;margin:0 auto;}
+/* ============ 左侧说明面板 ============ */
+.panel{width:372px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:24px;
+  padding:26px 26px 20px;backdrop-filter:blur(16px);display:flex;flex-direction:column;gap:16px;
+  box-shadow:0 34px 70px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);}
+.panel h1{font-size:26px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:12px;}
+.panel h1 .dot{width:12px;height:12px;border-radius:50%;background:var(--mint);box-shadow:0 0 14px var(--mint);}
+.panel .sub{color:var(--ink-dim);font-size:12.5px;letter-spacing:2.5px;margin-top:-10px;}
+.steps{list-style:none;display:flex;flex-direction:column;gap:10px;counter-reset:st;}
+.steps li{position:relative;background:rgba(125,240,178,.05);border:1px solid var(--line);
+  border-radius:14px;padding:11px 12px 11px 46px;font-size:13.5px;line-height:1.55;color:#cfe4d6;}
+.steps li b{color:var(--mint);font-weight:600;}
+.steps li::before{counter-increment:st;content:counter(st);position:absolute;left:11px;top:11px;
+  width:24px;height:24px;border-radius:8px;background:rgba(125,240,178,.14);color:var(--mint);
+  font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.steps kbd{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);border-radius:6px;
+  padding:1px 7px;font-size:11.5px;font-family:inherit;color:#fff;}
+.btnrow{display:flex;gap:10px;}
+.pbtn{flex:1;border:none;cursor:pointer;border-radius:14px;padding:13px 10px;font-size:14px;font-weight:600;
+  color:#062015;background:linear-gradient(135deg,#8df5bb,#4ade80);box-shadow:0 8px 20px rgba(74,222,128,.28);
+  transition:transform .15s,box-shadow .15s;font-family:inherit;}
+.pbtn:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(74,222,128,.36);}
+.pbtn:active{transform:translateY(0);}
+.pbtn.ghost{background:rgba(255,255,255,.07);color:var(--ink);border:1px solid rgba(255,255,255,.14);box-shadow:none;}
+.toggle{display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.22);
+  border:1px solid var(--line);border-radius:14px;padding:11px 14px;font-size:13.5px;color:#cfe4d6;}
+.switch{width:44px;height:24px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;cursor:pointer;transition:.25s;border:1px solid rgba(255,255,255,.12);}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.25s;}
+.switch.on{background:var(--mint2);}
+.switch.on::after{left:22px;}
+.status{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:14px;padding:11px 14px;font-size:13px;color:var(--ink-dim);}
+.status b{color:var(--gold);font-weight:600;}
+.panel .foot{margin-top:auto;font-size:11.5px;color:#6d8a7a;letter-spacing:1px;text-align:center;}
+/* ============ 手机 ============ */
+.stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;}
+.phone{width:338px;height:704px;flex:none;position:relative;}
+.phone::after{content:"";position:absolute;left:4%;right:4%;bottom:-46px;height:40px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.55),transparent 70%);filter:blur(6px);}
+.frame{position:absolute;inset:0;border-radius:58px;padding:10px;
+  background:linear-gradient(150deg,#3b4a42,#18241e 30%,#2c3a33 55%,#101a15 80%);
+  box-shadow:0 40px 90px rgba(0,0,0,.65), inset 0 1px 1px rgba(255,255,255,.25), inset 0 -2px 6px rgba(0,0,0,.6);}
+.frame::before{content:"";position:absolute;left:-3px;top:130px;width:4px;height:52px;border-radius:3px;background:#22302a;}
+.frame::after{content:"";position:absolute;right:-3px;top:150px;width:4px;height:86px;border-radius:3px;background:#22302a;}
+.screen{position:absolute;inset:10px;border-radius:48px;overflow:hidden;background:#081710;
+  box-shadow:inset 0 0 0 2px #000;}
+/* 壁纸 */
+.wall{position:absolute;inset:0;background:linear-gradient(165deg,#0d2b1e 0%,#123a28 38%,#1a4630 62%,#0e2c1f 100%);}
+.wall i{position:absolute;border-radius:50%;filter:blur(46px);opacity:.5;}
+.wall i:nth-child(1){width:70%;height:46%;left:-18%;top:-8%;background:#1e6b45;}
+.wall i:nth-child(2){width:60%;height:40%;right:-16%;top:22%;background:#0f5f5a;}
+.wall i:nth-child(3){width:76%;height:42%;left:6%;bottom:-14%;background:#6b4a2a;opacity:.34;}
+.wall i:nth-child(4){width:40%;height:26%;right:8%;bottom:16%;background:#274a6b;opacity:.3;}
+/* 状态栏 */
+.statusbar{position:absolute;top:0;left:0;right:0;height:46px;z-index:60;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 30px 6px;font-size:13.5px;font-weight:600;pointer-events:none;
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);}
+.statusbar .sright{display:flex;align-items:center;gap:6px;}
+.statusbar svg{display:block;}
+/* 锁屏 */
+.lock{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;
+  padding:74px 0 90px;transition:transform .45s cubic-bezier(.32,.72,.24,1);}
+.lock .lic{width:22px;height:22px;margin-bottom:20px;opacity:.9;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+.lock .ltime{font-size:76px;font-weight:200;letter-spacing:2px;line-height:1;text-shadow:0 4px 24px rgba(0,0,0,.35);}
+.lock .ldate{margin-top:10px;font-size:15px;font-weight:500;color:#e6f2ea;text-shadow:0 2px 8px rgba(0,0,0,.35);}
+.lock .lnotis{width:100%;flex:1;margin-top:26px;padding:0 16px;display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+.noti{background:rgba(10,24,17,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.09);
+  border-radius:16px;padding:11px 13px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 6px 18px rgba(0,0,0,.25);}
+.noti .ni{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.noti .nb{flex:1;min-width:0;}
+.noti .nt{display:flex;justify-content:space-between;font-size:10.5px;color:#9fc3ae;margin-bottom:3px;}
+.noti .nt b{color:#e8f5ec;font-size:11.5px;}
+.noti .nm{font-size:12px;color:#dcefe3;line-height:1.35;}
+.lock .hint{position:absolute;bottom:88px;display:flex;flex-direction:column;align-items:center;gap:6px;color:#d9efe0;}
+.lock .hint .chev{animation:chev 1.6s ease-in-out infinite;font-size:15px;}
+.lock .hint span{font-size:12.5px;letter-spacing:2px;}
+@keyframes chev{0%,100%{transform:translateY(6px);opacity:.4}50%{transform:translateY(-4px);opacity:1}}
+/* 桌面 */
+.home{position:absolute;inset:0;z-index:20;padding:64px 20px 0;display:flex;flex-direction:column;transition:transform .35s;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 14px;margin-top:6px;}
+.app{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;position:relative;}
+.app .ic{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 18px rgba(0,0,0,.35), inset 0 1px 1px rgba(255,255,255,.28);transition:transform .15s;}
+.app:active .ic{transform:scale(.88);}
+.app .nm{font-size:11px;color:#f2f7f3;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+.badge{position:absolute;top:-5px;right:calc(50% - 26px);min-width:19px;height:19px;padding:0 5px;border-radius:99px;
+  background:#ff4d4f;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);}
+.dock{margin-top:auto;background:rgba(8,18,13,.55);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.1);
+  border-radius:26px;padding:12px 14px;margin:0 -4px 30px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.dock .app .nm{display:none;}
+/* 应用通用 */
+.view{position:absolute;inset:0;z-index:30;background:#0b1f16;transform:translateX(104%);
+  transition:transform .34s cubic-bezier(.32,.72,.24,1);display:flex;flex-direction:column;box-shadow:-14px 0 40px rgba(0,0,0,.4);}
+.view.open{transform:translateX(0);}
+.vhead{padding:58px 20px 12px;display:flex;align-items:center;gap:10px;flex:none;}
+.vhead h2{font-size:20px;font-weight:700;flex:1;}
+.vbody{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column;}
+/* 计算器 */
+.calc{background:#0a0f0d;}
+.calc .cdisp{flex:none;padding:14px 22px 18px;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;min-height:118px;}
+.calc .cexpr{font-size:14px;color:#7d937f;height:20px;letter-spacing:1px;}
+.calc .cval{font-size:56px;font-weight:200;color:#fff;letter-spacing:1px;word-break:break-all;text-align:right;}
+.calc .cpad{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:4px 14px 86px;}
+.ckey{border:none;border-radius:50%;font-size:24px;font-weight:400;cursor:pointer;font-family:inherit;
+  background:#1d2b25;color:#fff;transition:filter .12s,transform .12s;}
+.ckey:active{filter:brightness(1.5);transform:scale(.94);}
+.ckey.op{background:#123526;color:var(--mint);}
+.ckey.eq{background:var(--mint);color:#052015;font-weight:600;}
+.ckey.fn{background:#122019;color:#cfe0d4;font-size:19px;}
+/* 备忘录(纸张) */
+.notes{background:#f3ead3;color:#3a3125;}
+.notes .vhead h2{color:#2e2617;}
+.notes .vhead .nb{color:#8a7a52;font-size:12.5px;}
+.notes .nlist{flex:1;overflow-y:auto;padding:6px 16px 80px;}
+.nitem{background:#fbf5e6;border:1px solid #e4d7b8;border-bottom-width:3px;border-radius:4px;
+  padding:12px 14px;margin-bottom:10px;cursor:pointer;box-shadow:0 2px 5px rgba(120,95,40,.12);}
+.nitem b{display:block;font-size:14.5px;margin-bottom:3px;}
+.nitem p{font-size:12px;color:#7a6c4e;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.nitem time{font-size:10.5px;color:#a08d63;}
+.nedit{flex:1;display:flex;flex-direction:column;padding:6px 16px 80px;background:#fbf5e6;}
+.nedit input{border:none;background:transparent;font-size:17px;font-weight:600;color:#2e2617;padding:8px 0;outline:none;border-bottom:2px solid #e4d7b8;font-family:inherit;}
+.nedit textarea{flex:1;border:none;background:transparent;resize:none;font-size:14px;line-height:1.7;color:#4a4030;
+  outline:none;font-family:inherit;padding-top:12px;}
+.nnew{align-self:flex-end;border:none;background:#2e2617;color:#f3ead3;border-radius:99px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.ndel{border:none;background:none;color:#b0573f;font-size:12.5px;cursor:pointer;padding:6px 2px;font-family:inherit;}
+.nempty{margin:auto;text-align:center;color:#a08d63;font-size:13px;line-height:2;}
+/* 天气 */
+.wx{background:linear-gradient(180deg,#0d3527 0%,#0f4a35 45%,#0b2c1f 100%);}
+.wx .vbody{overflow-y:auto;padding-bottom:80px;}
+.wx .loc{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600;margin-bottom:2px;}
+.wx .cond{font-size:13px;color:#b9d8c6;margin-bottom:4px;}
+.wx .big{font-size:74px;font-weight:200;line-height:1;display:flex;}
+.wx .big sup{font-size:30px;margin-top:12px;}
+.wx .range{font-size:14px;color:#b9d8c6;margin:4px 0 18px;}
+.wxcard{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:18px;
+  margin:10px 16px 0;padding:14px 16px;}
+.wxcard h4{font-size:12px;color:#9fc3ae;font-weight:600;letter-spacing:1px;margin-bottom:10px;}
+.hscroll{display:flex;gap:16px;overflow-x:auto;padding:4px 2px 8px;}
+.hitem{flex:none;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:12px;color:#cfe4d6;min-width:44px;}
+.hitem svg{display:block;}
+.frow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;}
+.frow:last-child{border-bottom:none;}
+.frow .fi{font-size:16px;width:22px;text-align:center;}
+.frow .fn{flex:1;color:#e8f5ec;}
+.frow .ft{color:#9fc3ae;font-size:12px;margin-right:8px;}
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 2px 0;}
+.wcell{background:rgba(0,0,0,.2);border-radius:14px;padding:11px 13px;}
+.wcell .wl{font-size:11px;color:#9fc3ae;margin-bottom:5px;}
+.wcell .wv{font-size:16.5px;font-weight:600;}
+.wcell .wv small{font-size:11px;color:#9fc3ae;font-weight:400;}
+/* 时钟 */
+.clock{background:linear-gradient(180deg,#0a1f16,#081710);}
+.ctabs{display:flex;gap:8px;padding:0 20px 12px;}
+.ctab{flex:1;border:none;border-radius:99px;padding:8px;font-size:13px;font-weight:600;cursor:pointer;
+  background:rgba(255,255,255,.08);color:#9fc3ae;font-family:inherit;transition:.2s;}
+.ctab.on{background:var(--mint);color:#052015;}
+.analog-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.digi{font-size:15px;color:#cfe4d6;font-variant-numeric:tabular-nums;letter-spacing:2px;}
+.sw-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:18px;justify-content:center;}
+.sw-time{font-size:52px;font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:2px;}
+.sw-laps{width:70%;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+.sw-lap{display:flex;justify-content:space-between;font-size:13px;color:#b9d8c6;background:rgba(255,255,255,.06);
+  border-radius:10px;padding:8px 14px;font-variant-numeric:tabular-nums;}
+.wc-row{display:flex;align-items:center;gap:12px;width:100%;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.07);}
+.wc-row:last-child{border:none;}
+.wc-row .cn{flex:1;font-size:14.5px;font-weight:600;}
+.wc-row .co{font-size:11.5px;color:#9fc3ae;}
+.wc-row .ct{font-size:17px;font-variant-numeric:tabular-nums;}
+/* 地图 */
+.map{background:#0a1f18;}
+.map .vbody{touch-action:none;}
+.mapsvg{position:absolute;inset:0;width:100%;height:100%;}
+.mapctl{position:absolute;right:14px;bottom:96px;display:flex;flex-direction:column;gap:8px;z-index:5;}
+.mapctl button{width:38px;height:38px;border-radius:50%;border:none;background:rgba(10,30,20,.85);border:1px solid rgba(255,255,255,.18);
+  color:var(--mint);font-size:18px;cursor:pointer;backdrop-filter:blur(6px);}
+.mapcard{position:absolute;left:14px;right:14px;bottom:96px;background:rgba(9,24,16,.94);border:1px solid var(--line);
+  border-radius:16px;padding:13px 16px;backdrop-filter:blur(10px);z-index:6;box-shadow:0 16px 40px rgba(0,0,0,.5);}
+.mapcard h3{font-size:15px;color:var(--gold);margin-bottom:4px;}
+.mapcard p{font-size:12.5px;color:#cfe4d6;line-height:1.5;}
+.mapcard .mx{position:absolute;top:10px;right:12px;color:#7d937f;cursor:pointer;font-size:15px;}
+/* 相册 */
+.photos{background:#081712;}
+.pgrid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px 2px 84px;}
+.pcell{aspect-ratio:1;overflow:hidden;cursor:pointer;position:relative;}
+.pcell svg{width:100%;height:100%;display:block;transition:transform .3s;}
+.pcell:active svg{transform:scale(.96);}
+.pview{position:absolute;inset:0;background:#050f0a;z-index:5;display:flex;flex-direction:column;}
+.pview .art{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+.pview .art svg{width:100%;height:100%;}
+.pnav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.12);color:#fff;font-size:16px;cursor:pointer;backdrop-filter:blur(6px);}
+.pnav.l{left:12px;} .pnav.r{right:12px;}
+.pcap{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 84px;color:#e8f5ec;}
+.pcap .t{font-size:16px;font-weight:600;}
+.pcap .c{font-size:12px;color:#7d937f;}
+/* 通知中心 */
+.nc{position:absolute;inset:0;z-index:50;background:rgba(7,18,12,.9);backdrop-filter:blur(22px);
+  transform:translateY(-103%);transition:transform .38s cubic-bezier(.32,.72,.24,1);display:flex;flex-direction:column;padding:52px 18px 40px;}
+.nc.open{transform:translateY(0);}
+.nc h3{font-size:17px;font-weight:700;margin-bottom:14px;}
+.nc .nlist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.nc .nfoot{margin-top:12px;text-align:center;}
+.nc .nfoot button{border:none;background:rgba(255,255,255,.08);color:#b9d8c6;border-radius:99px;padding:9px 22px;font-size:12.5px;cursor:pointer;font-family:inherit;}
+.nc .grab{width:44px;height:5px;border-radius:99px;background:rgba(255,255,255,.3);margin:14px auto 0;}
+.nc .empty{margin:auto;color:#5f7a6a;font-size:13px;letter-spacing:2px;}
+/* 来电 */
+.call{position:absolute;inset:0;z-index:70;background:linear-gradient(180deg,#0d2419,#060f0a);display:flex;flex-direction:column;
+  align-items:center;padding:64px 26px 46px;transform:translateY(104%);transition:transform .4s cubic-bezier(.32,.72,.24,1);}
+.call.open{transform:translateY(0);}
+.call .who{text-align:center;margin-bottom:26px;}
+.call .avatar{width:96px;height:96px;border-radius:50%;background:linear-gradient(140deg,#1c4a33,#0e2c1e);
+  border:2px solid rgba(125,240,178,.4);display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 16px;
+  box-shadow:0 0 0 0 rgba(125,240,178,.35);}
+.call.incoming .avatar{animation:pulse 1.6s ease-out infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(125,240,178,.4)}100%{box-shadow:0 0 0 34px rgba(125,240,178,0)}}
+.call .cname{font-size:26px;font-weight:700;}
+.call .csub{font-size:13px;color:#9fc3ae;margin-top:5px;letter-spacing:1px;}
+.call .ctime{font-size:17px;color:var(--mint);font-variant-numeric:tabular-nums;margin-top:4px;}
+.call .spacer{flex:1;}
+.cbtns{display:flex;width:100%;justify-content:space-around;margin-bottom:8px;}
+.cbtn{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11px;color:#b9d8c6;background:none;border:none;cursor:pointer;font-family:inherit;}
+.cbtn .ci{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;
+  box-shadow:0 8px 20px rgba(0,0,0,.4);}
+.cbtn.red .ci{background:linear-gradient(145deg,#ff5f57,#d63a30);color:#fff;}
+.cbtn.green .ci{background:linear-gradient(145deg,#5be08b,#25a266);color:#fff;}
+.cbtn.grey .ci{background:rgba(255,255,255,.1);color:#fff;}
+.call .mini{display:flex;gap:34px;margin-bottom:26px;}
+.mini .cbtn .ci{width:48px;height:48px;font-size:19px;background:rgba(255,255,255,.08);}
+.keypad{position:absolute;inset:0;background:rgba(6,15,10,.97);z-index:5;display:flex;flex-direction:column;
+  padding:60px 30px 90px;align-items:center;gap:18px;}
+.kp-grid{display:grid;grid-template-columns:repeat(3,74px);gap:14px;}
+.kp-grid button{width:74px;height:74px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:#fff;
+  font-size:26px;font-weight:300;cursor:pointer;font-family:inherit;}
+.kp-grid button:active{background:rgba(255,255,255,.22);}
+.kp-close{border:none;background:none;color:var(--mint);font-size:14px;cursor:pointer;font-family:inherit;}
+/* Home 指示条 */
+.homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:9px;width:128px;height:5px;border-radius:99px;
+  background:rgba(255,255,255,.65);z-index:65;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.toast{position:absolute;left:50%;top:56px;transform:translateX(-50%) translateY(-12px);z-index:90;
+  background:rgba(10,26,18,.94);border:1px solid var(--line);color:#e8f5ec;font-size:13px;padding:10px 20px;border-radius:99px;
+  opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;box-shadow:0 12px 30px rgba(0,0,0,.5);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media (max-width:1020px){
+  .page{flex-direction:column;padding:14px;overflow-y:auto;}
+  .panel{width:100%;}
+  .stage{padding:20px 0 60px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- ================= 左侧说明面板 ================= -->
+  <aside class="panel">
+    <h1><span class="dot"></span>手机模拟器</h1>
+    <p class="sub">PHONE OS · 单文件演示</p>
+    <ol class="steps">
+      <li><b>解锁：</b>在锁屏页<b>向上滑动</b>屏幕即可解锁；也可点击下方「锁定屏幕」后上滑。</li>
+      <li><b>回桌面：</b>在任意应用内<b>上滑底部横条</b>（或直接点横条）返回桌面。</li>
+      <li><b>打开应用：</b>点击图标打开 计算器 / 备忘录 / 天气 / 地图 / 时钟 / 相册。</li>
+      <li><b>通知中心：</b>在桌面或应用内，从<b>屏幕顶部向下滑动</b>拉出通知中心。</li>
+      <li><b>模拟来电：</b>点击「模拟来电」按钮，可体验 <b>接听 / 挂断</b>，接听后能通话、用拨号键盘。</li>
+    </ol>
+    <div class="btnrow">
+      <button class="pbtn ghost" id="btnLock">锁定屏幕</button>
+      <button class="pbtn" id="btnCall">📞 模拟来电</button>
+    </div>
+    <div class="toggle"><span>🔊 本地音效</span><div class="switch on" id="sndSwitch"></div></div>
+    <div class="status">当前界面：<b id="screenState">锁屏</b></div>
+    <p class="foot">纯本地运行 · 无外部框架 / 图片 / 接口</p>
+  </aside>
+
+  <!-- ================= 手机 ================= -->
+  <div class="stage">
+    <div class="phone">
+      <div class="frame">
+        <div class="screen" id="screen">
+          <div class="wall"><i></i><i></i><i></i><i></i></div>
+
+          <!-- 状态栏 -->
+          <div class="statusbar">
+            <span id="sbTime">14:06</span>
+            <span class="sright">
+              <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="#fff"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="#fff"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="#fff"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="#fff" opacity=".45"/></svg>
+              <svg width="16" height="11" viewBox="0 0 16 11"><path d="M8 10.4 5.6 7.6a3.4 3.4 0 0 1 4.8 0Z" fill="#fff"/><path d="M8 5.4a6.6 6.6 0 0 0-4.7 2L1.8 5.8a9 9 0 0 1 12.4 0L12.7 7.4A6.6 6.6 0 0 0 8 5.4Z" fill="#fff"/><path d="M8 1a11 11 0 0 0-7.8 3.3L-1.3 2.7a13.4 13.4 0 0 1 18.6 0L15.8 4.3A11 11 0 0 0 8 1Z" fill="#fff" opacity=".45" transform="translate(1.5,0) scale(.9)"/></svg>
+              <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".5"/><rect id="battFill" x="2.5" y="2.5" width="15" height="7" rx="2" fill="#fff"/><rect x="22.5" y="4" width="2.5" height="4" rx="1" fill="#fff" fill-opacity=".5"/></svg>
+              <span id="battPct" style="font-size:11px;">64%</span>
+            </span>
+          </div>
+
+          <!-- 锁屏 -->
+          <div class="lock" id="lockLayer">
+            <svg class="lic" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.5" fill="#fff"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#fff" stroke-width="2.2" fill="none"/><circle cx="12" cy="15" r="1.6" fill="#0b2018"/></svg>
+            <div class="ltime" id="lockTime">14:06</div>
+            <div class="ldate" id="lockDate">8月19日 · 上海 29° · 多云</div>
+            <div class="lnotis" id="lockNotis"></div>
+            <div class="hint"><span class="chev">▲</span><span>上滑解锁</span></div>
+          </div>
+
+          <!-- 桌面 -->
+          <div class="home" id="homeLayer">
+            <div class="grid" id="appGrid"></div>
+            <div class="dock" id="dockGrid"></div>
+          </div>
+
+          <!-- 应用视图容器 -->
+          <div id="viewRoot"></div>
+
+          <!-- 通知中心 -->
+          <div class="nc" id="ncLayer">
+            <h3>通知中心</h3>
+            <div class="nlist" id="ncList"></div>
+            <div class="nfoot"><button id="ncClear">清除全部通知</button></div>
+            <div class="grab"></div>
+          </div>
+
+          <!-- 来电 -->
+          <div class="call" id="callLayer">
+            <div id="callIncoming">
+              <div class="who">
+                <div class="avatar" id="callerAvatar">🎩</div>
+                <div class="cname" id="callerName">大少爷</div>
+                <div class="csub">上海 · 移动</div>
+              </div>
+              <div class="spacer"></div>
+              <div class="mini">
+                <button class="cbtn grey"><span class="ci">⏰</span>提醒我</button>
+                <button class="cbtn grey"><span class="ci">💬</span>信息</button>
+              </div>
+              <div class="cbtns">
+                <button class="cbtn red" id="btnDecline"><span class="ci">✕</span>挂断</button>
+                <button class="cbtn green" id="btnAnswer"><span class="ci">☎</span>接听</button>
+              </div>
+            </div>
+            <div id="callActive" style="display:none;width:100%;height:100%;flex-direction:column;align-items:center;">
+              <div class="who">
+                <div class="avatar" id="calleeAvatar">🎩</div>
+                <div class="cname" id="calleeName">大少爷</div>
+                <div class="ctime" id="callTimer">00:00</div>
+              </div>
+              <div class="spacer"></div>
+              <div class="cbtns" style="justify-content:center;gap:38px;">
+                <button class="cbtn grey" id="kbMute"><span class="ci">🎙</span>静音</button>
+                <button class="cbtn grey" id="kbKeypad"><span class="ci">⌨</span>拨号键盘</button>
+                <button class="cbtn grey" id="kbSpeaker"><span class="ci">🔊</span>免提</button>
+              </div>
+              <div class="cbtns">
+                <button class="cbtn red" id="btnHangup"><span class="ci">✕</span>挂断</button>
+              </div>
+            </div>
+            <div class="keypad" id="keypadUI" style="display:none;">
+              <div class="kp-grid" id="kpGrid"></div>
+              <button class="kp-close" id="kpClose">收起键盘</button>
+            </div>
+          </div>
+
+          <div class="homebar" id="homebar"></div>
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   手机模拟器 —— 全部本地运行，音效用 WebAudio 实时合成
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const pad2 = n => String(n).padStart(2,'0');
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/* ---------------- 音效引擎 ---------------- */
+const Snd = (() => {
+  let ctx = null, on = true, ringTimer = null;
+  function ac(){ if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(ctx && ctx.state==='suspended') ctx.resume(); return ctx; }
+  function tone(f,t,d,type='sine',v=.18,slide){
+    if(!on) return; const c=ac(); if(!c) return;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,c.currentTime+t);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,c.currentTime+t+d);
+    g.gain.setValueAtTime(0,c.currentTime+t);
+    g.gain.linearRampToValueAtTime(v,c.currentTime+t+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t+d);
+    o.connect(g).connect(c.destination); o.start(c.currentTime+t); o.stop(c.currentTime+t+d+.05);
+  }
+  function noise(t,d,v=.12,fc=2000,q=1){
+    if(!on) return; const c=ac(); if(!c) return;
+    const len=c.sampleRate*d, buf=c.createBuffer(1,len,c.sampleRate), ch=buf.getChannelData(0);
+    for(let i=0;i<len;i++) ch[i]=Math.random()*2-1;
+    const s=c.createBufferSource(); s.buffer=buf;
+    const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=fc; f.Q.value=q;
+    const g=c.createGain(); g.gain.setValueAtTime(v,c.currentTime+t);
+    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t+d);
+    s.connect(f).connect(g).connect(c.destination); s.start(c.currentTime+t);
+  }
+  return {
+    get on(){return on;},
+    toggle(){ on=!on; if(!on) this.ringStop(); return on; },
+    click(){ tone(2200,0,.05,'triangle',.07); },
+    key(){ tone(1560,0,.06,'sine',.12); noise(0,.03,.05,3200,2); },
+    tick(){ tone(900,0,.04,'square',.05); },
+    swish(){ noise(0,.16,.10,1200,1.4); },
+    unlock(){ noise(0,.2,.09,900,1.2); tone(660,0,.1,'sine',.12); tone(990,.09,.14,'sine',.12); },
+    lock(){ tone(880,0,.09,'sine',.1); tone(560,.08,.12,'sine',.1); noise(.05,.1,.06,700,1); },
+    coin(){ tone(988,0,.09,'square',.12); tone(1319,.08,.22,'square',.12); },
+    pay(){ tone(660,0,.1,'sine',.14); tone(440,.1,.2,'sine',.14); },
+    card(){ noise(0,.14,.08,2600,1); },
+    ding(){ tone(1760,0,.3,'sine',.12); tone(2217,.01,.34,'sine',.1); },
+    fanfare(){ [523,659,784,1047].forEach((f,i)=>tone(f,i*.11,.22,'triangle',.14)); },
+    jail(){ tone(196,0,.3,'sawtooth',.1,140); },
+    error(){ tone(220,0,.16,'sawtooth',.1,180); },
+    dtmf(d){ const m={'1':[697,1209],'2':[697,1336],'3':[697,1477],'4':[770,1209],'5':[770,1336],'6':[770,1477],'7':[852,1209],'8':[852,1336],'9':[852,1477],'*':[941,1209],'0':[941,1336],'#':[941,1477]}[d]||[697,1336];
+      tone(m[0],0,.12,'sine',.14); tone(m[1],0,.12,'sine',.14); },
+    ringStart(){
+      this.ringStop();
+      const seq=()=>{ tone(1319,0,.16,'sine',.16); tone(1568,.18,.16,'sine',.16); tone(2093,.36,.3,'sine',.15);
+                     tone(1568,.72,.16,'sine',.13); tone(1319,.9,.2,'sine',.12); };
+      seq(); ringTimer=setInterval(seq,1600);
+    },
+    ringStop(){ if(ringTimer){ clearInterval(ringTimer); ringTimer=null; } }
+  };
+})();
+
+/* ---------------- 全局状态 ---------------- */
+const state = { locked:true, view:'home', ncOpen:false, call:null };
+const CONTACTS=[
+  {name:'大少爷', token:'🎩'},{name:'金丝雀', token:'🐦'},
+  {name:'船老大', token:'🚢'},{name:'茶博士', token:'🍵'}
+];
+function setState(){ $('#screenState').textContent =
+  state.call ? '通话中' : state.locked ? '锁屏' :
+  state.ncOpen ? '通知中心' : state.view==='home' ? '桌面' : state.view; }
+
+/* ---------------- 状态栏 ---------------- */
+let battery = .64;
+if(navigator.getBattery) navigator.getBattery().then(b=>{
+  const upd=()=>{ battery=b.level; drawBatt(); }; upd();
+  b.addEventListener('levelchange',upd);
+});
+function drawBatt(){ $('#battFill').setAttribute('width', (15*battery).toFixed(1));
+  $('#battPct').textContent = Math.round(battery*100)+'%'; }
+function tickClock(){
+  const d=new Date(), h=d.getHours(), m=d.getMinutes();
+  const t=pad2(h)+':'+pad2(m);
+  $('#sbTime').textContent=t;
+  $('#lockTime').textContent=t;
+  const week='日一二三四五六'[d.getDay()];
+  $('#lockDate').textContent=`${d.getMonth()+1}月${d.getDate()}日 周${week} · 上海`;
+}
+setInterval(()=>{ tickClock(); if(state.call==='active') drawCallTime(); },1000);
+tickClock();
+
+/* ---------------- 通知数据 ---------------- */
+function buildNotis(){
+  const now=Date.now(), m=Math.floor;
+  return [
+    {icon:'💬',bg:'#25a266',app:'微信',time:'现在',title:'大少爷',msg:'晚上去外滩吃饭吗？'},
+    {icon:'📅',bg:'#e05c5c',app:'日历',time:'3 分钟前',title:'滨江骑行 · 19:00',msg:'还有 4 人参加，记得戴头盔'},
+    {icon:'🌤',bg:'#3d7a99',app:'天气',time:'26 分钟前',title:'今日天气',msg:'多云，26° ~ 32°，东南风 3 级'},
+    {icon:'📝',bg:'#c9a53f',app:'备忘录',time:'1 小时前',title:'购物清单',msg:'猫粮、洗衣液、给金丝雀带的小笼包'},
+    {icon:'✈️',bg:'#7a5fa0',app:'航旅纵横',time:'昨天',title:'航班动态',msg:'MU511 值机已开放，请提前选座'}
+  ];
+}
+function renderNotis(){
+  const list=buildNotis();
+  $('#lockNotis').innerHTML = state.locked ? list.slice(0,2).map(n=>notiHTML(n)).join('') : '';
+  $('#ncList').innerHTML = state.ncOpen ? list.map(n=>notiHTML(n)).join('') :
+    '<div class="empty">无更多通知</div>';
+}
+function notiHTML(n){
+  return `<div class="noti"><div class="ni" style="background:${n.bg}">${n.icon}</div>
+    <div class="nb"><div class="nt"><b>${n.app}</b><span>${n.time}</span></div>
+    <div class="nm"><b>${n.title}</b> ${n.msg}</div></div></div>`;
+}
+renderNotis();
+
+/* ---------------- 桌面图标 ---------------- */
+const APPS=[
+  {id:'photos',  name:'相册',  bg:'linear-gradient(145deg,#f7d774,#d99e2b)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4.5" fill="#fff"/><circle cx="9" cy="9" r="2" fill="#f7d774"/><path d="M3 17l5-5 4 4 3-3 6 6" fill="#7fb069"/></svg>'},
+  {id:'weather', name:'天气',  bg:'linear-gradient(145deg,#5b8dd9,#2c5aa8)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="4" fill="#ffd76e"/><g stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M17 4v3M17 11v3M20 7h-3M13 7h-3"/></g><path d="M6 20h11a3.5 3.5 0 0 0 .6-6.95A5 5 0 0 0 8.2 14 3 3 0 0 0 6 20Z" fill="#e8f0f8"/></svg>'},
+  {id:'calc',    name:'计算器',bg:'linear-gradient(145deg,#3a4a42,#15211b)', glyph:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="2.5" width="14" height="19" rx="2.5" stroke="#fff" stroke-width="1.8"/><rect x="8" y="5.5" width="8" height="3.5" rx="1" fill="#7df0b2"/><g fill="#fff"><circle cx="8.6" cy="12" r="1.15"/><circle cx="12" cy="12" r="1.15"/><circle cx="15.4" cy="12" r="1.15"/><circle cx="8.6" cy="15.6" r="1.15"/><circle cx="12" cy="15.6" r="1.15"/><circle cx="15.4" cy="15.6" r="1.15"/><rect x="7.9" y="18.2" width="1.4" height="1.4"/><rect x="11.3" y="18.2" width="1.4" height="1.4"/><rect x="14.7" y="18.2" width="1.4" height="1.4" fill="#7df0b2"/></g></svg>'},
+  {id:'notes',   name:'备忘录',bg:'linear-gradient(145deg,#fbf3df,#e8d9b0)', glyph:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="2.5" width="14" height="19" rx="2" fill="#fff" stroke="#d9c89e"/><g stroke="#b3a071" stroke-width="1.6" stroke-linecap="round"><path d="M8.5 7.5h7M8.5 11h7M8.5 14.5h4.5"/></g></svg>'},
+  {id:'map',     name:'地图',  bg:'linear-gradient(145deg,#4caf7d,#1e6b4a)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z" fill="#e8f5ec"/><path d="M9 4v14M15 6v14" stroke="#1e6b4a" stroke-width="1.6"/><circle cx="11.5" cy="10.5" r="1.6" fill="#e05c5c"/></svg>'},
+  {id:'clock',   name:'时钟',  bg:'linear-gradient(145deg,#2b3a33,#0c1410)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="#f2f5f3"/><circle cx="12" cy="12" r="9" fill="none" stroke="#0c1410" stroke-width="1.6"/><path d="M12 7v5l3.5 2" stroke="#15211b" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="1.2" fill="#15211b"/></svg>'}
+];
+const DOCK=[
+  {id:'phone',  name:'电话',  bg:'linear-gradient(145deg,#5be08b,#1f9d55)', glyph:'<svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M6.6 3h3l1.5 4-2 1.5a12 12 0 0 0 5.9 5.9l1.5-2 4 1.5v3a2.5 2.5 0 0 1-2.7 2.5C10.9 18.9 5.1 13.1 4.6 5.7A2.5 2.5 0 0 1 6.6 3Z"/></svg>'},
+  {id:'camera', name:'相机',  bg:'linear-gradient(145deg,#5a6a62,#232f29)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="14" rx="3" stroke="#fff" stroke-width="1.7"/><circle cx="12" cy="13" r="4.2" stroke="#fff" stroke-width="1.7"/><circle cx="12" cy="13" r="1.6" fill="#7df0b2"/><path d="M8 6l1.4-2.5h5.2L16 6" stroke="#fff" stroke-width="1.7" fill="none"/></svg>'},
+  {id:'music',  name:'音乐',  bg:'linear-gradient(145deg,#e05555,#a82e2e)', glyph:'<svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M9 18.5V6l11-2.5V16" stroke="#fff" stroke-width="1.9" fill="none" stroke-linejoin="round"/><circle cx="6.8" cy="18.5" r="2.6"/><circle cx="17.8" cy="16" r="2.6"/></svg>'},
+  {id:'settings',name:'设置', bg:'linear-gradient(145deg,#7d8f86,#43544c)', glyph:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="#fff" stroke-width="1.8"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>'}
+];
+function renderHome(){
+  $('#appGrid').innerHTML = APPS.map(a=>`<div class="app" data-app="${a.id}">
+    <div class="ic" style="background:${a.bg}">${a.glyph}${a.id==='weather'?'<span class="badge" style="background:#3d7a99">1</span>':''}</div>
+    <div class="nm">${a.name}</div></div>`).join('');
+  $('#dockGrid').innerHTML = DOCK.map(a=>`<div class="app" data-app="${a.id}">
+    <div class="ic" style="background:${a.bg}">${a.glyph}</div></div>`).join('');
+  $$('#appGrid .app, #dockGrid .app').forEach(el=>{
+    el.addEventListener('click',()=>{ Snd.click(); openApp(el.dataset.app); });
+  });
+}
+renderHome();
+
+/* ---------------- 视图管理 ---------------- */
+function openApp(id){
+  if(id==='phone'||id==='camera'||id==='music'||id==='settings'){
+    toast('演示版本未包含「'+({phone:'电话',camera:'相机',music:'音乐',settings:'设置'})[id]+'」应用');
+    Snd.error(); return;
+  }
+  if(!VIEWS[id]) buildView(id);
+  state.view=id; $('#viewRoot').querySelectorAll('.view').forEach(v=>v.classList.remove('open'));
+  $('#viewRoot').querySelector('#view-'+id).classList.add('open');
+  renderNotis(); setState(); Snd.swish();
+}
+function goHome(){
+  if(state.view!=='home'){
+    $('#viewRoot').querySelectorAll('.view').forEach(v=>v.classList.remove('open'));
+    state.view='home'; Snd.swish();
+  }
+  closeNC(); renderNotis(); setState();
+}
+function lock(anim=true){
+  state.locked=true; state.ncOpen=false;
+  $('#ncLayer').classList.remove('open');
+  const L=$('#lockLayer'); L.style.transition=anim?'transform .45s cubic-bezier(.32,.72,.24,1)':'none';
+  L.style.transform='translateY(0)'; renderNotis(); setState(); Snd.lock();
+}
+function unlock(){
+  state.locked=false; Snd.unlock();
+  const L=$('#lockLayer');
+  L.style.transform='translateY(-106%)';
+  setTimeout(()=>{ L.style.transition='none'; L.style.transform='translateY(-106%)'; L.style.transition=''; },480);
+  renderNotis(); setState();
+}
+/* ---------------- 通知中心 ---------------- */
+function openNC(){ if(state.locked) return; state.ncOpen=true;
+  $('#ncLayer').classList.add('open'); renderNotis(); setState(); Snd.swish(); }
+function closeNC(){ if(!state.ncOpen) return; state.ncOpen=false;
+  $('#ncLayer').classList.remove('open'); renderNotis(); setState(); }
+$('#ncClear').addEventListener('click',()=>{ $('#ncList').innerHTML='<div class="empty">无更多通知</div>'; Snd.tick(); });
+
+/* ---------------- Toast ---------------- */
+let toastTimer=null;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ---------------- 手势系统 ---------------- */
+const screen=$('#screen');
+let gesture=null, justDragged=false;
+screen.addEventListener('pointerdown',e=>{
+  if(e.target.closest('button,input,textarea,.noti,.app,.mapctl,.pview,.nitem,.hitem')) return;
+  const r=screen.getBoundingClientRect(), y=e.clientY-r.top, x=e.clientX-r.left;
+  let mode=null;
+  if(state.locked && y>70) mode='lock';
+  else if(!state.locked && !state.ncOpen){
+    if(y<48 && y>0) mode='nc';
+    else if(y>r.height-78) mode='home';
+  } else if(state.ncOpen && y<52) mode='ncClose';
+  if(!mode) return;
+  gesture={mode,x0:x,y0:y,dy:0};
+  screen.setPointerCapture(e.pointerId);
+});
+screen.addEventListener('pointermove',e=>{
+  if(!gesture) return;
+  const r=screen.getBoundingClientRect();
+  gesture.dy=e.clientY-r.top-gesture.y0;
+  const dy=gesture.dy;
+  if(Math.abs(dy)>10) justDragged=true;
+  if(gesture.mode==='lock'&&dy<0) $('#lockLayer').style.transform=`translateY(${dy}px)`;
+  if(gesture.mode==='nc'&&dy>0) $('#ncLayer').style.transform=`translateY(${-103+dy*1.05}%)`;
+  if(gesture.mode==='ncClose'&&dy>0) $('#ncLayer').style.transform=`translateY(${dy}px)`;
+  if(gesture.mode==='home'&&dy<0){ /* 视觉反馈：当前应用轻微跟随 */ }
+});
+screen.addEventListener('pointerup',e=>{
+  if(!gesture) return;
+  const {mode,dy}=gesture; gesture=null;
+  setTimeout(()=>justDragged=false,60);
+  if(mode==='lock'&&dy<-64) unlock();
+  else if(mode==='lock'){ $('#lockLayer').style.transform='translateY(0)'; }
+  else if(mode==='nc'&&dy>76) openNC();
+  else if(mode==='nc') $('#ncLayer').style.transform='translateY(-103%)';
+  else if(mode==='ncClose'&&dy>56) closeNC();
+  else if(mode==='ncClose') $('#ncLayer').style.transform='translateY(0)';
+  else if(mode==='home'&&dy<-56) goHome();
+  else if(mode==='nc'&&dy<-40) closeNC();
+});
+screen.addEventListener('click',e=>{ if(justDragged){ e.stopPropagation(); e.preventDefault(); } },true);
+$('#homebar').addEventListener('click',()=>{ if(state.ncOpen) closeNC(); else goHome(); });
+$('#btnLock').addEventListener('click',()=>{ if(!state.call) lock(); });
+$('#sndSwitch').addEventListener('click',function(){
+  const on=Snd.toggle(); this.classList.toggle('on',on); toast(on?'音效已开启':'音效已关闭');
+});
+
+/* ============================================================
+   应用 1：计算器
+   ============================================================ */
+const calc={expr:'',entry:'0',fresh:true};
+function calcExpr(s){
+  s=s.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-')
+     .replace(/(^|[+\-*/(])\./g,'$10.');
+  const toks=s.match(/(\d+\.?\d*)|[+\-*/()]/g); if(!toks) return NaN;
+  const out=[],ops=[],prec={'+':1,'-':1,'*':2,'/':2}; let prev=null;
+  for(const t of toks){
+    if(/^\d/.test(t)){ out.push(parseFloat(t)); prev='n'; }
+    else if(t==='('){ ops.push(t); prev='p'; }
+    else if(t===')'){ while(ops.length&&ops[ops.length-1]!=='(') out.push(ops.pop()); ops.pop(); prev='n'; }
+    else{
+      if(t==='-'&&prev!=='n'&&prev!==')') out.push(0);
+      while(ops.length&&ops[ops.length-1]!=='('&&prec[ops[ops.length-1]]>=prec[t]) out.push(ops.pop());
+      ops.push(t); prev='o';
+    }
+  }
+  while(ops.length) out.push(ops.pop());
+  const st=[];
+  for(const t of out){
+    if(typeof t==='number'){ st.push(t); continue; }
+    const b=st.pop(),a=st.pop();
+    if(a===undefined||b===undefined) return NaN;
+    let r;
+    if(t==='+') r=a+b; else if(t==='-') r=a-b; else if(t==='*') r=a*b; else r=(b===0?NaN:a/b);
+    st.push(r);
+  }
+  return st.length?st[0]:NaN;
+}
+function fmtNum(n){
+  if(!isFinite(n)||isNaN(n)) return '错误';
+  const v=Math.round(n*1e10)/1e10;
+  return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+function calcRender(){
+  const disp=calc.entry==='错误'?'错误':fmtNum(parseFloat(calc.entry))||'0';
+  $('#view-calc .cval').textContent=disp;
+  $('#view-calc .cexpr').textContent=calc.expr||' ';
+}
+function calcPress(k){
+  Snd.key();
+  if(k==='C'){ calc.expr=''; calc.entry='0'; calc.fresh=true; }
+  else if(k==='='){
+    const full=calc.expr+calc.entry;
+    const r=calcExpr(full);
+    calc.expr=calc.expr?full+' =' : '';
+    calc.entry=isNaN(r)?'错误':String(Math.round(r*1e10)/1e10);
+    calc.fresh=true;
+    if(isNaN(r)) Snd.error();
+  }
+  else if(['÷','×','−','+'].includes(k)){
+    if(calc.entry==='错误') calc.entry='0';
+    calc.expr+=calc.entry+k; calc.entry='0'; calc.fresh=true;
+  }
+  else if(k==='±'){ if(calc.entry!=='错误'){ calc.entry=calc.entry.startsWith('-')?calc.entry.slice(1):(calc.entry==='0'?'':'-'+calc.entry); } }
+  else if(k==='%'){ if(calc.entry!=='错误') calc.entry=String(parseFloat(calc.entry)/100); }
+  else if(k==='.'){ if(calc.fresh){ calc.entry='0.'; calc.fresh=false; } else if(!calc.entry.includes('.')) calc.entry+='.'; }
+  else{ // 数字
+    if(calc.fresh||calc.entry==='错误'){ calc.entry=k; calc.fresh=false; }
+    else if(calc.entry.replace(/[-.]/g,'').length<12) calc.entry=calc.entry==='0'?k:calc.entry+k;
+  }
+  calcRender();
+}
+
+/* ============================================================
+   应用 2：备忘录（localStorage 自动保存）
+   ============================================================ */
+let notes=[], curNote=null;
+function loadNotes(){
+  try{ notes=JSON.parse(localStorage.getItem('phonenotes')||'[]'); }catch(e){ notes=[]; }
+  if(!notes.length){
+    notes=[
+      {id:1,title:'👋 欢迎使用备忘录',body:'这条笔记会自动保存在本机浏览器里。\n试试点击右上角「+」新建一条吧。\n\n· 计算器支持连续四则运算\n· 天气与真实日期联动\n· 相册里的照片全部由代码绘制',ts:Date.now()},
+      {id:2,title:'🍜 周末觅食清单',body:'· 大壶春生煎 · 四川中路\n· 鲜得来排骨年糕 · 云南南路\n· 阿娘面馆 · 思南路\n· 光明邨大酒家 · 淮海路（排队预警）',ts:Date.now()-86400000}
+    ];
+    saveNotes();
+  }
+  notes.sort((a,b)=>b.ts-a.ts);
+}
+function saveNotes(){ try{ localStorage.setItem('phonenotes',JSON.stringify(notes)); }catch(e){} }
+function renderNotesList(){
+  const el=$('#notesList');
+  if(!notes.length){ el.innerHTML='<div class="nempty">暂无备忘录<br>点击右上角「+」新建</div>'; return; }
+  el.innerHTML=notes.map(n=>`<div class="nitem" data-id="${n.id}">
+    <b>${esc(n.title)||'无标题'}</b><p>${esc(n.body)}</p><time>${new Date(n.ts).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time></div>`).join('');
+  el.querySelectorAll('.nitem').forEach(it=>it.addEventListener('click',()=>{
+    curNote=notes.find(n=>n.id==it.dataset.id); Snd.click(); renderNoteEdit();
+  }));
+}
+function renderNoteEdit(){
+  $('#notesList').style.display='none'; $('#noteEditor').style.display='flex';
+  $('#neTitle').value=curNote.title; $('#neBody').value=curNote.body;
+  $('#neTitle').focus();
+}
+function renderNoteView(){
+  $('#noteEditor').style.display='none'; $('#notesList').style.display='flex'; renderNotesList();
+}
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================================================
+   应用 3：天气（按真实日期生成，每天不同）
+   ============================================================ */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296; }; }
+function weatherData(){
+  const d=new Date(), rng=mulberry32(d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate());
+  const monthBase=[4,6,10,14,19,24,28,30,26,21,15,9][d.getMonth()];
+  const base=monthBase+(rng()*4-2);
+  const conds=d.getMonth()>=4&&d.getMonth()<=9?['多云','晴','晴','多云','雷阵雨','阴','小雨','晴']:['多云','阴','晴','小雨','多云','阴','晴'];
+  const cond=conds[Math.floor(rng()*conds.length)];
+  const h=d.getHours()+d.getMinutes()/60;
+  const cur=base+5.5*Math.sin((h-9)/24*2*Math.PI);
+  const dayHi=base+5+rng()*2, dayLo=base-4-rng()*2;
+  const hourly=[];
+  for(let i=0;i<24;i++){
+    const t=base+5.5*Math.sin((i-9)/24*2*Math.PI);
+    const night=i<6||i>19;
+    hourly.push({h:i,t:Math.round(t),icon:cond==='晴'?(night?'moon':'sun'):cond==='多云'?'cloud-sun':cond==='阴'?'cloud':cond==='小雨'||cond==='雷阵雨'?'rain':'cloud-sun'});
+  }
+  const days=[];
+  const wk='日一二三四五六';
+  for(let i=0;i<6;i++){
+    const dd=new Date(d.getTime()+i*86400000);
+    const drift=(rng()*6-3)+(i===0?0:Math.sin(i*2.1)*1.5);
+    days.push({w:i===0?'今天':wk[dd.getDay()],c:conds[Math.floor(rng()*conds.length)],hi:Math.round(base+5+drift),lo:Math.round(base-4+drift*.6)});
+  }
+  return {cur:Math.round(cur),cond,hi:Math.round(dayHi),lo:Math.round(dayLo),hourly,days,
+    feels:Math.round(cur+(cond==='晴'?1:-2)),hum:Math.round(55+rng()*35),
+    wind:['东南风','东风','东北风','南风'][Math.floor(rng()*4)]+' '+(2+Math.floor(rng()*3))+'级',
+    uv:cond==='晴'?(h>9&&h<16?'强':'中等'):(cond==='多云'?'中等':'弱'),
+    pres:Math.round(1005+rng()*15),vis:Math.round(6+rng()*14),
+    aqi:Math.round(35+rng()*70),rain:Math.round(rng()*80)};
+}
+function wxIcon(icon,night){
+  const c1=night?'#e8ecf2':'#ffd76e', c2='#9fc3ae';
+  if(icon==='sun') return `<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="${c1}"/><g stroke="${c1}" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5 5l1.8 1.8M17.2 17.2 19 19M19 5l-1.8 1.8M6.8 17.2 5 19"/></g></svg>`;
+  if(icon==='moon') return `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M20 13.5A8 8 0 1 1 10.5 4 6.5 6.5 0 0 0 20 13.5Z" fill="#e8ecf2"/></svg>`;
+  if(icon==='cloud') return `<svg width="26" height="26" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .7-7.9A5.5 5.5 0 0 0 7.2 9.5 3.5 3.5 0 0 0 7 18Z" fill="#c9d6cf"/></svg>`;
+  if(icon==='rain') return `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 0 0 .7-7.9A5.5 5.5 0 0 0 7.2 5.5 3.5 3.5 0 0 0 7 14Z" fill="#c9d6cf"/><g stroke="#7db3d9" stroke-width="1.7" stroke-linecap="round"><path d="M8.5 17l-1 2.5M12.5 17l-1 2.5M16.5 17l-1 2.5"/></g></svg>`;
+  return `<svg width="26" height="26" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="${c1}"/><path d="M6 18h11a3.6 3.6 0 0 0 .6-7.1A5 5 0 0 0 8 10 3.2 3.2 0 0 0 6 18Z" fill="#dfe7e2"/></svg>`;
+}
+function renderWeather(){
+  const w=weatherData();
+  const night=new Date().getHours()<6||new Date().getHours()>19;
+  const hours=w.hourly.map(h=>`<div class="hitem"><span>${h.h}时</span>${wxIcon(h.icon,h.h<6||h.h>19)}<span>${h.t}°</span></div>`).join('');
+  const days=w.days.map(d=>`<div class="frow"><span class="fn">${d.w}</span>${wxIcon(d.c==='晴'?'sun':'多云'?'cloud-sun':d.c==='阴'?'cloud':'rain')}
+    <span class="ft">${d.lo}°</span><span style="flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,#4a7a9a,#c9a53f);position:relative;"><i style="position:absolute;left:20%;right:20%;top:0;bottom:0;background:#e8f5ec;border-radius:2px;"></i></span><span class="ft">${d.hi}°</span></div>`).join('');
+  $('#wxBody').innerHTML=`
+    <div style="padding:0 20px;">
+      <div class="loc">上海 <span style="font-size:11px;color:#9fc3ae">▼</span></div>
+      <div class="cond">${w.cond}</div>
+      <div class="big">${w.cur}<sup>°</sup></div>
+      <div class="range">最高 ${w.hi}° · 最低 ${w.lo}°</div>
+    </div>
+    <div class="wxcard"><h4>24 小时预报</h4><div class="hscroll">${hours}</div></div>
+    <div class="wxcard"><h4>6 日预报</h4>${days}</div>
+    <div class="wxcard"><h4>详情</h4><div class="wgrid">
+      <div class="wcell"><div class="wl">体感温度</div><div class="wv">${w.feels}<small>°C</small></div></div>
+      <div class="wcell"><div class="wl">相对湿度</div><div class="wv">${w.hum}<small>%</small></div></div>
+      <div class="wcell"><div class="wl">风向风力</div><div class="wv" style="font-size:14px">${w.wind}</div></div>
+      <div class="wcell"><div class="wl">紫外线</div><div class="wv" style="font-size:14px">${w.uv}</div></div>
+      <div class="wcell"><div class="wl">气压</div><div class="wv">${w.pres}<small> hPa</small></div></div>
+      <div class="wcell"><div class="wl">能见度</div><div class="wv">${w.vis}<small> km</small></div></div>
+      <div class="wcell"><div class="wl">空气质量 AQI</div><div class="wv">${w.aqi}<small> ${w.aqi<50?'优':w.aqi<80?'良':'轻度污染'}</small></div></div>
+      <div class="wcell"><div class="wl">降水概率</div><div class="wv">${w.rain}<small>%</small></div></div>
+    </div></div>`;
+}
+
+/* ============================================================
+   应用 4：时钟（模拟表盘 + 秒表 + 世界时钟）
+   ============================================================ */
+let swInt=null, swStart=0, swElapsed=0, swLaps=[];
+const WORLD=[
+  {c:'上海',o:8},{c:'东京',o:9},{c:'悉尼',o:10},{c:'巴黎',o:1},{c:'伦敦',o:0},{c:'纽约',o:-5}
+];
+function drawAnalog(){
+  const d=new Date(), s=d.getSeconds()+d.getMilliseconds()/1000,
+        m=d.getMinutes()+s/60, h=d.getHours()%12+m/60;
+  $('#ahHand').setAttribute('transform',`rotate(${h*30} 100 100)`);
+  $('#amHand').setAttribute('transform',`rotate(${m*6} 100 100)`);
+  $('#asHand').setAttribute('transform',`rotate(${s*6} 100 100)`);
+  $('#digClock').textContent=`${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+function renderWorld(){
+  $('#worldList').innerHTML=WORLD.map(w=>{
+    const t=new Date(Date.now()+(w.o*60 - new Date().getTimezoneOffset())*60000);
+    const hh=t.getUTCHours();
+    return `<div class="wc-row"><span style="font-size:17px">${hh>=6&&hh<19?'☀️':'🌙'}</span>
+      <span class="cn">${w.c}</span><span class="co">GMT${w.o>=0?'+':''}${w.o}</span>
+      <span class="ct">${pad2(hh)}:${pad2(t.getUTCMinutes())}</span></div>`;
+  }).join('');
+}
+function swTime(ms){
+  const m=Math.floor(ms/60000), s=Math.floor(ms%60000/1000), cs=Math.floor(ms%1000/10);
+  return `${pad2(m)}:${pad2(s)}.${pad2(cs)}`;
+}
+
+/* ============================================================
+   应用 5：地图（代码绘制的上海手绘风地图）
+   ============================================================ */
+const LANDMARKS=[
+  {n:'外滩',x:128,y:156,d:'万国建筑博览群，黄浦江畔的百年天际线'},
+  {n:'陆家嘴',x:240,y:178,d:'东方明珠与陆家嘴金融中心隔江相望'},
+  {n:'豫园',x:158,y:198,d:'明代园林，城隍庙商圈的九曲桥畔'},
+  {n:'静安寺',x:96,y:118,d:'千年古刹，静安商圈的金顶宝塔'},
+  {n:'武康路',x:86,y:190,d:'梧桐树下的老洋房与街角咖啡馆'},
+  {n:'新天地',x:142,y:222,d:'石库门里弄改造成的时尚地标'},
+  {n:'淮海路',x:108,y:210,d:'梧桐区的经典商业街'},
+  {n:'田子坊',x:126,y:244,d:'弄堂里的创意园区与画廊'},
+  {n:'人民广场',x:120,y:168,d:'上海的城市中心与交通枢纽'},
+  {n:'十六铺',x:148,y:232,d:'老码头，轮渡与游船的起点'}
+];
+function mapSVG(){
+  return `<svg class="mapsvg" id="mapSvg" viewBox="0 0 400 400">
+    <defs>
+      <radialGradient id="land" cx="45%" cy="40%"><stop offset="0%" stop-color="#11402e"/><stop offset="100%" stop-color="#0c2b1e"/></radialGradient>
+      <linearGradient id="riv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a6a80"/><stop offset="100%" stop-color="#0f4a5e"/></linearGradient>
+    </defs>
+    <rect width="400" height="400" fill="url(#land)"/>
+    <g opacity=".5" stroke="#1a4a34" stroke-width="1">
+      <path d="M0 100H400M0 200H400M0 300H400M100 0V400M200 0V400M300 0V400" stroke-dasharray="2 7"/>
+    </g>
+    <path d="M0 96 C 70 110, 100 118, 128 150 C 150 176, 148 190, 152 210 L 60 208 C 30 206, 12 196, 0 186 Z" fill="#17513a" opacity=".8"/>
+    <ellipse cx="306" cy="238" rx="34" ry="22" fill="#17513a" opacity=".7"/>
+    <ellipse cx="76" cy="140" rx="20" ry="12" fill="#17513a" opacity=".6"/>
+    <ellipse cx="98" cy="102" rx="10" ry="7" fill="#17513a" opacity=".6"/>
+    <path d="M186 -8 C 168 56, 254 92, 236 150 C 218 208, 258 238, 298 258 C 338 278, 378 296, 408 300 L 408 332 C 360 326, 322 312, 286 292 C 242 266, 212 236, 226 190 C 240 144, 196 110, 214 40 C 222 12, 210 -8, 204 -8 Z" fill="url(#riv)"/>
+    <path d="M186 -8 C 168 56, 254 92, 236 150" fill="none" stroke="#7fd6b0" stroke-width="1.2" opacity=".35"/>
+    <path d="M0 62 C 58 78, 92 94, 128 148" fill="none" stroke="#2a8a9e" stroke-width="7" opacity=".85"/>
+    <path d="M0 62 C 58 78, 92 94, 128 148" fill="none" stroke="#0f4a5e" stroke-width="1" opacity=".6"/>
+    <path d="M76 140 L 96 118 L 120 168 L 142 188 L 240 178 L 272 198" fill="none" stroke="#3fae5a" stroke-width="2.6" opacity=".9"/>
+    <path d="M120 168 L 142 212 L 150 244 L 152 276" fill="none" stroke="#c04545" stroke-width="2.6" opacity=".9"/>
+    <path d="M96 118 L 112 150 L 128 190 L 142 222 L 130 252" fill="none" stroke="#9e6fd0" stroke-width="2.6" opacity=".9"/>
+    <g font-size="10.5" fill="#cfe4d6" font-family="inherit">
+      ${LANDMARKS.map(l=>`<circle cx="${l.x}" cy="${l.y}" r="3.4" fill="#d9b45b" stroke="#0b2018" stroke-width="1.4"/>
+        <text x="${l.x+7}" y="${l.y+4}" stroke="#0b2018" stroke-width="2.6" paint-order="stroke" style="paint-order:stroke;">${l.n}</text>`).join('')}
+    </g>
+    <g fill="#7df0b2" opacity=".8">
+      <circle cx="76" cy="140" r="2.6"/><circle cx="96" cy="118" r="2.6"/><circle cx="120" cy="168" r="2.6"/>
+      <circle cx="142" cy="188" r="2.6"/><circle cx="240" cy="178" r="2.6"/><circle cx="142" cy="222" r="2.6"/><circle cx="150" cy="244" r="2.6"/>
+    </g>
+    <text x="200" y="376" text-anchor="middle" font-size="12" fill="#5f8a72" letter-spacing="4">上海 · SHANGHAI</text>
+  </svg>`;
+}
+function mapLabel(i){ return LANDMARKS[i]; }
+
+/* ============================================================
+   应用 6：相册（纯代码绘制的 12 张“照片”）
+   ============================================================ */
+let svgUid=0;
+function photoSVG(art){
+  const id='g'+(++svgUid);
+  const sky=(a,b)=>`<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${a}"/><stop offset="100%" stop-color="${b}"/></linearGradient>`;
+  const stars=(n,rng)=>{ let s=''; for(let i=0;i<n;i++) s+=`<circle cx="${rng()*300}" cy="${rng()*130}" r="${rng()*1.3+.4}" fill="#fff" opacity="${.4+rng()*.6}"/>`; return s; };
+  const build=(inner,defs='')=>`<svg viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice"><defs>${defs}</defs>${inner}</svg>`;
+  switch(art){
+    case 'bund': return build(`
+      ${sky('#0b2036','#3a1f2e')}
+      ${stars(26,mulberry32(11))}
+      <circle cx="238" cy="58" r="26" fill="#f5e9c9"/><circle cx="238" cy="58" r="40" fill="#f5e9c9" opacity=".12"/>
+      <path d="M0 210 V150 h26 v-18 h10 v18 h20 v-30 h14 v30 h24 v-16 h12 v16 h26 v-24 h14 v24 h24 v-14 h10 v14 h26 v-34 h16 v34 h24 v-20 h12 v20 h26 v-12 h10 v12 h26 v60 Z" fill="#12202e"/>
+      <g fill="#e8c25a">${[...Array(34)].map((_,i)=>`<rect x="${10+i*8.4}" y="${158+(i%5)*9}" width="3" height="4" opacity="${.35+((i*7)%5)*.13}"/>`).join('')}</g>
+      <path d="M0 210 H300 V300 H0 Z" fill="#0a1a2e"/>
+      <g stroke="#e8c25a" stroke-width="3" opacity=".4">${[...Array(9)].map((_,i)=>`<line x1="${20+i*32}" y1="${222+(i%3)*8}" x2="${20+i*32}" y2="${238+(i%3)*8}"/>`).join('')}</g>
+      <path d="M60 210 q30 6 60 0 q30 -6 60 0" stroke="#1d6a80" stroke-width="2" fill="none" opacity=".8"/>`);
+    case 'mist': return build(`
+      ${sky('#cfdcd4','#f2ecdc')}
+      <circle cx="150" cy="96" r="34" fill="#fff3d6" opacity=".95"/><circle cx="150" cy="96" r="58" fill="#fff3d6" opacity=".25"/>
+      <path d="M0 190 q75 -18 150 0 t150 0 V300 H0 Z" fill="#8fa398" opacity=".8"/>
+      <path d="M0 205 q75 -14 150 0 t150 0" stroke="#5f7a6a" stroke-width="3" fill="none" opacity=".6"/>
+      <path d="M20 196 L150 178 L280 196" stroke="#43564c" stroke-width="3" fill="none"/>
+      <g stroke="#43564c" stroke-width="2"><path d="M60 192 v-14 M110 188 v-14 M160 185 v-14 M210 188 v-14 M255 192 v-14"/></g>
+      <rect x="138" y="212" width="26" height="10" rx="4" fill="#31413a"/>
+      <path d="M120 212 h62" stroke="#31413a" stroke-width="2"/>
+      <rect x="0" y="228" width="300" height="72" fill="#e8e2cf" opacity=".55"/>`);
+    case 'lantern': return build(`
+      ${sky('#3d1220','#701f2e')}
+      ${stars(10,mulberry32(22))}
+      <path d="M0 300 V190 h60 v-40 h40 v40 h60 v-56 h34 v56 h60 v-38 h46 v148 Z" fill="#1f0d14"/>
+      <path d="M0 196 q75 -14 150 0 t150 0" stroke="#e8c25a" stroke-width="2.5" fill="none" opacity=".9"/>
+      <g>${[...Array(7)].map((_,i)=>{ const x=24+i*43, y=186+Math.sin(i/6*Math.PI)*16;
+        return `<line x1="${x}" y1="${y-6}" x2="${x}" y2="${y+16}" stroke="#7a3b2a" stroke-width="2"/>
+        <ellipse cx="${x}" cy="${y+30}" rx="13" ry="15" fill="#d94f3d"/><ellipse cx="${x}" cy="${y+30}" rx="13" ry="15" fill="none" stroke="#e8c25a" stroke-width="1.6"/>
+        <rect x="${x-4}" y="${y+12}" width="8" height="5" fill="#e8c25a"/><rect x="${x-4}" y="${y+46}" width="8" height="5" fill="#e8c25a"/>
+        <text x="${x}" y="${y+34}" text-anchor="middle" font-size="11" fill="#f5e9c9" font-family="serif">${['福','禄','寿','喜','财','吉','安'][i]}</text>`;}).join('')}</g>
+      <circle cx="150" cy="270" r="60" fill="#e8c25a" opacity=".06"/>`);
+    case 'tower': return build(`
+      ${sky('#e8ddc4','#cfd8c8')}
+      <path d="M0 300 V240 h300 v60 Z" fill="#9db08f"/>
+      <path d="M150 60 C 120 66 96 84 88 118 L 84 244 L 216 244 L 212 118 C 204 84 180 66 150 60 Z" fill="#7a4a3a"/>
+      <path d="M150 60 C 120 66 96 84 88 118 L 86 150 C 120 138 180 138 214 150 L 212 118 C 204 84 180 66 150 60 Z" fill="#8d5a46"/>
+      <g fill="#e8ddc4" opacity=".9">${[...Array(18)].map((_,i)=>{ const r=Math.floor(i/6), c=i%6;
+        return `<rect x="${104+c*18}" y="${96+r*30}" width="10" height="14" rx="1"/>`;}).join('')}</g>
+      <path d="M0 244 H300" stroke="#5a6b50" stroke-width="3"/>
+      <g fill="#5f7a4a"><circle cx="52" cy="222" r="24"/><circle cx="80" cy="232" r="17"/><circle cx="240" cy="216" r="26"/><circle cx="272" cy="230" r="18"/><circle cx="212" cy="234" r="15"/></g>`);
+    case 'skyline': return build(`
+      ${sky('#2c2350','#c9553e')}
+      <circle cx="70" cy="216" r="42" fill="#f5b73e" opacity=".9"/><circle cx="70" cy="216" r="66" fill="#f5b73e" opacity=".15"/>
+      <path d="M0 300 V236 h34 v-70 h10 v70 h30 v-104 h26 v-34 a13 13 0 0 1 26 0 v34 h20 v-56 h12 v56 h30 v-40 h22 v40 h26 v-66 h12 v66 h30 v-30 h18 v30 h34 v-84 h10 v84 h36 v64 Z" fill="#1a1533"/>
+      <g fill="#f5d76e">${[...Array(40)].map((_,i)=>{ const x=8+(i*37%284), y=240+(i*53%46); return `<rect x="${x}" y="${y}" width="3.4" height="4.4" opacity="${.3+(i%4)*.17}"/>`;}).join('')}</g>
+      <path d="M0 300 h300" stroke="#0f0c22" stroke-width="3"/>
+      <path d="M40 262 q40 8 80 0 q40 -8 80 0 q40 8 80 0" stroke="#f5b73e" stroke-width="2" fill="none" opacity=".35"/>`);
+    case 'temple': return build(`
+      ${sky('#e8c98a','#c98a5e')}
+      <circle cx="238" cy="64" r="30" fill="#fdf3d0"/><circle cx="238" cy="64" r="52" fill="#fdf3d0" opacity=".3"/>
+      <path d="M0 300 V250 h300 v50 Z" fill="#a8763e"/>
+      <path d="M0 250 h300" stroke="#7a4a2a" stroke-width="3"/>
+      <path d="M60 250 L150 196 L240 250 Z" fill="#3a2a1a"/>
+      <path d="M92 250 L150 214 L208 250 Z" fill="#8a2f2a"/>
+      <path d="M76 250 L150 206 L224 250 Z" fill="#d9a53f"/>
+      <rect x="144" y="206" width="12" height="44" fill="#5a3a22"/>
+      <path d="M118 250 v-20 h64 v20" fill="#8a2f2a"/>
+      <g stroke="#e8ddc4" stroke-width="3" fill="none" opacity=".8"><path d="M108 190 q6 -10 0 -20 q-5 -9 1 -18"/><path d="M196 190 q6 -10 0 -20 q-5 -9 1 -18"/></g>`);
+    case 'lane': return build(`
+      ${sky('#e8ddc4','#d8cba8')}
+      <path d="M0 0 H300 L240 300 H60 Z" fill="#b0573f"/>
+      <path d="M0 0 H300 L240 300 H206 L250 0 H0 Z" fill="#9c4632" opacity=".65"/>
+      <g stroke="#8a3b2a" stroke-width="1.4" opacity=".8">${[...Array(9)].map((_,i)=>`<line x1="0" y1="${i*34}" x2="300" y2="${i*34}"/>`).join('')}</g>
+      <path d="M60 300 L120 60 H180 L240 300 Z" fill="#e8ddc4"/>
+      <path d="M60 300 L120 60 H180 L240 300" fill="none" stroke="#7a4a3a" stroke-width="3"/>
+      <g fill="#5f7a4a"><circle cx="128" cy="80" r="18"/><circle cx="150" cy="70" r="20"/><circle cx="172" cy="80" r="16"/></g>
+      <g><circle cx="96" cy="230" r="13" fill="#4a5a42"/><circle cx="208" cy="216" r="14" fill="#4a5a42"/></g>
+      <path d="M110 300 q40 -26 80 0" stroke="#7a4a3a" stroke-width="2.5" fill="none"/>
+      <rect x="142" y="272" width="16" height="10" rx="3" fill="#31413a"/>
+      <path d="M142 276 q8 -10 16 0" stroke="#31413a" stroke-width="2" fill="none"/>`);
+    case 'shikumen': return build(`
+      ${sky('#d8cba8','#e8ddc4')}
+      <path d="M60 300 V90 h180 v210 Z" fill="#8a3b2a"/>
+      <g stroke="#6e2c1e" stroke-width="1.6" opacity=".9">${[...Array(12)].map((_,i)=>`<line x1="60" y1="${96+i*17}" x2="240" y2="${96+i*17}"/>`).join('')}</g>
+      <path d="M150 300 V196 a26 26 0 0 1 52 0 V300 Z" fill="#3a2318"/>
+      <path d="M150 196 a26 26 0 0 1 52 0" fill="none" stroke="#d9a53f" stroke-width="2.5"/>
+      <circle cx="196" cy="248" r="3.4" fill="#d9a53f"/>
+      <path d="M96 90 h108 l-14 -26 h-80 Z" fill="#5a3a22"/>
+      <path d="M84 64 h132" stroke="#3a2a1a" stroke-width="4"/>
+      <ellipse cx="104" cy="128" rx="10" ry="12" fill="#c04545"/><ellipse cx="196" cy="128" rx="10" ry="12" fill="#c04545"/>
+      <rect x="60" y="90" width="180" height="8" fill="#5a3a22"/>`);
+    case 'river': return build(`
+      ${sky('#f5c86e','#c95f6e')}
+      <circle cx="150" cy="150" r="46" fill="#fdf3d0"/><circle cx="150" cy="150" r="76" fill="#fdf3d0" opacity=".25"/>
+      <path d="M0 196 H300 V300 H0 Z" fill="#3a3a5e"/>
+      <path d="M104 196 a46 46 0 0 1 92 0" stroke="#5a4a3a" stroke-width="4" fill="none"/>
+      <g stroke="#5e6e9e" stroke-width="2" opacity=".9"><path d="M0 226 q37 -6 75 0 t75 0 t75 0 t75 0 M0 252 q37 -6 75 0 t75 0 t75 0 t75 0"/></g>
+      <ellipse cx="150" cy="238" rx="14" ry="46" fill="#f5c86e" opacity=".35"/>
+      <g stroke="#3a2a2a" stroke-width="2" fill="none"><path d="M40 60 q10 -8 20 0 M64 48 q10 -8 20 0 M210 44 q10 -8 20 0"/></g>`);
+    case 'garden': return build(`
+      ${sky('#e8b96e','#d88a5e')}
+      <circle cx="248" cy="70" r="28" fill="#fdf3d0" opacity=".95"/>
+      <path d="M0 300 V240 h300 v60 Z" fill="#8a5a3a"/>
+      <g><circle cx="70" cy="180" r="42" fill="#c04545"/><circle cx="120" cy="150" r="46" fill="#d96a3d"/><circle cx="172" cy="176" r="38" fill="#c9a53f"/><circle cx="216" cy="148" r="34" fill="#a83232"/></g>
+      <g stroke="#5a3a22" stroke-width="5"><path d="M70 222 v18 M120 196 v44 M172 214 v26 M216 182 v58"/></g>
+      <path d="M0 258 H300" stroke="#6e4226" stroke-width="3"/>
+      <g fill="#d96a3d"><rect x="40" y="120" width="6" height="6" transform="rotate(24 43 123)"/><rect x="250" y="200" width="6" height="6" transform="rotate(-18 253 203)"/><rect x="150" y="90" width="6" height="6" transform="rotate(40 153 93)"/><rect x="90" y="210" width="6" height="6" transform="rotate(60 93 213)"/></g>`);
+    case 'pier': return build(`
+      ${sky('#12303e','#1d5a5e')}
+      ${stars(16,mulberry32(33))}
+      <circle cx="52" cy="60" r="22" fill="#e8ecf2" opacity=".9"/>
+      <path d="M0 190 H300 V300 H0 Z" fill="#0d222e"/>
+      <g stroke="#2a8a9e" stroke-width="2" opacity=".7"><path d="M0 216 q37 -6 75 0 t75 0 t75 0 t75 0"/></g>
+      <path d="M96 300 L128 190 H172 L204 300 Z" fill="#5a4232"/>
+      <g stroke="#3a2e22" stroke-width="2">${[...Array(5)].map((_,i)=>`<line x1="${100+i*6}" y1="${290-i*18}" x2="${200-i*6}" y2="${290-i*18}"/>`).join('')}</g>
+      <path d="M60 190 q90 -34 180 0" stroke="#31413a" stroke-width="14" fill="none"/>
+      <rect x="128" y="168" width="44" height="22" rx="3" fill="#c04545"/>
+      <g fill="#f5d76e"><rect x="134" y="173" width="6" height="6"/><rect x="146" y="173" width="6" height="6"/><rect x="158" y="173" width="6" height="6"/></g>
+      <circle cx="104" cy="182" r="5" fill="#d9b45b"/><circle cx="196" cy="182" r="5" fill="#d9b45b"/>
+      <path d="M104 182 q-4 -40 10 -60 M196 182 q6 -36 -8 -56" stroke="#31413a" stroke-width="2.5" fill="none"/>`);
+    case 'neon': return build(`
+      ${sky('#160f2e','#3d1d4e')}
+      ${stars(14,mulberry32(44))}
+      <path d="M0 300 V150 h70 v150 M230 300 V120 h70 v180 M0 300 H300" fill="#0f0a1e"/>
+      <g fill="#ff5f8f"><circle cx="112" cy="120" r="16"/><circle cx="112" cy="120" r="26" opacity=".25"/></g>
+      <g fill="#4ad9d9"><circle cx="188" cy="96" r="13"/><circle cx="188" cy="96" r="22" opacity=".25"/></g>
+      <g fill="#f5d76e"><circle cx="150" cy="150" r="11"/><circle cx="150" cy="150" r="19" opacity=".25"/></g>
+      <text x="112" y="126" text-anchor="middle" font-size="15" fill="#fff" font-family="serif">酒</text>
+      <text x="188" y="101" text-anchor="middle" font-size="12" fill="#fff" font-family="serif">茶</text>
+      <text x="150" y="155" text-anchor="middle" font-size="11" fill="#fff" font-family="serif">戏</text>
+      <path d="M0 150 h70 M0 168 h70 M230 120 h70 M230 138 h70" stroke="#2a1d3e" stroke-width="3"/>
+      <g stroke="#2a1d3e" stroke-width="2"><path d="M0 40 H300 M0 66 H300 M0 92 H300"/></g>
+      <path d="M0 300 H300 V282 H0 Z" fill="#241636"/>
+      <g fill="#ff5f8f" opacity=".35"><rect x="88" y="230" width="48" height="52" rx="6"/></g>
+      <g fill="#4ad9d9" opacity=".35"><rect x="168" y="226" width="44" height="56" rx="6"/></g>
+      <g fill="#f5d76e" opacity=".3">${[...Array(8)].map((_,i)=>`<circle cx="${20+(i*37)%260}" cy="${296}" r="${2+(i%3)}"/>`).join('')}</g>`);
+    default: return build(`${sky('#0d2b1e','#123a28')}${stars(20,mulberry32(55))}`);
+  }
+}
+const PHOTOS=[
+  {cap:'外滩夜色',art:'bund'},{cap:'黄浦江晨雾',art:'mist'},{cap:'豫园灯会',art:'lantern'},
+  {cap:'武康大楼',art:'tower'},{cap:'陆家嘴天际线',art:'skyline'},{cap:'静安寺金顶',art:'temple'},
+  {cap:'田子坊巷弄',art:'lane'},{cap:'新天地石库门',art:'shikumen'},{cap:'苏州河黄昏',art:'river'},
+  {cap:'思南公馆的秋天',art:'garden'},{cap:'十六铺码头',art:'pier'},{cap:'南京路霓虹',art:'neon'}
+];
+let curPhoto=0;
+function renderPhotos(){
+  $('#pGrid').innerHTML=PHOTOS.map((p,i)=>`<div class="pcell" data-i="${i}">${photoSVG(p.art)}</div>`).join('');
+  $$('#pGrid .pcell').forEach(c=>c.addEventListener('click',()=>{
+    Snd.click(); curPhoto=+c.dataset.i; renderPhotoView(); $('#pview').style.display='flex';
+  }));
+}
+function renderPhotoView(){
+  const p=PHOTOS[curPhoto];
+  $('#pview .art').innerHTML=photoSVG(p.art);
+  $('#pcapTitle').textContent=p.cap;
+  $('#pcapCount').textContent=(curPhoto+1)+' / '+PHOTOS.length;
+}
+
+/* ============================================================
+   构建各应用视图
+   ============================================================ */
+const VIEWS={};
+function viewShell(id,title,bodyHTML,headExtra=''){
+  return `<div class="view" id="view-${id}">
+    <div class="vhead"><h2>${title}</h2>${headExtra}</div>
+    <div class="vbody">${bodyHTML}</div>
+  </div>`;
+}
+function buildView(id){
+  if(id==='calc'){ VIEWS.calc=viewShell('calc','计算器',`
+    <div class="calc" style="flex:1;display:flex;flex-direction:column;">
+      <div class="cdisp"><div class="cexpr"></div><div class="cval">0</div></div>
+      <div class="cpad">
+        ${['C','±','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','0','.',''].map((k,i)=>
+          k===''?'<button class="ckey eq" data-k="=">=</button>':
+          ['÷','×','−','+'].includes(k)?`<button class="ckey op" data-k="${k}">${k}</button>`:
+          ['C','±','%'].includes(k)?`<button class="ckey fn" data-k="${k}">${k}</button>`:
+          k==='.'?`<button class="ckey" data-k=".">.</button>`:
+          `<button class="ckey" data-k="${k}">${k}</button>`).join('')}
+      </div>
+    </div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.calc);
+    $$('#view-calc .ckey').forEach(b=>b.addEventListener('click',()=>calcPress(b.dataset.k)));
+    calcRender();
+  }
+  if(id==='notes'){ VIEWS.notes=viewShell('notes','备忘录',`
+    <div class="notes" style="flex:1;display:flex;flex-direction:column;">
+      <div class="vhead" style="padding-bottom:6px;"><h2>备忘录</h2><span class="nb" id="nCount"></span></div>
+      <div class="nlist" id="notesList" style="position:absolute;inset:120px 0 0;"></div>
+      <div class="nedit" id="noteEditor" style="display:none;position:absolute;inset:120px 0 0;">
+        <input id="neTitle" placeholder="标题"/>
+        <textarea id="neBody" placeholder="开始记录…"></textarea>
+        <button class="ndel" id="neDel">删除此备忘录</button>
+      </div>
+      <button class="nnew" id="neNew" style="position:absolute;right:20px;top:74px;">＋ 新备忘录</button>
+      <button class="nnew" id="neBack" style="display:none;position:absolute;right:20px;top:74px;background:#8a7a52;">‹ 返回列表</button>
+    </div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.notes);
+    const save=()=>{ curNote.title=$('#neTitle').value; curNote.body=$('#neBody').value;
+      curNote.ts=Date.now(); notes.sort((a,b)=>b.ts-a.ts); saveNotes(); };
+    $('#neTitle').addEventListener('input',save);
+    $('#neBody').addEventListener('input',save);
+    $('#neNew').addEventListener('click',()=>{ Snd.click();
+      curNote={id:Date.now(),title:'',body:'',ts:Date.now()}; notes.unshift(curNote); saveNotes(); renderNoteEdit(); });
+    $('#neBack').addEventListener('click',()=>{ save(); Snd.swish(); renderNoteView(); });
+    $('#neDel').addEventListener('click',()=>{ Snd.pay();
+      notes=notes.filter(n=>n.id!==curNote.id); saveNotes(); renderNoteView(); toast('备忘录已删除'); });
+    loadNotes(); renderNotesList(); $('#nCount').textContent=notes.length+' 条备忘录';
+  }
+  if(id==='weather'){ VIEWS.weather=viewShell('weather','天气',`<div class="wx" style="flex:1;display:flex;flex-direction:column;"><div class="vbody" id="wxBody" style="padding-top:8px;"></div></div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.weather); renderWeather(); }
+  if(id==='clock'){ VIEWS.clock=viewShell('clock','时钟',`
+    <div class="clock" style="flex:1;display:flex;flex-direction:column;">
+      <div class="ctabs">
+        <button class="ctab on" data-t="analog">时钟</button>
+        <button class="ctab" data-t="stop">秒表</button>
+        <button class="ctab" data-t="world">世界时钟</button>
+      </div>
+      <div class="analog-wrap" id="tabAnalog">
+        <svg width="230" height="230" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="96" fill="#0f2c22" stroke="#d9b45b" stroke-width="3"/>
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(125,240,178,.15)"/>
+          ${[...Array(60)].map((_,i)=>{ const a=i*6*Math.PI/180, big=i%5===0;
+            const r1=big?78:84, r2=88;
+            return `<line x1="${100+Math.sin(a)*r1}" y1="${100-Math.cos(a)*r1}" x2="${100+Math.sin(a)*r2}" y2="${100-Math.cos(a)*r2}" stroke="${big?'#d9b45b':'#4a6a58'}" stroke-width="${big?2.6:1.2}"/>`;}).join('')}
+          <text x="100" y="46" text-anchor="middle" font-size="15" fill="#7df0b2" font-family="serif" letter-spacing="3">上海</text>
+          <line id="ahHand" x1="100" y1="100" x2="100" y2="58" stroke="#e8f5ec" stroke-width="5" stroke-linecap="round"/>
+          <line id="amHand" x1="100" y1="100" x2="100" y2="36" stroke="#e8f5ec" stroke-width="3.4" stroke-linecap="round"/>
+          <line id="asHand" x1="100" y1="112" x2="100" y2="28" stroke="#e05c5c" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="100" cy="100" r="4" fill="#d9b45b"/>
+        </svg>
+        <div class="digi" id="digClock">--:--:--</div>
+      </div>
+      <div class="sw-wrap" id="tabStop" style="display:none;">
+        <div class="sw-time" id="swTime">00:00.00</div>
+        <div class="sw-laps" id="swLaps"></div>
+        <div style="display:flex;gap:16px;">
+          <button class="pbtn" id="swBtn" style="padding:12px 34px;">启动</button>
+          <button class="pbtn ghost" id="swReset" style="padding:12px 34px;">重置</button>
+        </div>
+      </div>
+      <div class="sw-wrap" id="tabWorld" style="display:none;">
+        <div style="width:100%;padding:6px 20px 0;" id="worldList"></div>
+      </div>
+    </div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.clock);
+    $$('.ctab').forEach(t=>t.addEventListener('click',()=>{
+      Snd.click(); $$('.ctab').forEach(x=>x.classList.remove('on')); t.classList.add('on');
+      $('#tabAnalog').style.display=t.dataset.t==='analog'?'flex':'none';
+      $('#tabStop').style.display=t.dataset.t==='stop'?'flex':'none';
+      $('#tabWorld').style.display=t.dataset.t==='world'?'flex':'none';
+    }));
+    $('#swBtn').addEventListener('click',function(){
+      if(swInt){ clearInterval(swInt); swInt=null; this.textContent='继续'; Snd.tick(); }
+      else{ swStart=Date.now()-swElapsed; swInt=setInterval(()=>{ swElapsed=Date.now()-swStart; $('#swTime').textContent=swTime(swElapsed); },50);
+        this.textContent='暂停'; Snd.ding(); }
+    });
+    $('#swReset').addEventListener('click',()=>{
+      clearInterval(swInt); swInt=null; swElapsed=0; swLaps=[];
+      $('#swTime').textContent='00:00.00'; $('#swLaps').innerHTML=''; $('#swBtn').textContent='启动'; Snd.tick();
+    });
+    $('#tabStop').addEventListener('dblclick',()=>{});
+    document.addEventListener('keydown',e=>{});
+    renderWorld(); drawAnalog();
+  }
+  if(id==='map'){ VIEWS.map=viewShell('map','地图',`
+    <div class="map" style="flex:1;display:flex;flex-direction:column;">
+      <div class="vbody" id="mapBody" style="touch-action:none;">${mapSVG()}
+        <div class="mapctl">
+          <button id="mapIn">＋</button><button id="mapOut">－</button><button id="mapHome">◎</button>
+        </div>
+        <div class="mapcard" id="mapcard" style="display:none;">
+          <h3 id="mcName"></h3><p id="mcDesc"></p><span class="mx" id="mcClose">✕</span>
+        </div>
+      </div>
+    </div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.map);
+    const body=$('#mapBody'); let tf={x:0,y:0,k:1};
+    const apply=()=>{ const g=body.querySelector('svg > g')||body.querySelector('svg');
+      $('#mapSvg').style.transform=`translate(${tf.x}px,${tf.y}px) scale(${tf.k})`;
+      $('#mapSvg').style.transformOrigin='center'; };
+    let drag=null;
+    body.addEventListener('pointerdown',e=>{ if(e.target.closest('.mapctl,.mapcard'))return;
+      drag={x:e.clientX-tf.x,y:e.clientY-tf.y}; body.setPointerCapture(e.pointerId); });
+    body.addEventListener('pointermove',e=>{ if(!drag)return;
+      tf.x=e.clientX-drag.x; tf.y=e.clientY-drag.y; apply(); });
+    body.addEventListener('pointerup',()=>drag=null);
+    $('#mapIn').addEventListener('click',()=>{ tf.k=Math.min(3,tf.k*1.5); apply(); Snd.key(); });
+    $('#mapOut').addEventListener('click',()=>{ tf.k=Math.max(1,tf.k/1.5); apply(); Snd.key(); });
+    $('#mapHome').addEventListener('click',()=>{ tf={x:0,y:0,k:1}; apply(); Snd.key(); });
+    body.querySelectorAll('circle[fill="#d9b45b"]').forEach((c,i)=>{
+      c.style.cursor='pointer';
+      c.addEventListener('click',e=>{
+        e.stopPropagation(); Snd.ding();
+        const l=mapLabel(i);
+        $('#mcName').textContent=l.n; $('#mcDesc').textContent=l.d;
+        $('#mapcard').style.display='block';
+      });
+    });
+    $('#mcClose').addEventListener('click',()=>{ $('#mapcard').style.display='none'; Snd.tick(); });
+  }
+  if(id==='photos'){ VIEWS.photos=viewShell('photos','相册',`
+    <div class="photos" style="flex:1;display:flex;flex-direction:column;">
+      <div class="vhead"><h2>图库</h2><span style="font-size:12px;color:#7d937f">${PHOTOS.length} 张照片</span></div>
+      <div class="pgrid" id="pGrid" style="position:absolute;top:110px;left:0;right:0;bottom:0;"></div>
+      <div class="pview" id="pview" style="display:none;">
+        <div class="art"></div>
+        <button class="pnav l" id="pvL">‹</button>
+        <button class="pnav r" id="pvR">›</button>
+        <div class="pcap"><span class="t" id="pcapTitle"></span><span class="c" id="pcapCount"></span></div>
+      </div>
+    </div>`);
+    $('#viewRoot').insertAdjacentHTML('beforeend',VIEWS.photos);
+    renderPhotos(); renderPhotoView();
+    $('#pvL').addEventListener('click',()=>{ curPhoto=(curPhoto+PHOTOS.length-1)%PHOTOS.length; Snd.swish(); renderPhotoView(); });
+    $('#pvR').addEventListener('click',()=>{ curPhoto=(curPhoto+1)%PHOTOS.length; Snd.swish(); renderPhotoView(); });
+    $('#pview').addEventListener('click',e=>{
+      if(e.target.id==='pview'||e.target.classList.contains('art')){ $('#pview').style.display='none'; Snd.swish(); }
+    });
+  }
+}
+
+/* ============================================================
+   来电流程
+   ============================================================ */
+let ringTO=null, callSec=0, callInt=null;
+function startCall(){
+  if(state.call) return;
+  const c=CONTACTS[Math.floor(Math.random()*CONTACTS.length)];
+  state.call='incoming';
+  $('#callerAvatar').textContent=c.token; $('#callerName').textContent=c.token+' '+c.name;
+  $('#calleeAvatar').textContent=c.token; $('#calleeName').textContent=c.token+' '+c.name;
+  $('#callIncoming').style.display='block'; $('#callActive').style.display='none';
+  $('#callLayer').classList.add('open','incoming');
+  Snd.ringStart();
+  ringTO=setTimeout(()=>{ endCall(false); toast('未接来电 · '+c.name); },26000);
+  setState();
+}
+function answerCall(){
+  if(state.call!=='incoming') return;
+  clearTimeout(ringTO); Snd.ringStop(); Snd.ding();
+  state.call='active'; callSec=0; drawCallTime();
+  $('#callLayer').classList.remove('incoming');
+  $('#callIncoming').style.display='none'; $('#callActive').style.display='flex';
+  callInt=setInterval(()=>{ callSec++; drawCallTime(); },1000);
+  setState();
+}
+function drawCallTime(){ $('#callTimer').textContent=pad2(Math.floor(callSec/60))+':'+pad2(callSec%60); }
+function endCall(connected){
+  const wasConnected=state.call==='active';
+  clearTimeout(ringTO); clearInterval(callInt); Snd.ringStop();
+  if(wasConnected){ Snd.pay(); toast('通话结束 · 时长 '+pad2(Math.floor(callSec/60))+':'+pad2(callSec%60)); }
+  else if(state.call==='incoming'){ Snd.error(); }
+  $('#callLayer').classList.remove('open');
+  setTimeout(()=>{ $('#callLayer').classList.remove('incoming'); },380);
+  state.call=null; callSec=0; setState();
+}
+$('#btnAnswer').addEventListener('click',answerCall);
+$('#btnDecline').addEventListener('click',()=>endCall(false));
+$('#btnHangup').addEventListener('click',()=>endCall(true));
+$('#btnCall').addEventListener('click',()=>{ Snd.click(); startCall(); });
+$('#kbKeypad').addEventListener('click',()=>{ $('#keypadUI').style.display='flex'; Snd.click(); });
+$('#kpClose').addEventListener('click',()=>{ $('#keypadUI').style.display='none'; Snd.click(); });
+$('#kbMute').addEventListener('click',e=>{ e.currentTarget.querySelector('span').textContent='🎙'; toast('静音已切换'); Snd.tick(); });
+$('#kbSpeaker').addEventListener('click',()=>{ toast('免提已切换'); Snd.tick(); });
+$('#kpGrid').innerHTML=['1','2','3','4','5','6','7','8','9','*','0','#'].map(d=>
+  `<button data-d="${d}">${d}</button>`).join('');
+$$('#kpGrid button').forEach(b=>b.addEventListener('click',()=>Snd.dtmf(b.dataset.d)));
+
+/* 拨号键盘默认提示：待机时点击屏保空白不锁屏等细节略 */
+setState();
+</script>
+</body>
+</html>
