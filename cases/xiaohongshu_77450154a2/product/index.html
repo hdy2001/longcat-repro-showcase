@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GLM5.3 Flash · 实测3D建模 — 动态3D场景</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0716; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- 海报文字层 ---------- */
+  .poster-ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  .title-wrap {
+    position: absolute; top: 4.5vh; left: 3.6vw;
+    animation: floatY 7s ease-in-out infinite;
+  }
+  .title-wrap h1 {
+    font-size: clamp(30px, 6.2vw, 68px);
+    font-weight: 900; font-style: italic;
+    letter-spacing: 0.5px; line-height: 1.06;
+    color: #ffffff;
+    -webkit-text-stroke: 2px rgba(18, 6, 34, 0.95);
+    text-shadow:
+      3px 3px 0 rgba(18, 6, 34, 0.9),
+      -2px -2px 0 rgba(18, 6, 34, 0.9),
+      0 0 26px rgba(150, 100, 255, 0.35);
+  }
+  .title-wrap .sub {
+    margin-top: 10px;
+    font-size: clamp(24px, 4.6vw, 50px);
+    font-weight: 900; line-height: 1.1;
+    color: #ffffff;
+    -webkit-text-stroke: 1.6px rgba(18, 6, 34, 0.95);
+    text-shadow:
+      2.5px 2.5px 0 rgba(18, 6, 34, 0.9),
+      -1.5px -1.5px 0 rgba(18, 6, 34, 0.9);
+  }
+  .title-wrap .sub .d3 {
+    color: #d9ff3d;
+    font-style: italic;
+    -webkit-text-stroke: 1.6px rgba(18, 6, 34, 0.95);
+    text-shadow:
+      2.5px 2.5px 0 rgba(18, 6, 34, 0.9),
+      -1.5px -1.5px 0 rgba(18, 6, 34, 0.9),
+      0 0 24px rgba(217, 255, 61, 0.55);
+    animation: d3Glow 3.2s ease-in-out infinite;
+  }
+  @keyframes floatY {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
+  }
+  @keyframes d3Glow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.35); }
+  }
+
+  .badge {
+    position: absolute; left: 3.6vw; bottom: 4vh;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
+    font-size: 12.5px; letter-spacing: 1.5px; font-weight: 600;
+    color: rgba(235, 228, 255, 0.92);
+    background: rgba(22, 10, 44, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #d9ff3d;
+    box-shadow: 0 0 8px #d9ff3d;
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  .hint {
+    position: absolute; right: 3.6vw; bottom: 4vh;
+    font-size: 12.5px; letter-spacing: 2px;
+    color: rgba(235, 228, 255, 0.55);
+    animation: hintFade 4s ease-in-out infinite;
+  }
+  @keyframes hintFade { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+  /* ---------- 氛围叠加 ---------- */
+  .vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 42%, transparent 55%, rgba(10, 4, 22, 0.6) 100%),
+      linear-gradient(to bottom, rgba(10, 4, 22, 0.35), transparent 18%, transparent 85%, rgba(10, 4, 22, 0.45));
+  }
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0.05;
+    background-image: repeating-conic-gradient(rgba(255,255,255,0.6) 0 0.6deg, transparent 0.6deg 1.4deg);
+    background-size: 5px 5px;
+    mix-blend-mode: overlay;
+  }
+
+  /* ---------- 加载 / 失败 ---------- */
+  .loader {
+    position: fixed; inset: 0; z-index: 100;
+    background: #0d0716;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    transition: opacity 0.9s ease;
+  }
+  .loader.hidden { opacity: 0; pointer-events: none; }
+  .loader .ring {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: #ff4fc3;
+    animation: spin 0.9s linear infinite;
+  }
+  .loader .txt { color: rgba(235,228,255,0.75); font-size: 13px; letter-spacing: 4px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #load-fail {
+    position: fixed; inset: 0; z-index: 99; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    background: #0d0716; color: rgba(235,228,255,0.8);
+    font-size: 14px; line-height: 2; letter-spacing: 1px; padding: 24px;
+  }
+  #load-fail.show { display: flex; }
+
+  @media (max-width: 640px) {
+    .title-wrap { top: 3.5vh; left: 5vw; }
+    .badge { left: 5vw; bottom: 3vh; font-size: 11px; padding: 7px 12px; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div class="poster-ui">
+  <div class="title-wrap">
+    <h1>GLM5.3 Flash</h1>
+    <div class="sub">实测 <span class="d3">3D</span> 建模</div>
+  </div>
+  <div class="badge"><span class="dot"></span>Three.js 实时渲染 · 动态光影 · AI 直出 3D 建模</div>
+  <div class="hint">移动鼠标环视场景</div>
+</div>
+
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<div class="loader" id="loader">
+  <div class="ring"></div>
+  <div class="txt">正在加载 3D 场景</div>
+</div>
+<div id="load-fail">3D 引擎加载失败<br>请检查网络连接后刷新页面（Three.js 通过 CDN 加载）</div>
+
+<script>
+  // 若 CDN 或 WebGL 失败，8 秒后给出提示
+  setTimeout(function () {
+    if (!window.__sceneReady) document.getElementById('load-fail').classList.add('show');
+  }, 8000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const AMP = REDUCED ? 0.15 : 1.0;
+
+/* ================= 渲染器 / 场景 ================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0716);
+scene.fog = new THREE.FogExp2(0x0d0716, 0.011);
+
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 120);
+camera.position.set(0, 2.6, 7.6);
+
+/* ================= 后期：辉光 ================= */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.55, 0.6
+);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ================= 纹理工具 ================= */
+function glowTexture(r, g, b) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, `rgba(${r},${g},${b},0.9)`);
+  grad.addColorStop(0.35, `rgba(${r},${g},${b},0.32)`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function shadowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+  grad.addColorStop(0.6, 'rgba(0,0,0,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+function sweepTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 32;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 256, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 32);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function signTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+  const ctx = c.getContext('2d');
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#2a1b4a';
+  ctx.font = '900 92px "Arial Black", Arial, sans-serif';
+  ctx.fillText('SKYLRK', 256, 62);
+  ctx.fillStyle = '#6a5a9a';
+  ctx.font = '700 30px Arial, sans-serif';
+  ctx.fillText('U F O   C A T C H E R', 256, 126);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ================= 灯光 ================= */
+scene.add(new THREE.HemisphereLight(0x9a8bd0, 0x140a20, 0.55));
+
+const keyLight = new THREE.DirectionalLight(0xfff0f6, 1.15);
+keyLight.position.set(4, 7, 6);
+scene.add(keyLight);
+
+const rimTeal = new THREE.PointLight(0x3fd8c8, 26, 20, 2);
+rimTeal.position.set(-6.5, 3.2, 2.5);
+scene.add(rimTeal);
+
+const rimPink = new THREE.PointLight(0xff5ac8, 26, 20, 2);
+rimPink.position.set(6.5, 3.6, 2.0);
+scene.add(rimPink);
+
+/* ================= 娃娃机 ================= */
+const machine = new THREE.Group();
+scene.add(machine);
+
+const cabMat  = new THREE.MeshStandardMaterial({ color: 0x1c3a34, roughness: 0.45, metalness: 0.25 });
+const cabDark = new THREE.MeshStandardMaterial({ color: 0x142a26, roughness: 0.5,  metalness: 0.2 });
+
+function addBox(w, h, d, x, y, z, mat, r = 0.06, parent = machine) {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
+// 底座机柜 + 上部机身
+addBox(3.2, 1.2, 2.0, 0, 0.6, -0.05, cabMat, 0.09);
+addBox(3.2, 2.9, 2.0, 0, 2.72, -0.12, cabMat, 0.09);
+
+// 玻璃舱：背板 / 地板 / 侧壁（淡薰衣草色内壁）
+const innerMat  = new THREE.MeshStandardMaterial({ color: 0xcabbe8, roughness: 0.9 });
+const innerMat2 = new THREE.MeshStandardMaterial({ color: 0xbfaee0, roughness: 0.9 });
+const backPanel = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 2.72), innerMat);
+backPanel.position.set(0, 2.6, -0.92);
+machine.add(backPanel);
+const floorPanel = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 1.8), innerMat2);
+floorPanel.rotation.x = -Math.PI / 2;
+floorPanel.position.set(0, 1.16, 0.0);
+machine.add(floorPanel);
+const sideL = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.72), innerMat2);
+sideL.rotation.y = Math.PI / 2;
+sideL.position.set(-1.44, 2.6, 0.0);
+machine.add(sideL);
+const sideR = sideL.clone();
+sideR.rotation.y = -Math.PI / 2;
+sideR.position.x = 1.44;
+machine.add(sideR);
+
+// 舱口边框：左右立柱 / 顶部横梁 / 底部唇边
+addBox(0.3, 2.85, 0.34, -1.45, 2.62, 0.8, cabDark, 0.05);
+addBox(0.3, 2.85, 0.34,  1.45, 2.62, 0.8, cabDark, 0.05);
+addBox(3.2, 0.5, 0.4, 0, 4.02, 0.78, cabDark, 0.06);
+addBox(3.2, 0.34, 0.4, 0, 1.18, 0.78, cabDark, 0.05);
+
+// 顶部白色发光招牌
+const signMat = new THREE.MeshStandardMaterial({
+  color: 0xf3edff, emissive: 0xbfaaff, emissiveIntensity: 0.6, roughness: 0.4
+});
+addBox(3.3, 0.85, 0.5, 0, 4.72, 0.55, signMat, 0.12);
+const signFace = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.6, 0.8),
+  new THREE.MeshBasicMaterial({ map: signTexture(), transparent: true })
+);
+signFace.position.set(0, 4.72, 0.81);
+machine.add(signFace);
+// 招牌下方灯带
+const headerGlowMat = new THREE.MeshStandardMaterial({
+  color: 0x8a6fff, emissive: 0x8a6fff, emissiveIntensity: 2.2
+});
+addBox(3.2, 0.05, 0.06, 0, 4.27, 0.95, headerGlowMat, 0.02);
+
+// 玻璃（前板）+ 假反射条纹
+const glass = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.9, 2.72),
+  new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.09,
+    roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false
+  })
+);
+glass.position.set(0, 2.6, 0.96);
+machine.add(glass);
+const streakMat = new THREE.MeshBasicMaterial({
+  map: sweepTexture(), transparent: true, opacity: 0.16,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+});
+const streak1 = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 2.72), streakMat);
+streak1.position.set(-0.75, 2.6, 0.975);
+streak1.rotation.z = 0.22;
+machine.add(streak1);
+const streak2 = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 2.72), streakMat.clone());
+streak2.material.opacity = 0.1;
+streak2.position.set(0.85, 2.6, 0.975);
+streak2.rotation.z = -0.3;
+machine.add(streak2);
+
+/* ---- 霓虹灯管：左青右粉 ---- */
+const neonCyanMat = new THREE.MeshStandardMaterial({ color: 0x4fe3d8, emissive: 0x4fe3d8, emissiveIntensity: 2.2 });
+const neonPinkMat = new THREE.MeshStandardMaterial({ color: 0xff4fc3, emissive: 0xff4fc3, emissiveIntensity: 2.2 });
+function neonTube(x, mat) {
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.5, 12), mat);
+  t.position.set(x, 2.6, 0.78);
+  machine.add(t);
+  return t;
+}
+neonTube(-1.32, neonCyanMat);
+neonTube( 1.32, neonPinkMat);
+const lightCyan = new THREE.PointLight(0x4fe3d8, 3.2, 3.2, 2);
+lightCyan.position.set(-1.25, 2.6, 0.6);
+machine.add(lightCyan);
+const lightPink = new THREE.PointLight(0xff4fc3, 3.2, 3.2, 2);
+lightPink.position.set(1.25, 2.6, 0.6);
+machine.add(lightPink);
+
+// 舱内顶部暖白灯管
+const barMat = new THREE.MeshStandardMaterial({ color: 0xffe9c4, emissive: 0xffdf9e, emissiveIntensity: 2.6 });
+addBox(2.2, 0.05, 0.14, 0, 3.9, 0.55, barMat, 0.02);
+const lightWarm = new THREE.PointLight(0xffd9a8, 3.6, 3.4, 2);
+lightWarm.position.set(0, 3.72, 0.45);
+machine.add(lightWarm);
+
+/* ---- 吊爪 ---- */
+const claw = new THREE.Group();
+const clawX = 0.15;
+claw.position.set(clawX, 3.0, 0.1);
+machine.add(claw);
+const blackMat = new THREE.MeshStandardMaterial({ color: 0x14141c, roughness: 0.35, metalness: 0.6 });
+const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 0.1, 16), blackMat);
+claw.add(hub);
+const prongTips = [];
+for (let i = 0; i < 3; i++) {
+  const prong = new THREE.Group();
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.26, 8), blackMat);
+  upper.position.y = -0.13;
+  const tilt = new THREE.Group();
+  tilt.rotation.z = 0.62;
+  tilt.add(upper);
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.006, 0.16, 8), blackMat);
+  tip.position.y = -0.3;
+  const tipG = new THREE.Group();
+  tipG.position.y = -0.26;
+  tipG.rotation.z = -1.5;
+  tipG.add(tip);
+  tilt.add(tipG);
+  prong.add(tilt);
+  prong.rotation.y = (i * Math.PI * 2) / 3;
+  claw.add(prong);
+  prongTips.push(tipG);
+}
+// 吊线（长度随爪子高度变化）
+const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 8), blackMat);
+machine.add(cable);
+const CABLE_TOP = 3.8;
+
+/* ---- 奖品：彩色毛绒球 ---- */
+const prizes = [];
+function makePrize(color, x, z, s, topColor) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(0.24 * s, 24, 18),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 })
+  );
+  body.scale.set(1, 0.82, 1);
+  g.add(body);
+  if (topColor) {
+    const top = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13 * s, 20, 14),
+      new THREE.MeshStandardMaterial({ color: topColor, roughness: 0.5 })
+    );
+    top.position.y = 0.17 * s;
+    top.scale.set(1, 0.8, 1);
+    g.add(top);
+  }
+  const baseY = 1.16 + 0.2 * s * 0.82;
+  g.position.set(x, baseY, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  machine.add(g);
+  prizes.push({ g, baseY, phase: Math.random() * Math.PI * 2, speed: 0.8 + Math.random() * 0.9 });
+}
+makePrize(0xff6fae, -0.78, -0.32, 1.05, 0xf2f2f8);
+makePrize(0x5f8dff, -0.22,  0.18, 1.15, 0xf2f2f8);
+makePrize(0xffd23f,  0.38, -0.28, 1.0,  0xff9a3c);
+makePrize(0x9b5fff,  0.82,  0.12, 0.95, 0xff6fae);
+makePrize(0xf2f2f8,  0.05,  0.48, 0.85, 0xff6fae);
+makePrize(0x5f8dff, -0.98,  0.28, 0.75);
+makePrize(0xffd23f,  0.62, -0.5,  0.7);
+makePrize(0xff4f4f, -1.05, -0.55, 0.6);
+makePrize(0x9b5fff,  0.98, -0.2,  0.7);
+
+/* ---- 底部操控面板 ---- */
+addBox(2.6, 0.72, 0.12, 0, 0.62, 0.98, new THREE.MeshStandardMaterial({ color: 0x0f1f1c, roughness: 0.4 }), 0.04);
+// 取物口
+addBox(0.95, 0.55, 0.05, -0.82, 0.6, 1.05, new THREE.MeshStandardMaterial({ color: 0x08120f, roughness: 0.6 }), 0.03);
+// 发光面板 + 按钮
+const panelGlowMat = new THREE.MeshStandardMaterial({ color: 0xff4fc3, emissive: 0xff4fc3, emissiveIntensity: 1.8 });
+addBox(1.15, 0.22, 0.05, 0.45, 0.34, 1.05, panelGlowMat, 0.02);
+const btnColors = [0xff4fc3, 0x9b5fff, 0xffd23f];
+btnColors.forEach((c, i) => {
+  const b = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.07, 0.04, 20),
+    new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 2.0, roughness: 0.3 })
+  );
+  b.rotation.x = Math.PI / 2;
+  b.position.set(-0.05 + i * 0.24, 0.72, 1.05);
+  machine.add(b);
+});
+const panelLight = new THREE.PointLight(0xff4fc3, 1.6, 2.2, 2);
+panelLight.position.set(0.45, 0.36, 1.35);
+machine.add(panelLight);
+
+/* ================= 地面 / 接触阴影 / 光晕 ================= */
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(16, 48),
+  new THREE.MeshStandardMaterial({ color: 0x0b0614, roughness: 0.95 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const contact = new THREE.Mesh(
+  new THREE.PlaneGeometry(5.4, 3.6),
+  new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false })
+);
+contact.rotation.x = -Math.PI / 2;
+contact.position.y = 0.006;
+scene.add(contact);
+
+const floorGlow = new THREE.Mesh(
+  new THREE.PlaneGeometry(8, 6),
+  new THREE.MeshBasicMaterial({
+    map: glowTexture(150, 90, 255), transparent: true, opacity: 0.16,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  })
+);
+floorGlow.rotation.x = -Math.PI / 2;
+floorGlow.position.y = 0.008;
+scene.add(floorGlow);
+
+/* ================= 背景：星空 + 星云 ================= */
+const starGeo = new THREE.BufferGeometry();
+{
+  const N = 700;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const r = 20 + Math.random() * 10;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3]     = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = Math.abs(r * Math.cos(ph)) * 0.8 - 2;
+    pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+}
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0xdde4ff, size: 0.09, sizeAttenuation: true, transparent: true,
+  opacity: 0.85, fog: false, depthWrite: false, blending: THREE.AdditiveBlending
+}));
+scene.add(stars);
+
+function nebula(r, g, b, x, y, z, scale, opacity) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture(r, g, b), transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+  }));
+  s.position.set(x, y, z);
+  s.scale.set(scale, scale, 1);
+  scene.add(s);
+  return s;
+}
+nebula(64, 220, 200, -8.5, 3.0, -7, 11, 0.32);  // 左：青
+nebula(255, 90, 200,  8.5, 3.5, -7, 11, 0.32);   // 右：粉
+nebula(140, 90, 255,  0, 8.5, -9, 12, 0.25);    // 顶：紫
+
+/* ================= 闪烁粒子（环绕机器） ================= */
+const sparkleGeo = new THREE.BufferGeometry();
+{
+  const N = 160;
+  const pos = new Float32Array(N * 3);
+  const phase = new Float32Array(N);
+  const size = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3]     = (Math.random() - 0.5) * 9;
+    pos[i * 3 + 1] = Math.random() * 6;
+    pos[i * 3 + 2] = -2.5 + Math.random() * 5.5;
+    phase[i] = Math.random();
+    size[i] = 0.22 + Math.random() * 0.4;
+  }
+  sparkleGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  sparkleGeo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+  sparkleGeo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+}
+const sparkleMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(0xffe9f6) }
+  },
+  vertexShader: `
+    attribute float aPhase;
+    attribute float aSize;
+    uniform float uTime;
+    varying float vA;
+    void main() {
+      vec3 p = position;
+      p.y = mod(p.y + uTime * (0.12 + aPhase * 0.22), 6.0);
+      p.x += sin(uTime * 0.4 + aPhase * 40.0) * 0.15;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      float tw = 0.3 + 0.7 * (0.5 + 0.5 * sin(uTime * (1.5 + aPhase * 2.0) + aPhase * 50.0));
+      vA = tw;
+      gl_PointSize = aSize * tw * (140.0 / -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying float vA;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float a = smoothstep(0.5, 0.05, d) * vA;
+      gl_FragColor = vec4(uColor, a);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+});
+const sparkles = new THREE.Points(sparkleGeo, sparkleMat);
+sparkles.fog = false;
+scene.add(sparkles);
+
+/* ================= 扫光 ================= */
+const sweepMat = new THREE.MeshBasicMaterial({
+  map: sweepTexture(), transparent: true, opacity: 0.08,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+});
+const sweep1 = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 5.4), sweepMat);
+sweep1.position.set(0, 2.45, 1.35);
+scene.add(sweep1);
+const sweep2 = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 5.4), sweepMat.clone());
+sweep2.material.opacity = 0.05;
+sweep2.position.set(0, 2.45, 1.4);
+scene.add(sweep2);
+
+/* ================= 交互：鼠标视差 ================= */
+const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
+window.addEventListener('mousemove', (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+});
+window.addEventListener('touchmove', (e) => {
+  if (e.touches.length > 0) {
+    mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+    mouse.y = (e.touches[0].clientY / window.innerHeight) * 2 - 1;
+  }
+}, { passive: true });
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+const lookTarget = new THREE.Vector3(0, 2.35, 0);
+let firstFrame = true;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // 相机：缓慢环绕 + 垂直浮动 + 鼠标视差
+  mouse.sx += (mouse.x - mouse.sx) * 0.04;
+  mouse.sy += (mouse.y - mouse.sy) * 0.04;
+  const orbit = Math.sin(t * 0.1) * 0.3 * AMP;
+  const radius = 7.6 + Math.sin(t * 0.07) * 0.25 * AMP;
+  const angle = orbit + mouse.sx * 0.18 * AMP;
+  const height = 2.6 + Math.sin(t * 0.13) * 0.25 * AMP - mouse.sy * 0.35 * AMP;
+  camera.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
+  camera.lookAt(lookTarget);
+
+  // 霓虹：呼吸 + 偶发闪烁
+  const flicker = Math.random() < 0.015 ? 0.45 : 1.0;
+  neonPinkMat.emissiveIntensity = (2.2 + Math.sin(t * 6.5) * 0.18) * flicker;
+  neonCyanMat.emissiveIntensity = 2.2 + Math.sin(t * 3.2) * 0.2;
+  lightPink.intensity = 3.2 * (0.9 + 0.1 * Math.sin(t * 6.5)) * flicker;
+  lightCyan.intensity = 3.2 + Math.sin(t * 3.2) * 0.3;
+
+  // 招牌：电流不稳式微闪
+  const signDip = Math.random() < 0.008 ? 0.4 : 1.0;
+  signMat.emissiveIntensity = (0.6 + Math.sin(t * 2.2) * 0.05) * signDip;
+
+  // 吊爪：升降 + 摇摆 + 缓慢平移
+  const clawY = 2.95 + Math.sin(t * 0.55) * 0.4 * AMP;
+  claw.position.y = clawY;
+  claw.position.x = clawX + Math.sin(t * 0.23) * 0.12 * AMP;
+  claw.rotation.z = Math.sin(t * 0.5) * 0.09 * AMP;
+  claw.rotation.x = Math.sin(t * 0.37) * 0.06 * AMP;
+  const len = CABLE_TOP - (clawY + 0.1);
+  cable.scale.y = len;
+  cable.position.set(claw.position.x, CABLE_TOP - len / 2, claw.position.z);
+
+  // 奖品：轻轻浮动 + 旋转
+  for (const p of prizes) {
+    p.g.position.y = p.baseY + Math.sin(t * p.speed + p.phase) * 0.03 * AMP;
+    p.g.rotation.y += 0.003 * AMP;
+  }
+
+  // 粒子 / 星空 / 扫光
+  sparkleMat.uniforms.uTime.value = t;
+  stars.rotation.y = t * 0.004;
+  const sp1 = ((t * 0.5) % 11) - 5.5;
+  sweep1.position.x = sp1;
+  sweep1.material.opacity = 0.08 * Math.sin((sp1 + 5.5) / 11 * Math.PI);
+  const sp2 = (((t * 0.28 + 5.5) % 11) - 5.5);
+  sweep2.position.x = sp2;
+  sweep2.material.opacity = 0.05 * Math.sin((sp2 + 5.5) / 11 * Math.PI);
+
+  // 星云呼吸
+  rimTeal.intensity = 26 + Math.sin(t * 0.8) * 6;
+  rimPink.intensity = 26 + Math.sin(t * 0.8 + Math.PI) * 6;
+
+  composer.render();
+
+  if (firstFrame) {
+    firstFrame = false;
+    window.__sceneReady = true;
+    document.getElementById('loader').classList.add('hidden');
+  }
+}
+animate();
+
+/* ================= 自适应 ================= */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
