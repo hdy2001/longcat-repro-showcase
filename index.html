@@ -160,6 +160,8 @@ ul.flaws{margin:0;padding-left:18px;font-size:14px}
 #zoom img{max-width:100%;max-height:100%}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
+.chip.bench{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--panel));color:var(--ink);font-weight:600}
+.bench-list{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 .figlink{color:inherit}.figlink:hover{text-decoration:none}.figlink span{color:var(--link)}
 .extras{padding-block:10px 20px;border-top:1px solid var(--line)}
 .extras>h2{font-size:21px;font-weight:700;margin:22px 0 16px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
@@ -260,12 +262,20 @@ function renderPost(c){
       ${p.frames&&p.frames.length?`<div class="small muted" style="margin-top:4px">${p.images.length?`${p.images.length} 张图片 + `:''}${p.frames.length} 张视频截帧</div>`:''}`:''}
     <dl class="kv">
       <dt>亮点</dt><dd><b>${esc(c.highlight)}</b></dd>
+      <dt>对标模型</dt><dd>${renderBench(c.benchmark)}</dd>
       <dt>作者 prompt</dt><dd>${c.original_prompt?`<div class="txt mono small">${esc(c.original_prompt)}</div>`:'<span class="muted">原帖未公开，复现 query 由 LongCat 根据素材反推</span>'}</dd>
       ${p.quoted_text?`<dt>引用帖</dt><dd class="txt small">${esc(p.quoted_text)}</dd>`:''}
       ${p.transcript?`<dt>口播字幕</dt><dd><details><summary class="small muted">展开</summary><div class="txt small">${esc(p.transcript)}</div></details></dd>`:''}
       <dt>预期产出</dt><dd class="small">${esc(c.expected_output)}</dd>
       <dt>达标标准</dt><dd><ol class="small" style="margin:0;padding-left:18px">${(c.criteria||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></dd>
     </dl></div>`;
+}
+function renderBench(b){
+  if (!b || !Object.keys(b).length) return '<span class="muted small">未分析</span>';
+  const sug = (b.suggested||[]).length ? `<div class="meta">${b.suggested.map(m=>`<span class="chip bench">${esc(m)}</span>`).join('')}</div>` : '<span class="muted small">原帖没有可对标的模型</span>';
+  const rows = (b.models_in_post||[]).map(m=>`<li><b>${esc(m.model)}</b> <span class="muted">· ${esc(m.role)}</span><div>${esc(m.performance)}</div></li>`).join('');
+  return `${sug}${b.reason?`<div class="small muted" style="margin-top:6px">${esc(b.reason)}</div>`:''}
+    ${rows?`<details style="margin-top:6px"><summary class="small muted">原帖出现的 ${b.models_in_post.length} 个模型</summary><ul class="small bench-list">${rows}</ul></details>`:''}`;
 }
 function renderProduct(c, r){
   const pr = r.product;

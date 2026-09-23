@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>湖畔宅 · 3D 场景复刻</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #hud {
+    position: fixed; top: 18px; left: 18px; z-index: 10;
+    color: #e8e2d4; font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    user-select: none; pointer-events: none;
+  }
+  #hud h1 { font-size: 15px; font-weight: 600; letter-spacing: 2px; opacity: .92; }
+  #hud .sub { font-size: 11px; opacity: .55; margin-top: 3px; letter-spacing: 1px; }
+  #panel { margin-top: 12px; display: flex; gap: 8px; pointer-events: auto; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 14px; font-size: 12px; letter-spacing: 1px; cursor: pointer;
+    color: #ddd6c6; background: rgba(20, 22, 26, .55); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: all .25s ease; font-family: inherit;
+  }
+  .btn:hover { background: rgba(60, 60, 66, .65); border-color: rgba(255,255,255,.3); }
+  .btn.active { background: rgba(214, 178, 110, .22); border-color: rgba(224, 188, 120, .65); color: #f0dfbe; }
+
+  #hint {
+    position: fixed; right: 18px; bottom: 14px; z-index: 10;
+    color: rgba(232, 226, 212, .5); font-size: 11px; letter-spacing: 1px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif; pointer-events: none;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 20; background: #0b0d10;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(232,226,212,.75); font-size: 13px; letter-spacing: 4px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    transition: opacity .8s ease;
+  }
+  #loading.done { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <h1>湖畔宅 · 建筑可视化</h1>
+  <div class="sub">GOLDEN HOUR — REAL-TIME 3D SCENE</div>
+  <div id="panel">
+    <button class="btn active" data-preset="golden">黄昏</button>
+    <button class="btn" data-preset="noon">正午</button>
+    <button class="btn" data-preset="dusk">蓝调</button>
+    <button class="btn" id="btnRotate">自动旋转</button>
+    <button class="btn" id="btnReset">重置视角</button>
+  </div>
+</div>
+<div id="hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+<div id="loading">场 景 加 载 中</div>
+
+<script src="vendor128/three.min.js"></script>
+<script src="vendor128/CopyShader.js"></script>
+<script src="vendor128/LuminosityHighPassShader.js"></script>
+<script src="vendor128/MaskPass.js"></script>
+<script src="vendor128/EffectComposer.js"></script>
+<script src="vendor128/RenderPass.js"></script>
+<script src="vendor128/ShaderPass.js"></script>
+<script src="vendor128/UnrealBloomPass.js"></script>
+<script src="vendor128/OrbitControls.js"></script>
+<script src="vendor128/Reflector.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
