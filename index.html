@@ -160,6 +160,7 @@ ul.flaws{margin:0;padding-left:18px;font-size:14px}
 #zoom img{max-width:100%;max-height:100%}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
+.figlink{color:inherit}.figlink:hover{text-decoration:none}.figlink span{color:var(--link)}
 .extras{padding-block:10px 20px;border-top:1px solid var(--line)}
 .extras>h2{font-size:21px;font-weight:700;margin:22px 0 16px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 .extras>h2 small{font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted)}
@@ -204,7 +205,7 @@ function renderIndex(){
   const avg = cs.length ? cs.reduce((a,c)=>a+(+c.total||0),0)/cs.length : 0;
   const plats = [...new Set(cs.map(c=>c.platform))];
   const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v,l])=>`<button aria-pressed="${FILTER[key]===v}" onclick="setF('${key}','${v}')">${l}</button>`).join('')}</div>`;
-  const shown = cs.filter(c => (FILTER.v==='all' || (FILTER.v==='pass' ? c.passed : !c.passed))
+  const shown = FILTER.v==='manual' ? (d.extras||[]) : cs.filter(c => (FILTER.v==='all' || (FILTER.v==='pass' ? c.passed : !c.passed))
     && (FILTER.t==='all' || c.task_type===FILTER.t) && (FILTER.p==='all' || c.platform===FILTER.p));
   const gen = new Date(d.generated_at*1000).toLocaleString('zh-CN',{hour12:false});
   $('#app').innerHTML = `
@@ -216,18 +217,19 @@ function renderIndex(){
       <div class="fig"><b>${cs.length}</b><span>已评分 case（共 ${d.total_cases} 个在跑）</span></div>
       <div class="fig"><b>${pass}</b><span>达标（总分 ≥ ${d.pass_total}）</span></div>
       <div class="fig"><b>${fmt(avg)}</b><span>平均最佳分 / 10</span></div>
+      ${(d.extras||[]).length?`<a class="fig figlink" href="javascript:void 0" onclick="setF('v','manual');document.querySelector('.bar').scrollIntoView({behavior:'smooth'})"><b>${d.extras.length}</b><span>手动案例 →</span></a>`:''}
       <div class="fig"><b class="mono" style="font-size:17px;line-height:2.1">${esc(d.model)}</b><span>执行模型 · 评审 ${esc(d.judge_model)}</span></div>
     </div>
   </div></header>
   <main class="wrap">
     <div class="bar">
-      ${seg('v',[['all','全部'],['pass','达标'],['partial','未完全达标']])}
+      ${seg('v',[['all','全部'],['pass','达标'],['partial','未完全达标'],...((d.extras||[]).length?[['manual',`手动案例 ${d.extras.length}`]]:[])])}
       ${seg('t',[['all','全部类型'],['single_gen','单次生成'],['agent','Agent 任务']])}
       ${plats.length>1?seg('p',[['all','全部平台'],...plats.map(p=>[p,p])]):''}
       <span class="count">显示 ${shown.length} 个 · 数据更新于 ${gen}</span>
     </div>
     ${shown.length ? `<div class="grid">${shown.map(card).join('')}</div>` : '<div class="empty">没有符合条件的 case</div>'}
-    ${(d.extras||[]).length ? `<section class="extras"><h2>手动案例 <small>在 Claude Code 里手动跑 LongCat 得到的作品，未经自动评审</small></h2>
+    ${(d.extras||[]).length && FILTER.v!=='manual' ? `<section class="extras"><h2>手动案例 <small>在 Claude Code 里手动跑 LongCat 得到的作品，未经自动评审</small></h2>
       <div class="grid">${d.extras.map(card).join('')}</div></section>` : ''}
   </main>`;
 }
