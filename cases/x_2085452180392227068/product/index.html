@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Angry Birds — Canvas Edition</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="1280" height="720"></canvas>
+
+    <div id="hudBtns">
+      <button id="btnRestart" class="icon-btn" title="Restart level (R)">&#8635;</button>
+      <button id="btnMute" class="icon-btn" title="Mute (M)">&#128266;</button>
+      <button id="btnMenu" class="icon-btn" title="Back to menu">&#9776;</button>
+    </div>
+
+    <div id="menu" class="overlay">
+      <h1 class="title">ANGRY <span>BIRDS</span></h1>
+      <p class="sub">a tiny canvas physics tribute</p>
+      <div class="howto">
+        <p>&#129667; Drag the bird on the slingshot &amp; release to launch</p>
+        <p>&#128072; Tap mid-flight to trigger special abilities</p>
+        <p>&#128021; Knock down every pig to win the level</p>
+      </div>
+      <div id="levelRow" class="level-row"></div>
+      <button id="btnPlay" class="btn big">&#9654; PLAY</button>
+    </div>
+
+    <div id="winScreen" class="overlay hidden">
+      <h2 class="panel-title">Level Complete!</h2>
+      <div id="winStars" class="stars"></div>
+      <div id="winScore" class="score-line"></div>
+      <div class="btn-row">
+        <button id="btnWinReplay" class="btn">&#8635; Replay</button>
+        <button id="btnWinNext" class="btn">Next &#9654;</button>
+        <button id="btnWinMenu" class="btn secondary">Menu</button>
+      </div>
+    </div>
+
+    <div id="loseScreen" class="overlay hidden">
+      <h2 class="panel-title">Out of Birds!</h2>
+      <p class="sub">The pigs are laughing at you&hellip;</p>
+      <div class="btn-row">
+        <button id="btnLoseRetry" class="btn">&#8635; Retry</button>
+        <button id="btnLoseMenu" class="btn secondary">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

@@ -160,6 +160,9 @@ ul.flaws{margin:0;padding-left:18px;font-size:14px}
 #zoom img{max-width:100%;max-height:100%}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
+.extras{padding-block:10px 20px;border-top:1px solid var(--line)}
+.extras>h2{font-size:21px;font-weight:700;margin:22px 0 16px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.extras>h2 small{font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted)}
 .empty{padding:60px 0;text-align:center;color:var(--muted)}
 footer{padding-block:28px 40px;font-size:12.5px;color:var(--muted)}
 
@@ -224,14 +227,16 @@ function renderIndex(){
       <span class="count">显示 ${shown.length} 个 · 数据更新于 ${gen}</span>
     </div>
     ${shown.length ? `<div class="grid">${shown.map(card).join('')}</div>` : '<div class="empty">没有符合条件的 case</div>'}
+    ${(d.extras||[]).length ? `<section class="extras"><h2>手动案例 <small>在 Claude Code 里手动跑 LongCat 得到的作品，未经自动评审</small></h2>
+      <div class="grid">${d.extras.map(card).join('')}</div></section>` : ''}
   </main>`;
 }
 function card(c){
   return `<a class="card" href="#${esc(c.id)}">
     <div class="shot">${c.shot?`<img src="${esc(c.shot)}" alt="" loading="lazy">`:'<div class="noimg">无截图</div>'}
-      <div class="score"><b class="v-${esc(c.verdict)}">${fmt(c.total)}</b><span class="small muted">R${c.best_round}</span></div></div>
+      ${c.manual ? '<div class="score"><span class="small">手动案例</span></div>' : `<div class="score"><b class="v-${esc(c.verdict)}">${fmt(c.total)}</b><span class="small muted">R${c.best_round}</span></div>`}</div>
     <div class="body">
-      <div class="meta"><span class="chip">${esc(c.platform)}</span><span class="chip">${TYPE[c.task_type]||esc(c.task_type)}</span>${vchip(c.verdict)}</div>
+      <div class="meta">${c.manual?'':`<span class="chip">${esc(c.platform)}</span>`}<span class="chip">${TYPE[c.task_type]||esc(c.task_type)}</span>${c.manual ? (c.model ? `<span class="chip mono">${esc(c.model)}</span>` : '') : vchip(c.verdict)}</div>
       <div class="hl">${esc(c.highlight)}</div>
       <div class="q">› ${esc(c.query)}</div>
     </div></a>`;
@@ -335,11 +340,31 @@ async function loadTraj(r){
   draw();
 }
 let CUR = null;
+function renderManual(c){
+  const r = c.rounds[0];
+  document.title = `${c.highlight.slice(0,24)}… · LongCat 复现集`;
+  $('#app').innerHTML = `<div class="wrap">
+    <div class="crumb"><a href="#">← 全部 case</a></div>
+    <section class="head">
+      <div>
+        <div class="label">手动案例 · ${TYPE[c.task_type]||esc(c.task_type)}${c.date?` · ${esc(c.date)}`:''}</div>
+        <h1 style="margin-top:8px">${esc(c.highlight)}</h1>
+        <div class="meta"><span class="chip mono">${esc(r.stats.model||'')}</span><span>${esc(c.note||'')}</span></div>
+      </div>
+    </section>
+    <section class="sec"><h2>Query <small>原样交给 Claude Code，一次生成</small></h2>
+      <div class="query"><span class="qtext">${esc(r.query)}</span><button class="btn" onclick="copy(CUR.rounds[0].query,this)">复制</button></div>
+    </section>
+    <section class="sec"><h2>产出</h2>${renderProduct(c, r).replace(`复现产出 · R${r.round}`, '作品')}</section>
+    <footer>数据由 longcat-repro 自动生成。</footer>
+  </div>`;
+}
 async function renderCase(id, roundNo){
   let c;
   try { c = CACHE[id] || (CACHE[id] = await getJSON(`data/cases/${id}.json`)); }
   catch { $('#app').innerHTML = `<div class="wrap empty">找不到这个 case。<a href="#">返回列表</a></div>`; return; }
   CUR = c;
+  if (c.manual) return renderManual(c);
   const r = c.rounds.find(x=>x.round===roundNo) || c.rounds.find(x=>x.round===c.best_round);
   const best = c.rounds.find(x=>x.round===c.best_round), bj = best.judge||{};
   document.title = `${c.highlight.slice(0,24)}… · LongCat 复现集`;
