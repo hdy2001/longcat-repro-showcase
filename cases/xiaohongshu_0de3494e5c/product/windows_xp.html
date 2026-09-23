@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows XP</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html,body { width:100%; height:100%; overflow:hidden; font-family:Tahoma,"宋体",sans-serif; font-size:11px; }
+  body { cursor:default; }
+
+  /* ============ Bliss 壁纸 ============ */
+  #desktop {
+    position:fixed; inset:0 0 30px 0; overflow:hidden;
+    background:
+      radial-gradient(ellipse 90% 45% at 18% 8%, rgba(255,255,255,.85) 0%, rgba(255,255,255,0) 55%),
+      radial-gradient(ellipse 70% 38% at 55% 3%, rgba(255,255,255,.7) 0%, rgba(255,255,255,0) 55%),
+      radial-gradient(ellipse 130% 62% at 50% 118%, #3f7a33 0%, #5a9a44 45%, #79b85e 62%, rgba(121,184,94,0) 75%),
+      linear-gradient(180deg, #1e5fc0 0%, #3a7bd0 42%, #6aa8dd 62%, #a8cfe9 100%);
+  }
+
+  /* ============ 桌面图标 ============ */
+  .dicon {
+    position:absolute; width:84px; padding:5px 2px 4px; text-align:center; cursor:default;
+    border:1px dotted transparent;
+  }
+  .dicon .lbl {
+    color:#fff; font-size:11px; line-height:1.25; margin-top:2px;
+    text-shadow:1px 1px 1px #000; word-break:break-all;
+  }
+  .dicon.sel { background:rgba(11,71,138,.55); border:1px dotted #cfe0f8; }
+  .dicon img { width:32px; height:32px; image-rendering:auto; filter:drop-shadow(1px 2px 1px rgba(0,0,0,.4)); }
+
+  /* ============ 任务栏 ============ */
+  #taskbar {
+    position:fixed; left:0; right:0; bottom:0; height:30px; z-index:5000;
+    background:linear-gradient(180deg,#245edb 0%,#3f8cf3 9%,#245edb 18%,#245edb 92%,#1941a5 100%);
+    display:flex; align-items:stretch; box-shadow:0 -1px 3px rgba(0,0,0,.4);
+  }
+  #startBtn {
+    width:92px; border:none; cursor:default; color:#fff; font-style:italic; font-weight:bold;
+    font-size:14px; font-family:Tahoma; text-shadow:1px 1px 2px rgba(0,0,0,.5);
+    background:linear-gradient(180deg,#5eac56 0%,#3c873c 50%,#357635 100%);
+    border-radius:0 10px 12px 0; box-shadow:inset 0 1px 1px rgba(255,255,255,.4), 2px 0 3px rgba(0,0,0,.35);
+    display:flex; align-items:center; justify-content:center; gap:4px; padding-right:14px;
+  }
+  #startBtn:hover { filter:brightness(1.1); }
+  #startBtn.open { background:linear-gradient(180deg,#2f7a2f 0%,#256525 100%); }
+  #quickLaunch { display:flex; align-items:center; padding:0 6px; gap:2px; border-right:1px solid rgba(255,255,255,.25); }
+  #quickLaunch .ql { width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:3px; }
+  #quickLaunch .ql:hover { background:rgba(255,255,255,.2); }
+  #quickLaunch .ql img { width:18px; height:18px; }
+  #taskButtons { flex:1; display:flex; align-items:stretch; padding:3px 4px; gap:3px; overflow:hidden; }
+  .tbutton {
+    width:160px; flex:none; display:flex; align-items:center; gap:5px; padding:0 8px;
+    background:linear-gradient(180deg,#3c81f3 0%,#2d6fe0 100%); color:#fff; font-size:11px;
+    border-radius:3px; cursor:default; overflow:hidden; white-space:nowrap;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .tbutton.active { background:linear-gradient(180deg,#1c4fb0 0%,#1a459c 100%); box-shadow:inset 1px 2px 3px rgba(0,0,0,.4); }
+  .tbutton img { width:14px; height:14px; flex:none; }
+  #tray {
+    display:flex; align-items:center; gap:7px; padding:0 12px; color:#fff; font-size:11px;
+    background:linear-gradient(180deg,#1290e9 0%,#19b9f3 9%,#19b9f3 92%,#1290e9 100%);
+    border-left:1px solid rgba(0,0,0,.25); border-radius:8px 0 0 0; text-shadow:1px 1px 1px rgba(0,0,0,.4);
+  }
+  #tray .ticon { width:16px; height:16px; display:flex; align-items:center; justify-content:center; }
+
+  /* ============ 开始菜单 ============ */
+  #startMenu {
+    position:fixed; left:0; bottom:30px; width:372px; z-index:6000; display:none;
+    background:#fff; border:1px solid #0831d9; border-radius:6px 6px 0 0; overflow:hidden;
+    box-shadow:3px -2px 12px rgba(0,0,0,.45);
+  }
+  #startMenu .sm-head {
+    height:54px; padding:0 10px; display:flex; align-items:center; gap:10px; color:#fff; font-size:14px; font-weight:bold;
+    background:linear-gradient(180deg,#1c53c7 0%,#3a7ff0 45%,#2459d6 100%);
+    text-shadow:1px 1px 2px rgba(0,0,0,.5); box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  #startMenu .sm-body { display:flex; min-height:300px; }
+  #startMenu .sm-left { width:50%; background:#fff; padding:6px 0; border-right:1px solid #95bdee; }
+  #startMenu .sm-right { width:50%; background:#d3e5fa; padding:6px 0; display:flex; flex-direction:column; }
+  .sm-item { display:flex; align-items:center; gap:8px; padding:5px 10px; cursor:default; font-size:11px; color:#00136b; }
+  .sm-item:hover { background:#316ac5; color:#fff; }
+  .sm-item img { width:28px; height:28px; flex:none; }
+  .sm-item.small img { width:18px; height:18px; }
+  .sm-sep { height:1px; background:#95bdee; margin:4px 2px; }
+  .sm-right .spacer { flex:1; }
+  #startMenu .sm-foot {
+    height:38px; background:linear-gradient(180deg,#3a7ff0 0%,#1c53c7 100%);
+    display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 10px;
+  }
+  .sm-foot .fbtn { display:flex; align-items:center; gap:5px; color:#fff; font-size:11px; padding:4px 8px; border-radius:3px; }
+  .sm-foot .fbtn:hover { background:rgba(255,255,255,.2); }
+
+  /* ============ 窗口 ============ */
+  .win {
+    position:absolute; background:#ece9d8; border:1px solid #0831d9;
+    border-radius:8px 8px 4px 4px; box-shadow:2px 3px 14px rgba(0,0,0,.5);
+    display:flex; flex-direction:column; min-width:200px; min-height:120px;
+  }
+  .titlebar {
+    height:30px; flex:none; display:flex; align-items:center; padding:0 4px 0 8px; gap:6px;
+    background:linear-gradient(180deg,#0997ff 0%,#0053ee 8%,#0050ee 40%,#06f 88%,#0044d0 100%);
+    background:linear-gradient(180deg,#0058e6 0%,#3a93ff 4%,#288eff 6%,#127dff 10%,#036ffc 14%,#0262ee 20%,#0057e5 26%,#0054e3 56%,#0255e0 66%,#044fd2 74%,#0347c4 82%,#023fb4 88%,#0136a1 94%,#002f91 100%);
+    border-radius:7px 7px 0 0; cursor:default;
+  }
+  .win.inactive .titlebar {
+    background:linear-gradient(180deg,#9db9eb 0%,#b9ccf0 4%,#a4bce8 8%,#9ab4e0 50%,#8fa9d4 90%,#8aa3cc 100%);
+  }
+  .titlebar img { width:16px; height:16px; flex:none; }
+  .ttitle { flex:1; color:#fff; font-size:12px; font-weight:bold; text-shadow:1px 1px 1px rgba(0,0,0,.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .win.inactive .ttitle { text-shadow:none; color:#e8eefb; }
+  .tbtns { display:flex; gap:2px; }
+  .tbtn {
+    width:22px; height:22px; border:1px solid rgba(255,255,255,.7); border-radius:3px; cursor:default;
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; color:#fff;
+    background:linear-gradient(180deg,#3d7be8 0%,#2456c8 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .tbtn.close { background:linear-gradient(180deg,#f0a184 0%,#e0683c 45%,#d9571f 100%); }
+  .tbtn:hover { filter:brightness(1.25); }
+  .menubar { flex:none; display:flex; align-items:center; background:#ece9d8; padding:1px 2px; border-bottom:1px solid #d4d0c8; }
+  .menubar .mi { padding:3px 7px; cursor:default; }
+  .menubar .mi:hover, .menubar .mi.open { background:#316ac5; color:#fff; }
+  .toolbar { flex:none; display:flex; align-items:center; gap:2px; padding:2px 3px; background:#ece9d8; border-bottom:1px solid #d4d0c8; }
+  .xp-tbtn { display:flex; flex-direction:column; align-items:center; gap:1px; padding:2px 7px 1px; font-size:10px; color:#222; border:1px solid transparent; border-radius:3px; cursor:default; }
+  .xp-tbtn:hover { border:1px solid #b5cbe8; background:#e8f0fb; }
+  .xp-tbtn.disabled { color:#a0a0a0; }
+  .xp-tbtn.disabled:hover { border-color:transparent; background:transparent; }
+  .xp-tbtn img { width:20px; height:20px; }
+  .addrbar { flex:none; display:flex; align-items:center; gap:4px; padding:3px 4px; background:#ece9d8; }
+  .addrbar label { font-size:11px; color:#222; }
+  .addrbar .addr {
+    flex:1; height:20px; border:1px solid #7f9db9; background:#fff; padding:0 4px; font-size:11px;
+    display:flex; align-items:center; font-family:Tahoma; outline:none;
+  }
+  .addrbar .go { font-size:10px; color:#222; padding:2px 8px; border:1px solid #7f9db9; border-radius:3px; background:#fff; cursor:default; }
+  .addrbar .go:hover { background:#e8f0fb; }
+  .content { flex:1; background:#fff; overflow:auto; position:relative; }
+  .statusbar { flex:none; display:flex; gap:2px; background:#ece9d8; padding:2px; }
+  .statusbar .cell { border:1px solid #d4d0c8; border-color:#d4d0c8 transparent transparent #d4d0c8; padding:2px 8px; font-size:11px; color:#222; }
+  .statusbar .cell.grow { flex:1; }
+
+  /* 资源管理器内容 */
+  .icons-grid { display:flex; flex-wrap:wrap; align-content:flex-start; padding:10px; gap:4px; }
+  .ficon { width:82px; padding:6px 2px; text-align:center; border:1px dotted transparent; cursor:default; }
+  .ficon:hover { background:rgba(11,71,138,.12); }
+  .ficon.sel { background:rgba(11,71,138,.35); border:1px dotted #316ac5; }
+  .ficon img { width:40px; height:40px; }
+  .ficon .lbl { font-size:11px; color:#111; margin-top:3px; word-break:break-all; line-height:1.2; }
+
+  /* XP 按钮 */
+  .xp-btn {
+    font-family:Tahoma; font-size:11px; padding:3px 14px; background:#fff; color:#111;
+    border:1px solid #7f9db9; border-radius:3px; cursor:default;
+  }
+  .xp-btn:hover { border-color:#316ac5; }
+  .xp-btn.primary { border:2px solid #003c74; }
+
+  /* ============ IE 网页 ============ */
+  .webpage { font-family:"宋体",SimSun,serif; font-size:14px; color:#000; background:#fff; min-height:100%; padding:0; }
+  .webpage a { color:#0000cc; text-decoration:underline; cursor:pointer; }
+  .webpage a:visited { color:#551a8b; }
+  .webpage table { border-collapse:collapse; }
+  .ie-banner {
+    height:58px; background:linear-gradient(180deg,#0055d4 0%,#3b86e8 60%,#0055d4 100%);
+    display:flex; align-items:center; padding:0 18px; color:#fff; border-bottom:3px solid #ff9900;
+  }
+  .ie-banner .logo { font-size:26px; font-weight:bold; font-style:italic; font-family:Georgia,serif; text-shadow:1px 2px 2px rgba(0,0,0,.5); }
+  .ie-banner .sub { font-size:10px; margin-left:10px; opacity:.85; font-style:normal; }
+  .adbar { background:#fff8e8; border:1px solid #e0c060; color:#8a5a00; text-align:center; padding:5px; font-size:13px; margin:6px; }
+  .news-list { padding:6px 18px; }
+  .news-list li { margin:4px 0; font-size:13px; }
+  .search-row { text-align:center; padding:26px 0 18px; }
+  .search-row .sbox { width:380px; height:26px; border:1px solid #7f9db9; padding:0 6px; font-size:15px; }
+  .search-row .sbtn { height:26px; padding:0 12px; border:1px solid #7f9db9; background:#f1f1f1; font-size:13px; cursor:pointer; }
+  .ie-error { padding:30px 40px; font-size:13px; color:#222; }
+  .ie-error h2 { font-size:18px; font-weight:normal; margin-bottom:10px; color:#000; }
+  .ie-error .diag { color:#555; margin-top:14px; }
+  .ie-error .diag a { color:#0000cc; }
+
+  /* ============ 扫雷 ============ */
+  .ms-frame { background:#c6c6c6; padding:8px; border-radius:0; box-shadow:2px 3px 10px rgba(0,0,0,.5); }
+  .ms-top { display:flex; justify-content:space-between; align-items:center; padding:3px 5px 6px; }
+  .led { background:#000; color:#ff2020; font-family:"Courier New",monospace; font-weight:bold; font-size:22px;
+         padding:1px 4px; letter-spacing:2px; border:2px inset #8a8a8a; min-width:52px; text-align:center;
+         text-shadow:0 0 4px rgba(255,32,32,.8); }
+  .ms-face {
+    width:34px; height:34px; border:2px outset #fff; background:#c6c6c6; font-size:20px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .ms-face:active { border:2px inset #fff; }
+  .ms-board { border:3px inset #fff; display:grid; background:#c6c6c6; }
+  .ms-cell {
+    width:16px; height:16px; border:2px outset #fff; background:#c6c6c6;
+    font-size:11px; font-weight:bold; display:flex; align-items:center; justify-content:center;
+    cursor:default; font-family:Tahoma; line-height:1;
+  }
+  .ms-cell.open { border:1px solid #8a8a8a; background:#c6c6c6; cursor:default; }
+  .ms-cell.mine { background:#ff0000; }
+  .ms-cell.boom { background:#ff0000; }
+  .ms-menu { background:#ece9d8; }
+  .ms-menu .mi { font-size:11px; }
+  .ms-menu .menu-drop { position:absolute; background:#fff; border:1px solid #8a8a8a; box-shadow:2px 2px 4px rgba(0,0,0,.3); padding:2px; min-width:150px; z-index:9999; }
+  .ms-menu .menu-drop .mi { padding:4px 20px 4px 8px; font-size:11px; color:#111; }
+  .ms-menu .menu-drop .mi:hover { background:#316ac5; color:#fff; }
+  .ms-menu .menu-drop .sep { height:1px; background:#c0c0c0; margin:3px 2px; }
+
+  /* ============ 蓝屏 ============ */
+  #bsod {
+    position:fixed; inset:0; z-index:100000; background:#0000aa; color:#fff; display:none;
+    font-family:"Courier New",monospace; font-size:14px; padding:70px 120px; line-height:1.55;
+  }
+  #bsod h1 { font-size:14px; font-weight:normal; background:#aaaaaa; color:#0000aa; display:inline-block; padding:0 6px; margin-bottom:18px; }
+  #bsod .stop { margin-top:22px; }
+  #bsod .reboot { margin-top:26px; animation:blink 1.2s step-start infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* ============ 关机画面 ============ */
+  #shutdownScr, #standbyScr {
+    position:fixed; inset:0; z-index:99000; background:#000; display:none;
+    align-items:center; justify-content:center; color:#f0a030; font-family:"宋体",serif;
+  }
+  #shutdownScr .txt, #standbyScr .txt { font-size:26px; letter-spacing:6px; text-shadow:0 0 12px rgba(240,160,48,.5); }
+
+  /* ============ 关机对话框 ============ */
+  #dlgShutdown {
+    position:fixed; inset:0; z-index:98000; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.15);
+  }
+  #dlgShutdown .box { width:340px; background:#ece9d8; border:1px solid #0831d9; border-radius:8px 8px 4px 4px; box-shadow:3px 4px 16px rgba(0,0,0,.5); }
+  #dlgShutdown .tb { height:30px; display:flex; align-items:center; padding:0 4px 0 8px; border-radius:7px 7px 0 0;
+    background:linear-gradient(180deg,#0058e6 0%,#3a93ff 40%,#0054e3 100%); color:#fff; font-weight:bold; font-size:12px; }
+  #dlgShutdown .bd { padding:16px; display:flex; gap:16px; align-items:flex-start; }
+  #dlgShutdown .bd img { width:40px; height:40px; }
+  #dlgShutdown .bd p { font-size:11px; color:#222; line-height:1.6; }
+  #dlgShutdown .ft { display:flex; justify-content:flex-end; gap:8px; padding:0 14px 12px; }
+
+  /* ============ 启动画面 ============ */
+  #boot {
+    position:fixed; inset:0; z-index:999999; background:#000; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:26px;
+  }
+  #boot .xp-logo { color:#fff; font-size:44px; font-weight:bold; font-family:Tahoma; }
+  #boot .xp-logo .x { color:#f65314; } #boot .xp-logo .p { color:#7cbb00; }
+  #boot .copy { color:#888; font-size:11px; margin-top:-14px; }
+  #boot .bar { width:190px; height:14px; border:1px solid #666; border-radius:8px; overflow:hidden; display:flex; gap:3px; padding:2px; }
+  #boot .bar i { width:14px; height:100%; background:linear-gradient(90deg,#3a7ff0,#7ab3ff); border-radius:2px; animation:bootSlide 1.1s linear infinite; }
+  @keyframes bootSlide { 0%{transform:translateX(-30px)} 100%{transform:translateX(210px)} }
+
+  /* 关于对话框 */
+  .dlg-about { position:fixed; inset:0; z-index:98000; display:none; align-items:center; justify-content:center; }
+  .dlg-about .box { width:300px; background:#ece9d8; border:1px solid #0831d9; border-radius:8px; box-shadow:3px 4px 16px rgba(0,0,0,.5); }
+  .dlg-about .tb { height:28px; display:flex; align-items:center; padding:0 4px 0 8px; border-radius:7px 7px 0 0;
+    background:linear-gradient(180deg,#0058e6 0%,#3a93ff 40%,#0054e3 100%); color:#fff; font-weight:bold; font-size:12px; }
+  .dlg-about .bd { padding:18px; font-size:11px; color:#222; line-height:1.7; text-align:center; }
+  .dlg-about .ft { display:flex; justify-content:center; padding:0 14px 14px; }
+</style>
+</head>
+<body>
+
+<!-- 启动画面 -->
+<div id="boot">
+  <div class="xp-logo"><span class="x">Windows</span><span class="p">XP</span></div>
+  <div class="bar"><i></i></div>
+  <div class="copy">Microsoft® Windows® XP Professional</div>
+</div>
+
+<!-- 桌面 -->
+<div id="desktop"></div>
+
+<!-- 任务栏 -->
+<div id="taskbar">
+  <button id="startBtn">
+    <svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 1 Q5 0 8 2 L8 8 Q4 7 1 8 Z" fill="#f65314"/><path d="M9 2 Q13 0 17 1 L17 7 Q13 6 9 8 Z" fill="#7cbb00"/><path d="M1 9 Q4 8 8 9 L8 15 Q4 14 1 15 Z" fill="#00a1f1"/><path d="M9 9 Q13 8 17 7 L17 14 Q13 13 9 15 Z" fill="#ffbb00"/></svg>
+    <span>开始</span>
+  </button>
+  <div id="quickLaunch"></div>
+  <div id="taskButtons"></div>
+  <div id="tray">
+    <span class="ticon">🔊</span>
+    <span class="ticon">🛡️</span>
+    <span id="clock">--:--</span>
+  </div>
+</div>
+
+<!-- 开始菜单 -->
+<div id="startMenu">
+  <div class="sm-head">
+    <svg width="34" height="34" viewBox="0 0 34 34"><rect x="1" y="1" width="32" height="32" rx="4" fill="#ece9d8"/><circle cx="17" cy="17" r="11" fill="#3a7ff0"/><circle cx="17" cy="17" r="9" fill="#7ab3ff"/><path d="M13 13 Q17 12 21 13 L21 21 Q17 22 13 21 Z" fill="#fff"/></svg>
+    <span>Administrator</span>
+  </div>
+  <div class="sm-body">
+    <div class="sm-left">
+      <div class="sm-item" id="smIE"><img alt="">Internet<br><b>Internet Explorer</b></div>
+      <div class="sm-item" id="smMine"><img alt="">扫雷<br><b>Minesweeper</b></div>
+      <div class="sm-sep"></div>
+      <div class="sm-item small" id="smDoc"><img alt="">我的文档</div>
+      <div class="sm-item small" id="smPc"><img alt="">我的电脑</div>
+    </div>
+    <div class="sm-right">
+      <div class="sm-item" id="smPc2"><img alt="">我的电脑</div>
+      <div class="sm-item" id="smNeighbor"><img alt="">网上邻居</div>
+      <div class="sm-sep"></div>
+      <div class="sm-item" id="smControl"><img alt="">控制面板</div>
+      <div class="spacer"></div>
+      <div class="sm-item" id="smHelp"><img alt="">帮助和支持</div>
+      <div class="sm-item" id="smRun"><img alt="">运行...</div>
+    </div>
+  </div>
+  <div class="sm-foot">
+    <div class="fbtn" id="smLogoff"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="none" stroke="#fff" stroke-width="2"/><path d="M9 3 L9 9 L13 11" stroke="#fff" stroke-width="2" fill="none"/></svg>注销</div>
+    <div class="fbtn" id="smShutdown"><svg width="18" height="18" viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" rx="2" fill="#e8112d"/></svg>关闭计算机</div>
+  </div>
+</div>
+
+<!-- 蓝屏 -->
+<div id="bsod">
+  <div>
+    <h1>A problem has been detected and windows has been shut down to prevent damage to your computer.</h1><br><br>
+    IRQL_NOT_LESS_OR_EQUAL<br><br>
+    If this is the first time you've seen this Stop error screen, restart your computer.
+    If this screen appears again, follow these steps:<br><br>
+    Check to make sure any new hardware or software is properly installed.
+    If this is a new installation, ask your hardware or software manufacturer for any windows updates you might need.<br><br>
+    If problems continue, disable or remove any newly installed hardware or software.
+    Disable BIOS memory options such as caching or shadowing.<br>
+    If you need to use Safe Mode to remove or disable components, restart your computer,
+    press F8 to select Advanced Startup Options, and then select Safe Mode.<br><br>
+    <div class="stop">
+    Technical information:<br><br>
+    *** STOP: 0x0000000A (0xC0000005, 0x804F3B21, 0x80571C90, 0x00000000)<br><br>
+    Collecting data for crash dump ...<br>
+    Initializing disk for crash dump ...<br>
+    Beginning dump of physical memory.<br>
+    Physical memory dump complete.<br>
+    Contact your system administrator or technical support group for further assistance.
+    </div>
+    <div class="reboot">　　</div>
+  </div>
+</div>
+
+<!-- 关机 / 待机画面 -->
+<div id="shutdownScr"><div class="txt">现在您可以安全地关闭计算机了。</div></div>
+<div id="standbyScr"><div class="txt" style="color:#666;font-size:18px">待机中……（点击返回）</div></div>
+
+<!-- 关闭计算机对话框 -->
+<div id="dlgShutdown">
+  <div class="box">
+    <div class="tb">关闭 Windows</div>
+    <div class="bd">
+      <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#3a7ff0"/><text x="20" y="27" text-anchor="middle" fill="#fff" font-size="20" font-weight:bold">?</text></svg>
+      <p>希望计算机做什么？</p>
+    </div>
+    <div class="ft">
+      <button class="xp-btn" id="btnStandby" disabled style="color:#aaa">待机(S)</button>
+      <button class="xp-btn primary" id="btnTurnOff">关闭(U)</button>
+      <button class="xp-btn" id="btnRestart">重新启动(R)</button>
+      <button class="xp-btn" id="btnCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 关于扫雷 -->
+<div class="dlg-about" id="dlgAbout">
+  <div class="box">
+    <div class="tb">关于“扫雷”</div>
+    <div class="bd">
+      <b>扫雷</b><br>版本 1.0<br><br>经典 Windows 游戏<br>左键揭开 · 右键插旗<br><br>© 2001 Microsoft Corporation
+    </div>
+    <div class="ft"><button class="xp-btn" id="btnAboutOk">确定</button></div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   Windows XP 模拟器
+   ================================================================ */
+(function () {
+  'use strict';
+
+  /* ---------- SVG 图标库 ---------- */
+  const ICO = {
+    folder: '<svg viewBox="0 0 48 48"><path d="M2 10 Q2 7 5 7 L18 7 L22 12 L43 12 Q46 12 46 15 L46 40 Q46 43 43 43 L5 43 Q2 43 2 40 Z" fill="#ffd966" stroke="#b8901f" stroke-width="1.5"/><path d="M2 16 L46 16 L46 40 Q46 43 43 43 L5 43 Q2 43 2 40 Z" fill="#ffe9a8" stroke="#b8901f" stroke-width="1.5"/></svg>',
+    mydoc: '<svg viewBox="0 0 48 48"><path d="M4 8 Q4 5 7 5 L18 5 L22 10 L41 10 Q44 10 44 13 L44 15 L4 15 Z" fill="#ffd966" stroke="#b8901f" stroke-width="1.5"/><rect x="8" y="13" width="32" height="28" fill="#fff" stroke="#b8901f" stroke-width="1.5"/><line x1="12" y1="20" x2="36" y2="20" stroke="#c0c0c0" stroke-width="2"/><line x1="12" y1="26" x2="36" y2="26" stroke="#c0c0c0" stroke-width="2"/><line x1="12" y1="32" x2="30" y2="32" stroke="#c0c0c0" stroke-width="2"/></svg>',
+    computer: '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="28" rx="2" fill="#c8ccd4" stroke="#7a7f88" stroke-width="1.5"/><rect x="7" y="9" width="34" height="22" fill="#3a7ff0"/><rect x="10" y="12" width="28" height="8" fill="#7ab3ff" opacity=".7"/><circle cx="24" cy="26" r="4" fill="#fff" opacity=".8"/><rect x="20" y="34" width="8" height="4" fill="#7a7f88"/><rect x="14" y="38" width="20" height="4" rx="1" fill="#c8ccd4" stroke="#7a7f88"/></svg>',
+    ie: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="#1e6fc8"/><circle cx="24" cy="24" r="19" fill="none" stroke="#0d4a94" stroke-width="2"/><text x="24" y="32" text-anchor="middle" fill="#fff" font-size="22" font-weight="bold" font-family="Georgia">e</text><ellipse cx="24" cy="24" rx="24" ry="8" fill="none" stroke="#f8b800" stroke-width="3.5" transform="rotate(-18 24 24)"/></svg>',
+    neighbor: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="#7ab3ff" stroke="#0d4a94" stroke-width="2"/><ellipse cx="24" cy="24" rx="8" ry="17" fill="none" stroke="#0d4a94" stroke-width="1.5"/><line x1="7" y1="24" x2="41" y2="24" stroke="#0d4a94" stroke-width="1.5"/><path d="M11 14 Q24 20 37 14" fill="none" stroke="#0d4a94" stroke-width="1.5"/><path d="M11 34 Q24 28 37 34" fill="none" stroke="#0d4a94" stroke-width="1.5"/></svg>',
+    recycle: '<svg viewBox="0 0 48 48"><path d="M14 12 L34 12 L32 42 L16 42 Z" fill="#c8ccd4" stroke="#7a7f88" stroke-width="1.5"/><rect x="11" y="8" width="26" height="5" rx="1" fill="#e8ecf4" stroke="#7a7f88"/><rect x="21" y="4" width="6" height="5" rx="1" fill="#e8ecf4" stroke="#7a7f88"/><line x1="20" y1="17" x2="20" y2="37" stroke="#7a7f88" stroke-width="2"/><line x1="24" y1="17" x2="24" y2="37" stroke="#7a7f88" stroke-width="2"/><line x1="28" y1="17" x2="28" y2="37" stroke="#7a7f88" stroke-width="2"/></svg>',
+    drive: '<svg viewBox="0 0 48 48"><rect x="4" y="14" width="40" height="20" rx="3" fill="#c8ccd4" stroke="#7a7f88" stroke-width="1.5"/><rect x="8" y="18" width="18" height="4" rx="1" fill="#e8112d"/><circle cx="36" cy="26" r="3" fill="#7cbb00"/><rect x="8" y="27" width="26" height="3" rx="1" fill="#7a7f88"/></svg>',
+    control: '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="36" rx="3" fill="#ece9d8" stroke="#7a7f88" stroke-width="1.5"/><rect x="8" y="10" width="16" height="12" fill="#3a7ff0"/><rect x="26" y="10" width="14" height="5" fill="#7cbb00"/><rect x="26" y="17" width="14" height="5" fill="#f65314"/><rect x="8" y="24" width="16" height="12" fill="#7ab3ff"/><rect x="26" y="24" width="14" height="12" fill="#ffbb00"/></svg>',
+    help: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="#3a7ff0"/><text x="24" y="33" text-anchor="middle" fill="#fff" font-size="24" font-weight="bold">?</text></svg>',
+    run: '<svg viewBox="0 0 48 48"><rect x="4" y="10" width="30" height="22" rx="2" fill="#3a7ff0"/><rect x="7" y="13" width="24" height="16" fill="#7ab3ff"/><rect x="30" y="16" width="14" height="22" rx="2" fill="#c8ccd4" stroke="#7a7f88"/><line x1="34" y1="22" x2="40" y2="22" stroke="#7a7f88" stroke-width="2"/><line x1="34" y1="27" x2="40" y2="27" stroke="#7a7f88" stroke-width="2"/></svg>',
+    mine: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#c6c6c6" stroke="#7a7a7a" stroke-width="2"/><circle cx="24" cy="24" r="9" fill="#222"/><g stroke="#222" stroke-width="3"><line x1="24" y1="6" x2="24" y2="15"/><line x1="24" y1="33" x2="24" y2="42"/><line x1="6" y1="24" x2="15" y2="24"/><line x1="33" y1="24" x2="42" y2="24"/><line x1="11" y1="11" x2="17" y2="17"/><line x1="31" y1="31" x2="37" y2="37"/><line x1="37" y1="11" x2="31" y2="17"/><line x1="17" y1="31" x2="11" y2="37"/></g><circle cx="21" cy="21" r="2.5" fill="#fff"/></svg>',
+    notepad: '<svg viewBox="0 0 48 48"><rect x="10" y="4" width="28" height="40" fill="#fff" stroke="#7a7f88" stroke-width="1.5"/><line x1="15" y1="12" x2="33" y2="12" stroke="#c0c0c0" stroke-width="2"/><line x1="15" y1="19" x2="33" y2="19" stroke="#c0c0c0" stroke-width="2"/><line x1="15" y1="26" x2="33" y2="26" stroke="#c0c0c0" stroke-width="2"/><line x1="15" y1="33" x2="28" y2="33" stroke="#c0c0c0" stroke-width="2"/></svg>',
+    net: '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="28" rx="2" fill="#c8ccd4" stroke="#7a7f88" stroke-width="1.5"/><rect x="7" y="9" width="34" height="22" fill="#7ab3ff"/><rect x="18" y="34" width="12" height="4" fill="#7a7f88"/><rect x="12" y="38" width="24" height="4" rx="1" fill="#c8ccd4" stroke="#7a7f88"/><circle cx="24" cy="20" r="5" fill="#fff" opacity=".85"/></svg>'
+  };
+
+  /* ---------- 全局状态 ---------- */
+  let zTop = 100;
+  const windows = [];       // 所有窗口
+  const taskButtons = [];   // 任务栏按钮
+  let bsodShown = false;
+
+  const $ = id => document.getElementById(id);
+  const desktop = $('desktop');
+
+  /* ---------- 桌面图标（XP 默认：左列自上而下） ---------- */
+  const desktopIcons = [
+    { id: 'mydoc',   label: '我的文档',   icon: ICO.mydoc,    open: () => openFolder('我的文档', DOC_FILES, 'C:\\Documents and Settings\\Administrator\\My Documents') },
+    { id: 'mypc',    label: '我的电脑',   icon: ICO.computer, open: openMyComputer },
+    { id: 'neighbor',label: '网上邻居',   icon: ICO.neighbor, open: () => openFolder('网上邻居', [
+        { icon: ICO.neighbor, label: '整个网络', dbl: () => openFolder('整个网络', [{ icon: ICO.computer, label: 'Microsoft Windows 网络', dbl: () => openFolder('Microsoft Windows 网络', []) }], '网络') },
+        { icon: ICO.computer, label: 'WORKGROUP', dbl: () => openFolder('WORKGROUP', [{ icon: ICO.computer, label: 'XP-PRO', dbl: () => openFolder('XP-PRO（无法访问：没有权限）', [], '网络') }], '网络') }
+      ], '网上邻居') },
+    { id: 'ie',      label: 'Internet\nExplorer', icon: ICO.ie, open: openIE },
+    { id: 'recycle', label: '回收站',     icon: ICO.recycle, open: () => openFolder('回收站', [], '回收站') }
+  ];
+  desktopIcons.forEach((ic, i) => {
+    const el = document.createElement('div');
+    el.className = 'dicon';
+    el.style.left = '8px';
+    el.style.top = (8 + i * 80) + 'px';
+    el.innerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ic.icon)}" alt=""><div class="lbl">${ic.label.replace(/\n/g, '<br>')}</div>`;
+    desktop.appendChild(el);
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      document.querySelectorAll('.dicon').forEach(d => d.classList.remove('sel'));
+      el.classList.add('sel');
+    });
+    el.addEventListener('dblclick', () => ic.open());
+  });
+  desktop.addEventListener('click', () => document.querySelectorAll('.dicon').forEach(d => d.classList.remove('sel')));
+
+  /* ---------- 任务栏时钟 ---------- */
+  function tickClock() {
+    const d = new Date();
+    $('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  /* ---------- 开始菜单 ---------- */
+  const startBtn = $('startBtn'), startMenu = $('startMenu');
+  startBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = startMenu.style.display !== 'block';
+    startMenu.style.display = open ? 'block' : 'none';
+    startBtn.classList.toggle('open', open);
+  });
+  document.addEventListener('click', e => {
+    if (!startMenu.contains(e.target)) { startMenu.style.display = 'none'; startBtn.classList.remove('open'); }
+  });
+  $('smIE').querySelector('img').src = ICO.ie.toDataURL ? '' : '';
+  document.querySelectorAll('#smIE img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.ie)}" alt="">`);
+  document.querySelectorAll('#smMine img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.mine)}" alt="">`);
+  document.querySelectorAll('#smDoc img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.mydoc)}" alt="">`);
+  document.querySelectorAll('#smPc img, #smPc2 img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.computer)}" alt="">`);
+  document.querySelectorAll('#smNeighbor img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.neighbor)}" alt="">`);
+  document.querySelectorAll('#smControl img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.control)}" alt="">`);
+  document.querySelectorAll('#smHelp img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.help)}" alt="">`);
+  document.querySelectorAll('#smRun img').forEach(im => im.outerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(ICO.run)}" alt="">`);
+
+  $('smIE').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openIE(); });
+  $('smMine').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openMine(); });
+  $('smDoc').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openMyDoc(); });
+  $('smPc').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openMyComputer(); });
+  $('smPc2').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openMyComputer(); });
+  $('smNeighbor').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); desktopIcons[2].open(); });
+  $('smControl').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); openControlPanel(); });
+  $('smHelp').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); alert('帮助和支持\n\n本模拟系统不包含帮助内容。'); });
+  $('smRun').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); const r = prompt('键入程序、文件夹或文档的名称，Windows 将为您打开。\n（试试输入 notepad 或 cmd）'); if (r) runDialog(r); });
+  $('smLogoff').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); alert('注销\n\n当前不支持注销会话。'); });
+  $('smShutdown').addEventListener('click', () => { startMenu.style.display = 'none'; startBtn.classList.remove('open'); $('dlgShutdown').style.display = 'flex'; });
+
+  $('btnCancel').addEventListener('click', () => $('dlgShutdown').style.display = 'none');
+  $('btnTurnOff').addEventListener('click', () => {
+    $('dlgShutdown').style.display = 'none';
+    $('shutdownScr').style.display = 'flex';
+  });
+  $('btnRestart').addEventListener('click', () => {
+    $('dlgShutdown').style.display = 'none';
+    $('shutdownScr').style.display = 'flex';
+    setTimeout(() => { $('shutdownScr').style.display = 'none'; location.reload(); }, 2200);
+  });
+  $('standbyScr').addEventListener('click', () => $('standbyScr').style.display = 'none');
+  $('shutdownScr').addEventListener('click', () => { $('shutdownScr').style.display = 'none'; rebootToDesktop(); });
+
+  /* 快速启动 */
+  const ql = $('quickLaunch');
+  [[ICO.ie, () => openIE()], [ICO.mydoc, () => openMyDoc()], [ICO.computer, () => openMyComputer()]].forEach(([icon, fn]) => {
+    const d = document.createElement('div');
+    d.className = 'ql';
+    d.innerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(icon)}" alt="">`;
+    d.addEventListener('click', fn);
+    ql.appendChild(d);
+  });
+
+  /* ================================================================
+     窗口管理器
+     ================================================================ */
+  function createWindow(opts) {
+    const w = {
+      title: opts.title, icon: opts.icon, el: null,
+      maximized: false, prevRect: null, minimized: false,
+      x: opts.x ?? (60 + (windows.length * 28) % 220),
+      y: opts.y ?? (40 + (windows.length * 24) % 160),
+      w: opts.w, h: opts.h,
+      onbuild: opts.onbuild, onClose: opts.onClose
+    };
+    const el = document.createElement('div');
+    el.className = 'win';
+    el.style.left = w.x + 'px'; el.style.top = w.y + 'px';
+    el.style.width = w.w + 'px'; el.style.height = w.h + 'px';
+    el.style.zIndex = ++zTop;
+
+    const tb = document.createElement('div');
+    tb.className = 'titlebar';
+    tb.innerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(w.icon)}" alt=""><span class="ttitle">${w.title}</span>`;
+    const btns = document.createElement('div');
+    btns.className = 'tbtns';
+    btns.innerHTML = `<div class="tbtn" data-a="min">─</div><div class="tbtn" data-a="max">□</div><div class="tbtn close" data-a="close">✕</div>`;
+    tb.appendChild(btns);
+    el.appendChild(tb);
+
+    w.el = el;
+    w.titlebar = tb;
+    w.body = w.onbuild(el) || null;
+
+    btns.addEventListener('click', e => {
+      e.stopPropagation();
+      const a = e.target.dataset.a;
+      if (a === 'min') minimizeWindow(w);
+      else if (a === 'max') toggleMax(w);
+      else if (a === 'close') closeWindow(w);
+    });
+    btns.addEventListener('dblclick', e => { if (e.target === btns) closeWindow(w); });
+
+    // 拖动
+    tb.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('tbtn')) return;
+      if (w.maximized) return;
+      const sx = e.clientX - w.x, sy = e.clientY - w.y;
+      function mv(ev) {
+        w.x = Math.min(Math.max(ev.clientX - sx, -w.w + 80), innerWidth - 60);
+        w.y = Math.min(Math.max(ev.clientY - sy, 0), innerHeight - 70);
+        el.style.left = w.x + 'px'; el.style.top = w.y + 'px';
+      }
+      function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+
+    // 聚焦
+    el.addEventListener('mousedown', () => focusWindow(w));
+
+    document.body.appendChild(el);
+    windows.push(w);
+    addTaskButton(w);
+    focusWindow(w);
+    return w;
+  }
+
+  function focusWindow(w) {
+    windows.forEach(x => x.el.classList.add('inactive'));
+    w.el.classList.remove('inactive');
+    w.el.style.zIndex = ++zTop;
+    taskButtons.forEach(b => b.el.classList.toggle('active', b.win === w && !w.minimized));
+  }
+
+  function minimizeWindow(w) {
+    w.minimized = true;
+    w.el.style.display = 'none';
+    taskButtons.forEach(b => { if (b.win === w) b.el.classList.remove('active'); });
+    const next = windows.filter(x => !x.minimized && x !== w).pop();
+    if (next) focusWindow(next);
+  }
+
+  function toggleMax(w) {
+    if (w.maximized) {
+      Object.assign(w.el.style, { left: w.prevRect.x + 'px', top: w.prevRect.y + 'px', width: w.prevRect.w + 'px', height: w.prevRect.h + 'px' });
+      w.maximized = false;
+    } else {
+      w.prevRect = { x: w.x, y: w.y, w: w.el.offsetWidth, h: w.el.offsetHeight };
+      Object.assign(w.el.style, { left: '0px', top: '0px', width: innerWidth + 'px', height: (innerHeight - 30) + 'px' });
+      w.maximized = true;
+    }
+  }
+
+  function closeWindow(w) {
+    w.el.remove();
+    windows.splice(windows.indexOf(w), 1);
+    removeTaskButton(w);
+    if (w.onClose) w.onClose();
+  }
+
+  /* 任务栏按钮 */
+  function addTaskButton(w) {
+    const b = document.createElement('div');
+    b.className = 'tbutton';
+    b.innerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(w.icon)}" alt=""><span>${w.title}</span>`;
+    b.addEventListener('click', () => {
+      if (w.minimized) { w.minimized = false; w.el.style.display = 'flex'; focusWindow(w); }
+      else if (w.el.classList.contains('inactive')) focusWindow(w);
+      else minimizeWindow(w);
+    });
+    $('taskButtons').appendChild(b);
+    w.taskBtn = b;
+    taskButtons.push({ el: b, win: w });
+  }
+  function removeTaskButton(w) {
+    const i = taskButtons.findIndex(b => b.win === w);
+    if (i >= 0) { taskButtons[i].el.remove(); taskButtons.splice(i, 1); }
+  }
+
+  /* ================================================================
+     资源管理器
+     ================================================================ */
+  const DOC_FILES = [
+    { icon: ICO.folder, label: 'My Music' }, { icon: ICO.folder, label: 'My Pictures' },
+    { icon: ICO.folder, label: 'My Videos' }, { icon: ICO.notepad, label: '新建文本文档.txt' },
+    { icon: ICO.notepad, label: '购物清单.txt' }
+  ];
+  const C_FILES = [
+    { icon: ICO.folder, label: 'Documents and Settings' }, { icon: ICO.folder, label: 'Program Files' },
+    { icon: ICO.folder, label: 'WINDOWS' }, { icon: ICO.notepad, label: 'autoexec.bat' },
+    { icon: ICO.notepad, label: 'config.sys' }, { icon: ICO.notepad, label: 'io.sys' },
+    { icon: ICO.notepad, label: 'ntldr' }
+  ];
+  const D_FILES = [
+    { icon: ICO.folder, label: '软件备份' }, { icon: ICO.notepad, label: '说明.txt' }
+  ];
+
+  function buildExplorer(el, state) {
+    const mb = document.createElement('div');
+    mb.className = 'menubar';
+    mb.innerHTML = '<span class="mi">文件(F)</span><span class="mi">编辑(E)</span><span class="mi">查看(V)</span><span class="mi">收藏(A)</span><span class="mi">工具(T)</span><span class="mi">帮助(H)</span>';
+    el.appendChild(mb);
+    const tb = document.createElement('div');
+    tb.className = 'toolbar';
+    tb.innerHTML = `
+      <div class="xp-tbtn disabled">◀<span>后退</span></div>
+      <div class="xp-tbtn disabled">▶<span>前进</span></div>
+      <div class="xp-tbtn disabled">▲<span>向上</span></div>
+      <div class="xp-tbtn disabled">🔍<span>搜索</span></div>
+      <div class="xp-tbtn disabled">📁<span>文件夹</span></div>
+      <div class="xp-tbtn disabled">▦<span>查看</span></div>`;
+    el.appendChild(tb);
+    const ab = document.createElement('div');
+    ab.className = 'addrbar';
+    ab.innerHTML = `<label>地址(D)</label><div class="addr">${state.addr}</div><div class="go">转到 →</div>`;
+    el.appendChild(ab);
+    const ct = document.createElement('div');
+    ct.className = 'content';
+    el.appendChild(ct);
+    const grid = document.createElement('div');
+    grid.className = 'icons-grid';
+    ct.appendChild(grid);
+    const sb = document.createElement('div');
+    sb.className = 'statusbar';
+    sb.innerHTML = `<div class="cell grow">${state.items} 个对象</div><div class="cell">我的电脑</div>`;
+    el.appendChild(sb);
+    state.itemsEl = grid;
+    state.statusCount = sb.querySelector('.cell');
+    return state;
+  }
+
+  function addFolderIcon(grid, item) {
+    const d = document.createElement('div');
+    d.className = 'ficon';
+    d.innerHTML = `<img src="data:image/svg+xml;utf8,${encodeURIComponent(item.icon)}" alt=""><div class="lbl">${item.label}</div>`;
+    d.addEventListener('click', e => {
+      e.stopPropagation();
+      grid.querySelectorAll('.ficon').forEach(f => f.classList.remove('sel'));
+      d.classList.add('sel');
+    });
+    grid.appendChild(d);
+    if (item.dbl) d.addEventListener('dblclick', () => item.dbl());
+    return d;
+  }
+
+  function openFolder(title, items, addr, opts) {
+    opts = opts || {};
+    const w = createWindow({ title, icon: ICO.folder, w: opts.w || 560, h: opts.h || 400,
+      x: opts.x, y: opts.y,
+      onbuild(el) {
+        const st = buildExplorer(el, { addr, items });
+        items.forEach(it => addFolderIcon(st.itemsEl, it));
+      }
+    });
+    w.explorerState = items;
+    return w;
+  }
+
+  /* 我的电脑 —— 双击 C 盘触发蓝屏 */
+  function openMyComputer() {
+    createWindow({ title: '我的电脑', icon: ICO.computer, w: 580, h: 400,
+      onbuild(el) {
+        buildExplorer(el, { addr: '我的电脑', items: 4 });
+        const st = el.querySelector('.icons-grid');
+        [
+          { icon: ICO.drive, label: '本地磁盘 (C:)', dbl: () => openDrive('C:') },
+          { icon: ICO.drive, label: '软件 (D:)', dbl: () => openDrive('D:') },
+          { icon: ICO.control, label: '控制面板', dbl: () => openControlPanel() },
+          { icon: ICO.recycle, label: '回收站', dbl: () => openFolder('回收站', [], '回收站') }
+        ].forEach(it => addFolderIcon(st, it));
+        el.querySelector('.statusbar .cell.grow').textContent = '4 个对象';
+      }
+    });
+  }
+
+  function openDrive(drive) {
+    if (drive === 'C:') {
+      const w = openFolder('本地磁盘 (C:)', C_FILES, 'C:\\', { x: 140, y: 90 });
+      // 访问 C 盘 → 触发蓝屏
+      setTimeout(() => {
+        if (windows.includes(w)) triggerBSOD();
+      }, 1100);
+    } else {
+      openFolder('软件 (D:)', D_FILES, 'D:\\', { x: 140, y: 90 });
+    }
+  }
+
+  function openMyDoc() {
+    openFolder('我的文档', DOC_FILES, 'C:\\Documents and Settings\\Administrator\\My Documents');
+  }
+
+  function openControlPanel() {
+    openFolder('控制面板', [
+      { icon: ICO.computer, label: '系统' }, { icon: ICO.control, label: '显示' },
+      { icon: ICO.neighbor, label: '网络连接' }, { icon: ICO.run, label: '计划任务' }
+    ], '控制面板', { w: 520, h: 340 });
+  }
+
+  function runDialog(cmd) {
+    cmd = cmd.trim().toLowerCase();
+    if (cmd === 'notepad' || cmd.indexOf('txt') >= 0) {
+      createWindow({ title: '无标题 - 记事本', icon: ICO.notepad, w: 440, h: 300,
+        onbuild(el) {
+          const mb = el.appendChild(Object.assign(document.createElement('div'), { className: 'menubar' }));
+          mb.innerHTML = '<span class="mi">文件(F)</span><span class="mi">编辑(E)</span><span class="mi">格式(O)</span><span class="mi">查看(V)</span><span class="mi">帮助(H)</span>';
+          const ta = el.appendChild(Object.assign(document.createElement('textarea'), {
+            style: 'flex:1;border:none;outline:none;resize:none;font-family:宋体;font-size:14px;padding:6px;'
+          }));
+          ta.value = '欢迎使用 Windows XP 模拟器！\r\n\r\n试试：\r\n· 双击“我的电脑” → 本地磁盘 (C:) 会发生什么？\r\n· 开始菜单 → 扫雷\r\n· 开始菜单 → Internet Explorer';
+          el.appendChild(Object.assign(document.createElement('div'), { className: 'statusbar' }))
+            .innerHTML = '<div class="cell grow">完成</div><div class="cell">Windows (CRLF)</div><div class="cell">UTF-8</div>';
+        }
+      });
+    } else if (cmd === 'cmd') {
+      createWindow({ title: '命令提示符', icon: ICO.run, w: 540, h: 320,
+        onbuild(el) {
+          const ct = el.appendChild(Object.assign(document.createElement('div'), {
+            className: 'content', style: 'background:#000;color:#ccc;font-family:Consolas,monospace;font-size:13px;padding:8px;white-space:pre-wrap;'
+          }));
+          ct.textContent = 'Microsoft Windows XP [版本 5.1.2600]\\n(C) 版权所有 1985-2001 Microsoft Corp.\\n\\nC:\\Documents and Settings\\Administrator>';
+          el.appendChild(Object.assign(document.createElement('div'), { className: 'statusbar' }))
+            .innerHTML = '<div class="cell grow">完成</div><div class="cell">命令提示符</div>';
+        }
+      });
+    } else if (cmd === 'mine' || cmd === 'winmine') {
+      openMine();
+    } else {
+      alert('Windows 找不到文件“' + cmd + '”。\n请确定文件名是否正确后，再试一次。');
+    }
+  }
+
+  /* ================================================================
+     Internet Explorer（内置模拟互联网）
+     ================================================================ */
+  const SITES = {
+    'http://www.msn.cn/': `
+      <div class="ie-banner"><span class="logo">msn</span><span class="sub">中国 · 门户网站</span>
+        <span style="margin-left:auto;font-size:12px">📧 邮箱　🌤 天气　💬 博客</span></div>
+      <div class="adbar">★ 宽屏液晶显示器 震撼上市 ★ 新品促销 直降500元 ★</div>
+      <table width="100%" style="padding:0 18px"><tr>
+        <td width="55%" valign="top"><b style="color:#c00">今日热点</b>
+          <ul class="news-list">
+            <li><a data-nav="http://news.sina.com.cn/">我国自主研制的新一代火箭发射成功</a></li>
+            <li><a data-nav="http://news.sina.com.cn/">全国粮食生产再获丰收</a></li>
+            <li><a data-nav="http://news.sina.com.cn/">城市地铁新线路正式开通运营</a></li>
+            <li><a data-nav="http://www.xpnet.com/">Windows XP 使用技巧大全</a></li>
+          </ul>
+        </td>
+        <td valign="top"><b style="color:#060">科技资讯</b>
+          <ul class="news-list">
+            <li><a data-nav="http://www.xpnet.com/">宽带上网的几种方式</a></li>
+            <li><a data-nav="http://www.xpnet.com/">如何优化系统启动速度</a></li>
+            <li><a data-nav="http://www.google.cn/">……</a></li>
+          </ul>
+          <div class="adbar" style="margin-left:0">📱 彩铃下载 🎵 图铃随心换</div>
+        </td>
+      </tr></table>
+      <div style="text-align:center;color:#888;font-size:11px;padding:14px">© 2001-2006 MSN 中国 版权所有</div>`,
+
+    'http://news.sina.com.cn/': `
+      <div class="ie-banner" style="background:linear-gradient(180deg,#c00 0%,#e33 60%,#c00 100%);border-bottom-color:#fff">
+        <span class="logo" style="font-style:normal">新浪新闻</span></div>
+      <div style="padding:10px 20px;font-size:12px;color:#666">
+        <a data-nav="http://www.msn.cn/">首页</a> &gt; 新闻 &gt; 国内新闻</div>
+      <div style="padding:6px 24px">
+        <h2 style="font-size:20px;margin:12px 0 16px;font-weight:normal">我国自主研制的新一代运载火箭发射成功</h2>
+        <p style="font-size:12px;color:#888">2006年9月23日 08:45　新华网　记者：张明</p>
+        <p style="line-height:2;text-indent:2em;margin-top:14px">
+        新华社今日电 我国自主研制XX型运载火箭于今日凌晨在XX卫星发射中心点火升空，卫星顺利进入预定轨道。
+        此次发射任务取得圆满成功，标志着我国航天事业迈上新台阶。</p>
+        <p style="line-height:2;text-indent:2em">
+        据了解，该火箭采用了多项新技术，运载能力较上一型号提高约百分之三十。发射现场气氛热烈，
+        科研人员表示将继续努力，为祖国航天事业作出更大贡献。</p>
+        <p style="line-height:2;text-indent:2em">相关专题：<a data-nav="http://news.sina.com.cn/">更多国内新闻</a>　<a data-nav="http://www.msn.cn/">返回新浪首页</a></p>
+      </div>
+      <div class="adbar">⬇ 下载新浪点点通 实时掌握最新资讯 ⬇</div>`,
+
+    'http://www.google.cn/': `
+      <div style="text-align:center;padding-top:30px">
+        <div style="font-size:42px;font-weight:bold;font-family:Arial">
+          <span style="color:#4285f4">G</span><span style="color:#ea4335">o</span><span style="color:#fbbc05">o</span><span style="color:#4285f4">g</span><span style="color:#34a853">l</span><span style="color:#ea4335">e</span>
+          <span style="font-size:16px;color:#888;margin-left:4px">.cn</span></div>
+        <div class="search-row">
+          <input class="sbox" id="gq" placeholder="请输入搜索关键词"><br><br>
+          <button class="sbtn" id="gbtn">Google 搜索</button>
+          <button class="sbtn">手气不错</button>
+        </div>
+        <div style="color:#888;font-size:12px;margin-top:16px">Google 已支持以下网站搜索：<a data-nav="http://news.sina.com.cn/">新闻</a> · <a data-nav="http://www.msn.cn/">网页目录</a></div>
+      </div>`,
+
+    'http://www.google.cn/search': `
+      <div style="padding:14px 20px">
+        <div style="font-size:22px;font-weight:bold;font-family:Arial;margin-bottom:12px">
+          <span style="color:#4285f4">G</span><span style="color:#ea4335">o</span><span style="color:#fbbc05">o</span><span style="color:#4285f4">g</span><span style="color:#34a853">l</span><span style="color:#ea4335">e</span>
+          <span style="font-size:12px;color:#888"> 搜索</span></div>
+        <div style="font-size:12px;color:#666;margin-bottom:16px">约有 <b>1,240,000</b> 条结果，以下是第 1-10 条 （用时 0.23 秒）</div>
+        <div style="margin-bottom:18px">
+          <a data-nav="http://www.xpnet.com/" style="font-size:15px">XP 爱好者之家 - Windows XP 技巧、主题、软件下载</a><br>
+          <span style="font-size:12px;color:#060">www.xpnet.com/</span><br>
+          <span style="font-size:12px;color:#444">专业的 Windows XP 技术站点，提供系统优化、主题美化、驱动程序下载……</span></div>
+        <div style="margin-bottom:18px">
+          <a data-nav="http://news.sina.com.cn/" style="font-size:15px">新闻中心 - 国内新闻</a><br>
+          <span style="font-size:12px;color:#060">news.sina.com.cn/</span><br>
+          <span style="font-size:12px;color:#444">新华网、人民网等国内重要新闻媒体的官方网站……</span></div>
+        <div style="margin-bottom:18px">
+          <a data-nav="http://www.msn.cn/" style="font-size:15px">MSN 中国</a><br>
+          <span style="font-size:12px;color:#060">www.msn.cn/</span><br>
+          <span style="font-size:12px;color:#444"> MSN 中文门户网站，提供即时通讯、电子邮箱、博客等服务……</span></div>
+      </div>`,
+
+    'http://www.xpnet.com/': `
+      <div class="ie-banner" style="background:linear-gradient(180deg,#003c74 0%,#0066cc 60%,#003c74 100%);border-bottom-color:#f65314">
+        <span class="logo" style="font-size:20px">XP 爱好者之家</span><span class="sub">www.xpnet.com</span></div>
+      <table width="100%" style="padding:0 14px"><tr>
+        <td width="120" valign="top" style="background:#eef4fb;padding:8px;font-size:12px;line-height:1.9">
+          <b>网站导航</b><br><a data-nav="http://www.xpnet.com/">网站首页</a><br><a data-nav="http://www.msn.cn/">科技资讯</a><br>
+          <a data-nav="http://news.sina.com.cn/">新闻快递</a><br><a data-nav="http://www.google.cn/">搜索引擎</a></td>
+        <td valign="top" style="padding:10px 14px">
+          <h3 style="font-size:15px;color:#003c74;font-weight:normal;border-bottom:1px solid #95bdee;padding-bottom:6px">最新文章</h3>
+          <ul class="news-list">
+            <li><a data-nav="http://www.xpnet.com/">Windows XP 加速启动的 N 个技巧</a> <span style="color:#c00;font-size:11px">NEW</span></li>
+            <li><a data-nav="http://www.xpnet.com/">经典主题下载：让 XP 焕然一新</a></li>
+            <li><a data-nav="http://www.xpnet.com/">ADSL 宽带安装与优化指南</a></li>
+            <li><a data-nav="http://www.xpnet.com/">系统备份与还原完全手册</a></li>
+          </ul>
+          <div class="adbar" style="margin-left:0">硬件报价：P4 2.8G 仅 599 元！内存 512M 限量热卖！</div>
+        </td>
+      </tr></table>
+      <div style="text-align:center;color:#888;font-size:11px;padding:10px">© 2006 XP 爱好者之家　本站为模拟站点</div>`
+  };
+
+  function ieErrorPage(url) {
+    return `<div class="ie-error">
+      <h2>无法显示网页</h2>
+      您正在查找的页目前不可用。网页可能暂时不可用，或者可能已永久更改了地址。<br><br>
+      <b>请尝试以下操作：</b><br>
+      · 单击<a data-nav="${historyList[historyIndex] || 'http://www.msn.cn/'}">“后退”</a>按钮，链接到另一页。<br>
+      · 单击工具栏上的<a data-nav="http://www.msn.cn/">“主页”</a>，转到主页。<br>
+      · 稍后再试。<br><br>
+      <div class="diag">无法显示该页<br>找不到服务器或 DNS 错误<br>Internet Explorer</div>
+    </div>`;
+  }
+
+  let historyList = [], historyIndex = -1;
+
+  function openIE() {
+    createWindow({ title: 'MSN 中国 - Windows Internet Explorer', icon: ICO.ie, w: 780, h: 560,
+      onbuild(el) {
+        // 菜单
+        const mb = el.appendChild(Object.assign(document.createElement('div'), { className: 'menubar' }));
+        mb.innerHTML = '<span class="mi">文件(F)</span><span class="mi">编辑(E)</span><span class="mi">查看(V)</span><span class="mi">收藏夹(A)</span><span class="mi">工具(T)</span><span class="mi">帮助(H)</span>';
+        // 工具栏
+        const tb = el.appendChild(Object.assign(document.createElement('div'), { className: 'toolbar' }));
+        tb.innerHTML = `
+          <div class="xp-tbtn" id="ieBack">◀<span>后退</span></div>
+          <div class="xp-tbtn" id="ieFwd">▶<span>前进</span></div>
+          <div class="xp-tbtn disabled">✕<span>停止</span></div>
+          <div class="xp-tbtn" id="ieRef">⟳<span>刷新</span></div>
+          <div class="xp-tbtn" id="ieHome">🏠<span>主页</span></div>`;
+        // 地址栏
+        const ab = el.appendChild(Object.assign(document.createElement('div'), { className: 'addrbar' }));
+        ab.innerHTML = `<label>地址(D)</label><div class="addr" contenteditable="true" id="ieAddr" style="white-space:nowrap;overflow:hidden"></div><div class="go">转到 →</div>`;
+        // 内容
+        const ct = el.appendChild(Object.assign(document.createElement('div'), { className: 'content', id: 'ieContent' }));
+        // 状态栏
+        const sb = el.appendChild(Object.assign(document.createElement('div'), { className: 'statusbar' }));
+        sb.innerHTML = `<div class="cell grow">完成</div><div class="cell">🌐 Internet</div><div class="cell">100%</div>`;
+
+        const addr = ab.querySelector('#ieAddr');
+        function navigate(url) {
+          if (!url) return;
+          historyList = historyList.slice(0, historyIndex + 1);
+          historyList.push(url); historyIndex = historyList.length - 1;
+          renderPage();
+        }
+        function renderPage() {
+          const url = historyList[historyIndex];
+          addr.textContent = url;
+          const page = SITES[url] || ieErrorPage(url);
+          ct.innerHTML = `<div class="webpage">${page}</div>`;
+          bindPage(ct, navigate);
+          tb.querySelector('#ieBack').classList.toggle('disabled', historyIndex <= 0);
+          tb.querySelector('#ieFwd').classList.toggle('disabled', historyIndex >= historyList.length - 1);
+        }
+        function bindPage(root, nav) {
+          root.querySelectorAll('a[data-nav]').forEach(a => {
+            a.addEventListener('click', e => { e.preventDefault(); nav(a.dataset.nav); });
+          });
+          const gq = root.querySelector('#gq'), gbtn = root.querySelector('#gbtn');
+          if (gq && gbtn) {
+            gbtn.addEventListener('click', () => {
+              const q = gq.value.trim();
+              nav('http://www.google.cn/search?q=' + encodeURIComponent(q));
+            });
+            gq.addEventListener('keydown', e => { if (e.key === 'Enter') gbtn.click(); });
+          }
+        }
+        ab.querySelector('.go').addEventListener('click', () => navigate(addr.textContent.trim()));
+        addr.addEventListener('keydown', e => { if (e.key === 'Enter') navigate(addr.textContent.trim()); });
+        tb.querySelector('#ieBack').addEventListener('click', () => { if (historyIndex > 0) { historyIndex--; renderPage(); } });
+        tb.querySelector('#ieFwd').addEventListener('click', () => { if (historyIndex < historyList.length - 1) { historyIndex++; renderPage(); } });
+        tb.querySelector('#ieRef').addEventListener('click', renderPage);
+        tb.querySelector('#ieHome').addEventListener('click', () => navigate('http://www.msn.cn/'));
+
+        navigate('http://www.msn.cn/');
+      }
+    });
+  }
+
+  /* ================================================================
+     扫雷
+     ================================================================ */
+  const DIFFS = { easy: { rows: 9, cols: 9, mines: 10 }, mid: { rows: 16, cols: 16, mines: 40 }, hard: { rows: 16, cols: 30, mines: 99 } };
+  let ms = null;
+
+  function openMine() {
+    createWindow({ title: '扫雷', icon: ICO.mine, w: 260, h: 420, x: innerWidth - 320, y: 80,
+      onbuild(el) {
+        const mb = el.appendChild(Object.assign(document.createElement('div'), { className: 'menubar ms-menu' }));
+        mb.innerHTML = `
+          <span class="mi" data-m="game">游戏(G)</span><span class="mi" data-m="help">帮助(H)</span>
+          <div class="menu-drop" id="msMenuGame" style="display:none">
+            <div class="mi" id="msNew">开局(F2)</div><div class="sep"></div>
+            <div class="mi" id="msEasy" style="font-weight:bold">初级 (9×9)</div>
+            <div class="mi" id="msMid">中级 (16×16)</div>
+            <div class="mi" id="msHard">高级 (30×16)</div><div class="sep"></div>
+            <div class="mi" id="msExit">退出</div>
+          </div>
+          <div class="menu-drop" id="msMenuHelp" style="display:none">
+            <div class="mi" id="msAbout">关于扫雷(A)</div>
+          </div>`;
+        const frame = el.appendChild(Object.assign(document.createElement('div'), { className: 'ms-frame' }));
+        frame.innerHTML = `
+          <div class="ms-top">
+            <div class="led" id="msMines">010</div>
+            <button class="ms-face" id="msFace">🙂</button>
+            <div class="led" id="msTime">000</div>
+          </div>
+          <div class="ms-board" id="msBoard"></div>`;
+        const sb = el.appendChild(Object.assign(document.createElement('div'), { className: 'statusbar' }));
+        sb.innerHTML = '<div class="cell grow">完成</div><div class="cell">扫雷</div>';
+
+        const board = frame.querySelector('#msBoard');
+        const minesEl = frame.querySelector('#msMines');
+        const timeEl = frame.querySelector('#msTime');
+        const faceBtn = frame.querySelector('#msFace');
+
+        function newGame(diffKey) {
+          const d = DIFFS[diffKey];
+          ms = { ...d, diffKey, grid: [], started: false, over: false, flags: 0, revealed: 0, timer: null, time: 0 };
+          board.style.gridTemplateColumns = `repeat(${d.cols}, 16px)`;
+          board.innerHTML = '';
+          for (let r = 0; r < d.rows; r++) {
+            ms.grid[r] = [];
+            for (let c = 0; c < d.cols; c++) {
+              ms.grid[r][c] = { mine: false, open: false, flag: false, n: 0 };
+              const cell = document.createElement('div');
+              cell.className = 'ms-cell';
+              cell.dataset.r = r; cell.dataset.c = c;
+              board.appendChild(cell);
+            }
+          }
+          minesEl.textContent = pad(d.mines);
+          timeEl.textContent = '000';
+          faceBtn.textContent = '🙂';
+          clearInterval(ms.timer);
+        }
+      function pad(n) { n = Math.max(0, Math.min(999, n | 0)); return String(n).padStart(3, '0'); }
+
+      function placeMines(safeR, safeC) {
+        const d = ms;
+        let placed = 0;
+        while (placed < d.mines) {
+          const r = Math.random() * d.rows | 0, c = Math.random() * d.cols | 0;
+          if (ms.grid[r][c].mine) continue;
+          if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+          ms.grid[r][c].mine = true; placed++;
+        }
+        for (let r = 0; r < d.rows; r++) for (let c = 0; c < d.cols; c++) {
+          if (ms.grid[r][c].mine) continue;
+          let n = 0;
+          eachN(r, c, (rr, cc) => { if (ms.grid[rr][cc].mine) n++; });
+          ms.grid[r][c].n = n;
+        }
+      }
+      function eachN(r, c, fn) {
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+          if (!dr && !dc) continue;
+          const rr = r + dr, cc = c + dc;
+          if (rr >= 0 && rr < ms.rows && cc >= 0 && cc < ms.cols) fn(rr, cc);
+        }
+      }
+      function cellEl(r, c) { return board.children[r * ms.cols + c]; }
+
+      function openCell(r, c) {
+        const d = ms, cell = d.grid[r][c];
+        if (d.over || cell.open || cell.flag) return;
+        if (!d.started) {
+          d.started = true;
+          placeMines(r, c);
+          d.timer = setInterval(() => { d.time = Math.min(d.time + 1, 999); timeEl.textContent = pad(d.time); }, 1000);
+        }
+        if (cell.mine) return gameOver(r, c);
+        flood(r, c);
+        checkWin();
+      }
+      function flood(r, c) {
+        const d = ms;
+        const stack = [[r, c]];
+        while (stack.length) {
+          const [rr, cc] = stack.pop();
+          const cell = d.grid[rr][cc];
+          if (cell.open || cell.flag || cell.mine) continue;
+          cell.open = true; d.revealed++;
+          const el = cellEl(rr, cc);
+          el.classList.add('open');
+          if (cell.n > 0) { el.textContent = cell.n; el.style.color = NUMCOL[cell.n]; }
+          if (cell.n === 0) eachN(rr, cc, (r2, c2) => { if (!d.grid[r2][c2].open) stack.push([r2, c2]); });
+        }
+      }
+      function gameOver(hr, hc) {
+        ms.over = true;
+        clearInterval(ms.timer);
+        faceBtn.textContent = '😵';
+        for (let r = 0; r < ms.rows; r++) for (let c = 0; c < ms.cols; c++) {
+          const cell = ms.grid[r][c], el = cellEl(r, c);
+          if (cell.mine && !cell.flag) { el.classList.add('open'); el.textContent = '💣'; }
+          if (!cell.mine && cell.flag) { el.textContent = '❌'; }
+        }
+      }
+      function checkWin() {
+        if (ms.revealed === ms.rows * ms.cols - ms.mines) {
+          ms.over = true;
+          clearInterval(ms.timer);
+          faceBtn.textContent = '😎';
+          ms.flags = ms.mines;
+          minesEl.textContent = pad(ms.mines - ms.flags);
+          for (let r = 0; r < ms.rows; r++) for (let c = 0; c < ms.cols; c++)
+            if (ms.grid[r][c].mine && !ms.grid[r][c].flag) { ms.grid[r][c].flag = true; cellEl(r, c).textContent = '🚩'; }
+        }
+      }
+      function toggleFlag(r, c) {
+        const d = ms, cell = d.grid[r][c];
+        if (d.over || cell.open) return;
+        cell.flag = !cell.flag;
+        d.flags += cell.flag ? 1 : -1;
+        cellEl(r, c).textContent = cell.flag ? '🚩' : '';
+        minesEl.textContent = pad(d.mines - d.flags);
+      }
+
+      const NUMCOL = { 1: '#0000ff', 2: '#007b00', 3: '#ff0000', 4: '#00007b', 5: '#7b0000', 6: '#007b7b', 7: '#000000', 8: '#7b7b7b' };
+
+      board.addEventListener('click', e => {
+        const t = e.target.closest('.ms-cell');
+        if (t) openCell(+t.dataset.r, +t.dataset.c);
+      });
+      board.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const t = e.target.closest('.ms-cell');
+        if (t) toggleFlag(+t.dataset.r, +t.dataset.c);
+      });
+      faceBtn.addEventListener('click', () => newGame(ms.diffKey));
+
+      // 菜单
+      const mGame = mb.querySelector('[data-m="game"]'), mHelp = mb.querySelector('[data-m="help"]');
+      const dropG = mb.querySelector('#msMenuGame'), dropH = mb.querySelector('#msMenuHelp');
+      function closeMenus() { dropG.style.display = 'none'; dropH.style.display = 'none'; mGame.classList.remove('open'); mHelp.classList.remove('open'); }
+      mGame.addEventListener('click', () => { const o = dropG.style.display !== 'block'; closeMenus(); if (o) { dropG.style.display = 'block'; mGame.classList.add('open'); } });
+      mHelp.addEventListener('click', () => { const o = dropH.style.display !== 'block'; closeMenus(); if (o) { dropH.style.display = 'block'; mHelp.classList.add('open'); } });
+      document.addEventListener('click', e => { if (!mb.contains(e.target)) closeMenus(); });
+      dropG.querySelector('#msNew').addEventListener('click', () => { closeMenus(); newGame(ms.diffKey); });
+      dropG.querySelector('#msEasy').addEventListener('click', () => { closeMenus(); newGame('easy'); });
+      dropG.querySelector('#msMid').addEventListener('click', () => { closeMenus(); newGame('mid'); });
+      dropG.querySelector('#msHard').addEventListener('click', () => { closeMenus(); newGame('hard'); });
+      dropG.querySelector('#msExit').addEventListener('click', () => { closeMenus(); w.close(); });
+      dropH.querySelector('#msAbout').addEventListener('click', () => { closeMenus(); $('dlgAbout').style.display = 'flex'; });
+      $('btnAboutOk').addEventListener('click', () => $('dlgAbout').style.display = 'none');
+
+      addEventListener('keydown', e => { if (e.key === 'F2') { const w2 = windows.find(x => x.title === '扫雷'); if (w2 && !w2.minimized) newGame(ms.diffKey); } });
+
+      newGame('easy');
+      return frame;
+    },
+    onClose: () => { if (ms) { clearInterval(ms.timer); } }
+    });
+  }
+
+  /* ================================================================
+     蓝屏
+     ================================================================ */
+  function triggerBSOD() {
+    if (bsodShown) return;
+    bsodShown = true;
+    // 白屏闪烁 → 蓝屏
+    const fl = document.createElement('div');
+    fl.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99998';
+    document.body.appendChild(fl);
+    setTimeout(() => {
+      fl.remove();
+      $('bsod').style.display = 'block';
+      const reboot = $('bsod').querySelector('.reboot');
+      reboot.textContent = '　　　　按任意键重新启动计算机';
+      function back() {
+        $('bsod').style.display = 'none';
+        document.removeEventListener('keydown', back);
+        $('bsod').removeEventListener('click', back);
+        bsodShown = false;
+        rebootToDesktop();
+      }
+      document.addEventListener('keydown', back);
+      $('bsod').addEventListener('click', back);
+    }, 450);
+  }
+
+  function rebootToDesktop() {
+    // 关闭所有窗口，回到桌面
+    [...windows].forEach(w => closeWindow(w));
+    document.querySelectorAll('.dicon.sel').forEach(d => d.classList.remove('sel'));
+  }
+
+  /* ---------- 启动 ---------- */
+  setTimeout(() => {
+    $('boot').style.transition = 'opacity .6s';
+    $('boot').style.opacity = '0';
+    setTimeout(() => $('boot').remove(), 650);
+  }, 2200);
+
+  // 初始打开我的电脑，展示桌面
+  setTimeout(() => { openMyComputer(); }, 2600);
+})();
+</script>
+</body>
+</html>

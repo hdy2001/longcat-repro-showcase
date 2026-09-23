@@ -1,540 +1,450 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GLM-5.3-Flash 上手体验 · 动画还原</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="dark" />
+<title>Stocks on Solana — DEPTH</title>
 <style>
+  :root {
+    --bg: #05070c;
+    --text: #e9eef6;
+    --muted: #7d8798;
+    --line: rgba(255, 255, 255, 0.08);
+    --teal: #38e0a4;
+    --pink: #ff5d7e;
+    --live: #ff4d8d;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%;
-    background: #141414;
-    font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
-    overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Space Grotesk", "Inter", -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100%;
+    display: flex;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* ===== 720x960 竖屏画布 ===== */
-  .stage {
-    position: absolute;
-    left: 50%; top: 50%;
-    width: 720px; height: 960px;
-    background: #000;
-    overflow: hidden;
-    transform-origin: center center;
-    box-shadow: 0 0 80px rgba(0,0,0,.8);
-    cursor: pointer;
+  /* ================= 背景层 ================= */
+  .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(640px 420px at 16% 112%, rgba(56, 224, 164, 0.12), transparent 62%),
+      radial-gradient(640px 420px at 84% 112%, rgba(255, 93, 126, 0.12), transparent 62%),
+      radial-gradient(1000px 640px at 50% -24%, rgba(72, 92, 145, 0.14), transparent 66%);
+  }
+  .bg::before { /* 网格 */
+    content: ""; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 56px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 56px);
+    -webkit-mask-image: radial-gradient(72% 72% at 50% 44%, #000 26%, transparent 100%);
+    mask-image: radial-gradient(72% 72% at 50% 44%, #000 26%, transparent 100%);
+  }
+  .bg::after { /* 书脊竖纹(呼应视频背景里的书架) */
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.022) 0 2px, transparent 2px 96px);
+    -webkit-mask-image: linear-gradient(180deg, transparent 26%, #000 58%, transparent 96%);
+    mask-image: linear-gradient(180deg, transparent 26%, #000 58%, transparent 96%);
   }
 
-  /* ===== 顶部 UI（小红书风格） ===== */
-  .ui-top {
-    position: absolute; left: 0; right: 0; top: 0;
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 26px 26px 0;
-    z-index: 60;
-    pointer-events: none;
-  }
-  .xhs-logo {
-    background: #ff2442;
-    color: #fff;
-    font-weight: 700;
-    font-size: 24px;
-    line-height: 1;
-    padding: 9px 16px 10px;
-    border-radius: 999px;
-    letter-spacing: 1px;
-  }
-  .user-chip {
-    display: flex; align-items: center; gap: 12px;
-    padding: 6px 8px;
-  }
-  .user-chip .avatar {
-    width: 52px; height: 52px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.92);
-    object-fit: cover;
-    background: #000;
-  }
-  .user-chip .name {
-    color: #fff;
-    font-size: 26px;
-    font-weight: 600;
-    text-shadow: 0 1px 6px rgba(0,0,0,.7);
-  }
+  .stage { position: relative; z-index: 2; margin: auto; display: flex; flex-direction: column;
+    align-items: center; gap: 56px; padding: 48px 20px; }
 
-  /* ===== 底部字幕 ===== */
-  .subtitle {
-    position: absolute;
-    left: 40px; right: 40px;
-    bottom: 74px;
-    text-align: center;
-    color: #fff;
-    font-size: 30px;
+  /* ================= 标题:模糊 → 清晰 ================= */
+  .title {
+    font-size: clamp(30px, 5.4vw, 58px);
     font-weight: 500;
-    line-height: 1.45;
-    letter-spacing: .5px;
-    text-shadow: 0 1px 3px rgba(0,0,0,.95), 0 2px 12px rgba(0,0,0,.8), 0 0 2px #000;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity .35s ease, transform .35s ease;
-    z-index: 70;
-    pointer-events: none;
+    filter: blur(22px) brightness(1.8);
+    transform: scale(1.06);
+    animation: title-in 1.7s var(--ease) 2.75s both;
   }
-  .subtitle.show { opacity: 1; transform: translateY(0); }
-
-  /* ===== 进度条 ===== */
-  .progress {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 5px;
-    background: rgba(255,255,255,.12);
-    z-index: 80;
-  }
-  .progress .bar {
-    height: 100%; width: 0%;
-    background: linear-gradient(90deg, #ff2442, #ff7a45);
+  .title .brace { opacity: 0.45; font-weight: 300; }
+  @keyframes title-in {
+    0%   { opacity: 0; filter: blur(22px) brightness(1.8); transform: scale(1.06); letter-spacing: 0.1em;
+           text-shadow: 0 0 46px rgba(56,224,164,0), 0 0 46px rgba(255,93,126,0); }
+    100% { opacity: 1; filter: blur(0) brightness(1);    transform: scale(1);    letter-spacing: 0.04em;
+           text-shadow: 0 0 42px rgba(255,255,255,0.16); }
   }
 
-  /* ===== 控制按钮 ===== */
-  .ctrl {
-    position: absolute; right: 24px; bottom: 26px;
-    display: flex; gap: 10px;
-    z-index: 90;
-  }
-  .ctrl button {
-    width: 58px; height: 58px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(0,0,0,.55);
-    color: #fff;
-    font-size: 26px;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-    transition: background .2s, transform .15s;
-  }
-  .ctrl button:hover { background: rgba(0,0,0,.8); transform: scale(1.06); }
-
-  /* ===== 场景层通用 ===== */
-  .scene {
-    position: absolute; inset: 0;
+  /* ================= DEPTH 模块 ================= */
+  .module {
+    width: min(700px, 94vw);
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(16, 21, 30, 0.86), rgba(10, 13, 19, 0.92));
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 22px 26px 18px;
     opacity: 0;
-    transition: opacity .38s ease;
-    z-index: 10;
-    pointer-events: none;
+    transform: translateY(26px) scale(0.97);
+    animation: module-in 1.05s var(--ease) 4.55s both;
   }
-  .scene.active { opacity: 1; }
-  .scene img.ph {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .scene img.ph.contain { object-fit: contain; background: #000; }
+  @keyframes module-in { to { opacity: 1; transform: translateY(0) scale(1); } }
 
-  /* Ken Burns：缓慢推近 / 平移（时长与段落一致） */
-  @keyframes kbZoom {
-    from { transform: scale(1.03) translate(0,0); }
-    to   { transform: scale(1.13) translate(-1.5%, 1.5%); }
-  }
-  @keyframes kbZoomOut {
-    from { transform: scale(1.12) translate(1%, -1%); }
-    to   { transform: scale(1.02) translate(0,0); }
-  }
-  @keyframes kbPan {
-    from { transform: scale(1.08) translateX(-2.2%); }
-    to   { transform: scale(1.08) translateX(2.2%); }
-  }
-  .kb-zoom { animation: kbZoom 6.5s ease-in-out forwards; }
-  .kb-zoom-out { animation: kbZoomOut 6.5s ease-in-out forwards; }
-  .kb-pan { animation: kbPan 7s ease-in-out forwards; }
+  /* 模块四角取景框 */
+  .mod-corner { position: absolute; width: 13px; height: 13px; border: 1.5px solid rgba(255,255,255,0.3);
+    opacity: 0; animation: fade-in 0.5s ease both; }
+  .mod-corner.tl { top: -7px; left: -7px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; animation-delay: 4.9s; }
+  .mod-corner.tr { top: -7px; right: -7px; border-left: 0; border-bottom: 0; border-top-right-radius: 6px; animation-delay: 5.0s; }
+  .mod-corner.bl { bottom: -7px; left: -7px; border-right: 0; border-top: 0; border-bottom-left-radius: 6px; animation-delay: 5.1s; }
+  .mod-corner.br { bottom: -7px; right: -7px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; animation-delay: 5.2s; }
 
-  /* ===== Glitch 标题 ===== */
-  .title-scene { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .scanlines {
-    position: absolute; inset: 0;
-    background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px);
-    pointer-events: none;
+  .mod-header { display: flex; justify-content: space-between; align-items: center;
+    opacity: 0; animation: fade-in 0.7s ease 4.65s both; }
+  .tag { font-size: 11px; letter-spacing: 0.28em; font-weight: 600; color: #aab6c8;
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 5px 10px 5px 12px;
+    background: rgba(255,255,255,0.04); }
+  .chart-icons { display: flex; gap: 16px; align-items: center; color: #55617a; }
+  .chart-icons .ci { width: 18px; height: 18px; display: block; }
+  .chart-icons .active { color: #93a3bd; }
+
+  .mod-sub { display: flex; justify-content: space-between; align-items: center; margin-top: 15px;
+    opacity: 0; animation: fade-in 0.7s ease 4.8s both; }
+  .live { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); letter-spacing: 0.14em; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live);
+    animation: live-pulse 1.7s ease-out infinite; }
+  @keyframes live-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 77, 141, 0.55); }
+    70%  { box-shadow: 0 0 0 9px rgba(255, 77, 141, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 77, 141, 0); }
   }
-  .z-big {
+  .stats { display: flex; gap: 10px; font-family: var(--mono); font-size: 14.5px; font-variant-numeric: tabular-nums; }
+  .stat { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; }
+  .stat i { font-style: normal; font-size: 11px; opacity: 0.8; }
+  .stat.bid { color: var(--teal); }
+  .stat.ask { color: var(--pink); }
+  .stat.flash { animation: stat-flash 0.9s ease; }
+  @keyframes stat-flash {
+    0% { background: rgba(255,255,255,0.13); }
+    100% { background: transparent; }
+  }
+
+  /* ================= 深度图 ================= */
+  .chart { position: relative; margin-top: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .chart-grid { position: absolute; inset: 0; pointer-events: none; }
+  .chart-grid i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.05); }
+
+  .side { display: flex; flex-direction: column; gap: 4px; }
+  .side.bids { justify-content: flex-end; } /* 最下方 = 最贴近中间价的买盘 */
+
+  .bar {
+    --d: 0s;
+    height: 11px;
+    width: 0;
+    border-radius: 2px 7px 7px 2px;
     position: relative;
-    font-size: 330px;
-    font-weight: 900;
-    font-style: italic;
-    line-height: 1;
-    color: #fff;
-    letter-spacing: -10px;
-    text-shadow: 0 0 60px rgba(255,255,255,.35);
-    animation: zFloat 2.6s ease-in-out infinite;
+    cursor: crosshair;
+    will-change: width;
+    transition: width 0.95s var(--ease) var(--d), transform 0.25s ease, filter 0.25s ease;
   }
-  @keyframes zFloat {
-    0%,100% { transform: translateY(0) skewX(-6deg); }
-    50%     { transform: translateY(-14px) skewX(-6deg); }
+  .bar::after { /* 条形末端的光点,悬停时亮起 */
+    content: ""; position: absolute; right: -1px; top: 50%; transform: translateY(-50%) scale(0.6);
+    width: 5px; height: 5px; border-radius: 50%; opacity: 0; transition: opacity 0.2s ease, box-shadow 0.2s ease;
   }
-  .title-line {
-    position: relative;
-    margin-top: 42px;
-    font-size: 62px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: 2px;
-  }
-  .glitch::before, .glitch::after {
-    content: attr(data-text);
-    position: absolute; left: 0; top: 0;
-    width: 100%;
-    overflow: hidden;
-    mix-blend-mode: screen;
-  }
-  .glitch::before {
-    color: #0ff;
-    transform: translate(4px, 0);
-    clip-path: inset(0 0 55% 0);
-    animation: glitchA 1.1s infinite steps(2, end);
-    opacity: .85;
-  }
-  .glitch::after {
-    color: #ff2d78;
-    transform: translate(-4px, 0);
-    clip-path: inset(55% 0 0 0);
-    animation: glitchB 1.4s infinite steps(2, end);
-    opacity: .85;
-  }
-  @keyframes glitchA {
-    0%   { clip-path: inset(12% 0 74% 0); transform: translate(-6px,2px); }
-    25%  { clip-path: inset(58% 0 22% 0); transform: translate(5px,-2px); }
-    50%  { clip-path: inset(28% 0 52% 0); transform: translate(-4px,1px); }
-    75%  { clip-path: inset(70% 0 8% 0);  transform: translate(6px,-1px); }
-    100% { clip-path: inset(8% 0 80% 0);  transform: translate(-5px,2px); }
-  }
-  @keyframes glitchB {
-    0%   { clip-path: inset(64% 0 18% 0); transform: translate(5px,-2px); }
-    25%  { clip-path: inset(16% 0 66% 0); transform: translate(-6px,1px); }
-    50%  { clip-path: inset(48% 0 34% 0); transform: translate(4px,-1px); }
-    75%  { clip-path: inset(6% 0 78% 0);  transform: translate(-5px,2px); }
-    100% { clip-path: inset(56% 0 26% 0); transform: translate(6px,-2px); }
+  .bar.bid::after { background: var(--teal); box-shadow: 0 0 10px var(--teal); }
+  .bar.ask::after { background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+  .bar:hover, .bar.hot { filter: brightness(1.4) saturate(1.15); transform: scaleY(1.3); }
+  .bar:hover::after, .bar.hot::after { opacity: 1; transform: translateY(-50%) scale(1); }
+
+  /* 中间价分隔线 */
+  .spread-line { height: 2px; position: relative; }
+  .spread-line::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8) 18%, rgba(255,255,255,0.8) 82%, transparent);
+    box-shadow: 0 0 14px rgba(255,255,255,0.35);
+    transform: scaleX(0); transform-origin: center;
+    animation: draw-x 0.9s var(--ease) 5.45s both;
   }
 
-  /* ===== 终端光标 ===== */
-  .cursor-blink {
-    position: absolute;
-    width: 14px; height: 30px;
-    background: #4ade80;
-    animation: blink 1s steps(1) infinite;
-  }
-  @keyframes blink { 0%,55% { opacity: 1; } 56%,100% { opacity: 0; } }
+  /* 悬停十字线 */
+  .crosshair { position: absolute; top: 8px; bottom: 8px; left: 0; width: 1px;
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,0.55) 0 3px, transparent 3px 7px);
+    opacity: 0; transition: opacity 0.16s ease; pointer-events: none; }
 
-  /* ===== 结尾关注卡 ===== */
-  .follow-scene { display: flex; align-items: center; justify-content: center; }
-  .follow-bg {
-    position: absolute; inset: -40px;
-    background: url("inputs/scene_05.jpg") center/cover no-repeat;
-    filter: blur(14px) brightness(.35);
-    transform: scale(1.1);
+  /* 悬停提示 */
+  .tooltip { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none;
+    background: rgba(12, 16, 24, 0.96); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 9px; padding: 8px 12px; font-family: var(--mono); font-size: 11.5px;
+    line-height: 1.6; color: #c6d0e0; box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+    opacity: 0; white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 10px)) scale(0.95);
+    transition: opacity 0.16s ease, transform 0.2s var(--ease);
   }
-  .follow-card {
-    position: relative;
-    display: flex; flex-direction: column; align-items: center;
-    animation: cardIn .6s cubic-bezier(.2,.9,.3,1.2) both;
-  }
-  @keyframes cardIn {
-    from { opacity: 0; transform: scale(.7) translateY(40px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-  }
-  .follow-avatar-wrap { position: relative; }
-  .follow-avatar {
-    width: 220px; height: 220px;
-    border-radius: 50%;
-    border: 6px solid #fff;
-    object-fit: cover;
-    background: #000;
-    display: block;
-  }
-  .follow-check {
-    position: absolute;
-    right: 6px; bottom: 14px;
-    width: 58px; height: 58px;
-    border-radius: 50%;
-    background: #fff;
-    color: #ff2442;
-    font-size: 34px;
-    font-weight: 900;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,.4);
-  }
-  .follow-name {
-    margin-top: 30px;
-    font-size: 46px;
-    font-weight: 800;
-    color: #fff;
-    text-shadow: 0 2px 10px rgba(0,0,0,.7);
-    letter-spacing: 2px;
-  }
-  .follow-btn {
-    margin-top: 34px;
-    padding: 16px 84px;
-    font-size: 30px;
-    font-weight: 700;
-    color: #111;
-    background: #fff;
-    border: none;
-    border-radius: 999px;
-    cursor: pointer;
-    letter-spacing: 4px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.35);
-    animation: btnPulse 1.8s ease-in-out infinite;
-  }
-  @keyframes btnPulse {
-    0%,100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
-  }
+  .tooltip.below { transform: translate(-50%, 12px) scale(0.95); }
+  .tooltip.show { opacity: 1; transform: translate(-50%, calc(-100% - 10px)) scale(1); }
+  .tooltip.below.show { transform: translate(-50%, 12px) scale(1); }
+  .t-side { font-size: 10px; letter-spacing: 0.2em; }
+  .t-side.bid { color: var(--teal); }
+  .t-side.ask { color: var(--pink); }
 
-  /* ===== 重播提示 ===== */
-  .replay-hint {
-    position: absolute;
-    left: 50%; bottom: 110px;
-    transform: translateX(-50%);
-    color: rgba(255,255,255,.85);
-    font-size: 22px;
-    background: rgba(0,0,0,.5);
-    padding: 10px 22px;
-    border-radius: 999px;
-    z-index: 85;
-    display: none;
-    letter-spacing: 1px;
+  .mod-footer { display: flex; justify-content: space-between; margin-top: 16px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; color: #5f6b7e;
+    opacity: 0; animation: fade-in 0.7s ease 5.05s both; }
+
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes draw-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* ================= 蓝图线框(开场) ================= */
+  .wireframe { position: fixed; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; }
+  .wireframe.out { animation: wf-out 0.7s ease both; }
+  @keyframes wf-out { to { opacity: 0; } }
+  .wf-inner { position: relative; width: min(640px, 78vw); height: 340px; }
+  .wf-line { position: absolute; left: 40px; right: 40px; height: 1px; background: rgba(200,215,235,0.5);
+    transform: scaleX(0); }
+  .wf-top { top: 60px; transform-origin: left;  animation: draw-x 0.8s cubic-bezier(0.4,0,0.2,1) 0.12s both; }
+  .wf-bottom { bottom: 60px; transform-origin: right; animation: draw-x 0.8s cubic-bezier(0.4,0,0.2,1) 0.38s both; }
+  .wf-corner { position: absolute; width: 18px; height: 18px; border: 1.5px solid rgba(200,215,235,0.55);
+    opacity: 0; animation: fade-in 0.4s ease both; }
+  .wf-corner.tl { top: 60px; left: 40px; border-right: 0; border-bottom: 0; animation-delay: 0.75s; }
+  .wf-corner.tr { top: 60px; right: 40px; border-left: 0; border-bottom: 0; animation-delay: 0.85s; }
+  .wf-corner.bl { bottom: 60px; left: 40px; border-right: 0; border-top: 0; animation-delay: 0.95s; }
+  .wf-corner.br { bottom: 60px; right: 40px; border-left: 0; border-top: 0; animation-delay: 1.05s; }
+  .wf-plus { position: absolute; color: rgba(190,205,228,0.5); font-size: 15px; font-weight: 300;
+    opacity: 0; animation: fade-in 0.4s ease both; }
+  .wf-dotside { position: absolute; top: 50%; width: 64px; border-top: 2px dotted rgba(200,215,235,0.35);
+    opacity: 0; animation: fade-in 0.5s ease both; }
+  .wf-dotside.left { left: -110px; animation-delay: 1.1s; }
+  .wf-dotside.right { right: -110px; animation-delay: 1.2s; }
+  .wf-dots { position: absolute; left: 50%; bottom: -36px; transform: translateX(-50%); display: flex; gap: 14px; }
+  .wf-dots i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid rgba(200,215,235,0.5);
+    opacity: 0; animation: fade-in 0.35s ease both; }
+  .wf-dots i.on { background: rgba(200,215,235,0.55); }
+
+  /* ================= 减弱动效 ================= */
+  @media (prefers-reduced-motion: reduce) {
+    .wireframe { display: none; }
+    .title { animation-duration: 0.01s; animation-delay: 0s; }
+    .module { animation-duration: 0.01s; animation-delay: 0s; }
+    .mod-header, .mod-sub, .mod-footer { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+    .mod-corner, .spread-line::before { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+    .bar { --d: 0s !important; transition-duration: 0.01s !important; }
+    .live-dot { animation: none; }
   }
-  .replay-hint.show { display: block; animation: hintIn .4s ease both; }
-  @keyframes hintIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 </style>
 </head>
 <body>
+  <div class="bg" aria-hidden="true"></div>
 
-<div class="stage" id="stage">
-  <!-- 顶部 UI -->
-  <div class="ui-top">
-    <div class="xhs-logo">小红书</div>
-    <div class="user-chip">
-      <img class="avatar" src="assets/avatar.png" alt="Z派大鑫">
-      <span class="name">Z派大鑫</span>
+  <!-- 蓝图线框开场 -->
+  <div class="wireframe" id="wireframe" aria-hidden="true">
+    <div class="wf-inner">
+      <span class="wf-plus" style="top:-26px; left:-26px;  animation-delay:.55s">+</span>
+      <span class="wf-plus" style="top:-26px; right:-26px; animation-delay:.65s">+</span>
+      <span class="wf-plus" style="bottom:-26px; left:-26px;  animation-delay:.75s">+</span>
+      <span class="wf-plus" style="bottom:-26px; right:-26px; animation-delay:.85s">+</span>
+      <i class="wf-line wf-top"></i>
+      <i class="wf-line wf-bottom"></i>
+      <i class="wf-corner tl"></i><i class="wf-corner tr"></i>
+      <i class="wf-corner bl"></i><i class="wf-corner br"></i>
+      <i class="wf-dotside left"></i>
+      <i class="wf-dotside right"></i>
     </div>
+    <div class="wf-dots" id="wfDots"></div>
   </div>
 
-  <!-- 场景 1：Glitch 标题卡 -->
-  <div class="scene title-scene" id="scTitle">
-    <div class="scanlines"></div>
-    <div class="z-big glitch" data-text="Z">Z</div>
-    <div class="title-line glitch" data-text="GLM 5.3 Flash">GLM 5.3 Flash</div>
-  </div>
+  <div class="stage">
+    <h1 class="title"><span class="brace">{</span> Stocks on Solana <span class="brace">}</span></h1>
 
-  <!-- 场景 2：终端（分析视频） -->
-  <div class="scene" id="scTerm">
-    <img class="ph kb-zoom" id="imgTerm" src="inputs/scene_03.jpg" alt="Claude Code 终端">
-    <div class="cursor-blink" style="left:60%; bottom:18%;"></div>
-  </div>
+    <main class="module" id="module" aria-label="DEPTH market depth">
+      <i class="mod-corner tl"></i><i class="mod-corner tr"></i>
+      <i class="mod-corner bl"></i><i class="mod-corner br"></i>
 
-  <!-- 场景 3：线框设计稿 -->
-  <div class="scene" id="scWire">
-    <img class="ph contain kb-pan" src="inputs/scene_02.jpg" alt="线框设计稿">
-  </div>
+      <header class="mod-header">
+        <div class="tag">DEPTH</div>
+        <div class="chart-icons" aria-hidden="true">
+          <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M5 20v-7M12 20V5M19 20v-4" />
+          </svg>
+          <svg class="ci active" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 17l5-6 4 3 6-8" /><path d="M15 6h3v3" />
+          </svg>
+        </div>
+      </header>
 
-  <!-- 场景 4：Stocks on Solana 标题 -->
-  <div class="scene" id="scSolana">
-    <img class="ph contain kb-zoom-out" src="inputs/scene_04.jpg" alt="Stocks on Solana">
-  </div>
-
-  <!-- 场景 5：Depth 图表（青） -->
-  <div class="scene" id="scDepth">
-    <img class="ph kb-zoom" src="inputs/scene_01.jpg" alt="Depth 数据图表">
-  </div>
-
-  <!-- 场景 6：One book 成品 -->
-  <div class="scene" id="scOnebook">
-    <img class="ph contain kb-zoom-out" src="inputs/scene_05.jpg" alt="One book 数据可视化">
-  </div>
-
-  <!-- 场景 7：关注卡 -->
-  <div class="scene follow-scene" id="scFollow">
-    <div class="follow-bg"></div>
-    <div class="follow-card">
-      <div class="follow-avatar-wrap">
-        <img class="follow-avatar" src="assets/avatar.png" alt="Z派大鑫">
-        <div class="follow-check">✓</div>
+      <div class="mod-sub">
+        <div class="live"><span class="live-dot"></span>Live</div>
+        <div class="stats">
+          <span class="stat bid" id="bidStat"><i>↑</i><b id="bidVal">$875k</b></span>
+          <span class="stat ask" id="askStat"><i>↓</i><b id="askVal">$1.02M</b></span>
+        </div>
       </div>
-      <div class="follow-name">Z派大鑫</div>
-      <button class="follow-btn" id="followBtn">关注</button>
-    </div>
+
+      <div class="chart" id="chart">
+        <div class="chart-grid" aria-hidden="true">
+          <i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i>
+        </div>
+        <div class="side bids" id="bids"></div>
+        <div class="spread-line" aria-hidden="true"></div>
+        <div class="side asks" id="asks"></div>
+        <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+      </div>
+
+      <footer class="mod-footer">
+        <span>SOL / USDC · 0.02%</span>
+        <span id="latency">updated 42ms ago</span>
+      </footer>
+    </main>
   </div>
 
-  <!-- 字幕 -->
-  <div class="subtitle" id="subtitle"></div>
-
-  <!-- 重播提示 -->
-  <div class="replay-hint" id="replayHint">点击画面 重新播放</div>
-
-  <!-- 控制 -->
-  <div class="ctrl">
-    <button id="replayBtn" title="重播">↻</button>
-  </div>
-
-  <!-- 进度条 -->
-  <div class="progress"><div class="bar" id="bar"></div></div>
-</div>
+  <div class="tooltip" id="tooltip" aria-hidden="true"></div>
 
 <script>
 (function () {
-  "use strict";
+  'use strict';
 
-  /* ===== 时间线：还原原视频节奏（总时长 46s） ===== */
-  var TL = [
-    { start: 0.0,  end: 4.0,  scene: null,       sub: "Z派大鑫段时间在海外刷屏的Ox-Alpha模型" },
-    { start: 4.0,  end: 8.0,  scene: null,       sub: "昨晚终于揭晓了" },
-    { start: 8.0,  end: 12.5, scene: "scTitle",  sub: "他就是GLM-5.3-Flash" },
-    { start: 12.5, end: 18.5, scene: "scTerm",   sub: "分析这个视频，生成一个类似的动画" },
-    { start: 18.5, end: 24.5, scene: "scWire",   sub: "从开场动画、数据模块到页面交互" },
-    { start: 24.5, end: 28.5, scene: "scSolana", sub: "最后生成这个效果" },
-    { start: 28.5, end: 34.5, scene: "scDepth",  sub: "最离谱的是 能力对标Opus 4.8" },
-    { start: 34.5, end: 40.5, scene: "scOnebook",sub: "价格却大约只有它的四十分之一" },
-    { start: 40.5, end: 46.0, scene: "scFollow", sub: "这个模型确实值得试一下" }
-  ];
-  var TOTAL = 46;
+  /* ============ 蓝图线框:底部圆点逐个出现,随后整体淡出 ============ */
+  var wf = document.getElementById('wireframe');
+  var dotsBox = document.getElementById('wfDots');
+  var filled = [0, 1, 3, 5, 6, 8, 10];
+  for (var i = 0; i < 12; i++) {
+    var d = document.createElement('i');
+    if (filled.indexOf(i) > -1) d.className = 'on';
+    d.style.animationDelay = (1.25 + i * 0.05) + 's';
+    dotsBox.appendChild(d);
+  }
+  setTimeout(function () { wf.classList.add('out'); }, 2350);
+  setTimeout(function () { wf.parentNode && wf.parentNode.removeChild(wf); }, 3150);
 
-  var stage = document.getElementById("stage");
-  var subEl = document.getElementById("subtitle");
-  var bar = document.getElementById("bar");
-  var replayBtn = document.getElementById("replayBtn");
-  var replayHint = document.getElementById("replayHint");
-  var followBtn = document.getElementById("followBtn");
+  /* ============ DEPTH 数据模型 ============ */
+  var N = 14;                 // 每侧条形数量
+  var MID = 128.42;           // 中间价
+  var chart = document.getElementById('chart');
+  var bidsEl = document.getElementById('bids');
+  var asksEl = document.getElementById('asks');
+  var cross = document.getElementById('crosshair');
+  var tip = document.getElementById('tooltip');
+  var bidStat = document.getElementById('bidStat');
+  var askStat = document.getElementById('askStat');
+  var bidVal = document.getElementById('bidVal');
+  var askVal = document.getElementById('askVal');
+  var latencyEl = document.getElementById('latency');
+  var bars = [];
+  var bidTotal = 875000, askTotal = 1020000;
 
-  var curSeg = -1;
-  var curSub = "";
-  var startTs = null;
-  var accPause = 0;
-  var frozenT = null;   // 暂停时的时间
-  var ended = false;
-
-  function segAt(t) {
-    for (var i = TL.length - 1; i >= 0; i--) {
-      if (t >= TL[i].start) return i;
-    }
-    return 0;
+  function fmt(n) { /* 875000 → $875k,1020000 → $1.02M */
+    if (n >= 999000) return '$' + (n / 1e6).toFixed(2) + 'M';
+    return '$' + Math.round(n / 1e3) + 'k';
   }
 
-  function setScene(id) {
-    var scenes = document.querySelectorAll(".scene");
-    for (var i = 0; i < scenes.length; i++) scenes[i].classList.remove("active");
-    if (id) {
-      var el = document.getElementById(id);
-      if (el) {
-        el.classList.remove("active");
-        // 重启动画（Ken Burns / 关注卡）
-        void el.offsetWidth;
-        el.classList.add("active");
-      }
-    }
-  }
+  /* 深度分布:峰值略偏离中间价,向两侧衰减 */
+  function gauss(x) { var t = (x - 2) / 3.6; return Math.exp(-t * t); }
+  function baseWidth(idx) { return Math.min(97, Math.max(9, 15 + 80 * gauss(idx))); }
 
-  function setSub(text) {
-    if (text === curSub) return;
-    curSub = text;
-    if (!text) { subEl.classList.remove("show"); return; }
-    subEl.classList.remove("show");
-    setTimeout(function () {
-      subEl.textContent = text;
-      subEl.classList.add("show");
-    }, 200);
-  }
-
-  function applySeg(i) {
-    curSeg = i;
-    var seg = TL[i];
-    setScene(seg.scene);
-    setSub(seg.sub);
-  }
-
-  function tick(now) {
-    if (startTs === null) startTs = now;
-    var t = frozenT !== null ? frozenT : (now - startTs - accPause) / 1000;
-
-    if (t >= TOTAL) {
-      t = TOTAL;
-      bar.style.width = "100%";
-      ended = true;
-      replayHint.classList.add("show");
-      return; // 停止循环，停留在最后一帧
-    }
-    var i = segAt(t);
-    if (i !== curSeg) applySeg(i);
-    bar.style.width = (t / TOTAL * 100) + "%";
-    requestAnimationFrame(tick);
-  }
-
-  function play() {
-    if (ended) restart();
-    if (frozenT !== null) {
-      startTs = performance.now() - (frozenT * 1000 + accPause);
-      frozenT = null;
-      replayHint.classList.remove("show");
-      requestAnimationFrame(tick);
+  function build(el, side, count) {
+    for (var i = 0; i < count; i++) {
+      var idx = (side === 'bid') ? count - 1 - i : i; // 0 = 贴近中间价
+      var b = document.createElement('div');
+      b.className = 'bar ' + side;
+      b._side = side; b._idx = idx;
+      b._w = baseWidth(idx);
+      b._price = side === 'bid'
+        ? MID - (idx + 1) * (0.02 + Math.random() * 0.006)
+        : MID + (idx + 1) * (0.02 + Math.random() * 0.006);
+      b._vol = 30 + Math.random() * 150;
+      /* 颜色:越贴近中间价越亮 */
+      var a = 0.45 + 0.55 * (1 - idx / (N - 1));
+      var c = side === 'bid' ? '56,224,164' : '255,93,126';
+      b.style.background = 'linear-gradient(90deg, rgba(' + c + ',' + (a * 0.32).toFixed(3) +
+        '), rgba(' + c + ',' + a.toFixed(3) + '))';
+      /* 入场延迟:模块动画(4.55s)之后,条形依次生长 */
+      b.style.setProperty('--d', 'calc(5.15s + ' + (i * 0.045).toFixed(3) + 's)');
+      el.appendChild(b);
+      bars.push(b);
     }
   }
+  build(bidsEl, 'bid', N);
+  build(asksEl, 'ask', N);
 
-  function pause() {
-    if (ended || frozenT !== null) return;
-    // 用最近一次 rAF 的时间近似
-    frozenT = (performance.now() - startTs - accPause) / 1000;
-  }
-
-  function restart() {
-    curSeg = -1;
-    curSub = "";
-    frozenT = null;
-    ended = false;
-    accPause = 0;
-    startTs = performance.now();
-    subEl.classList.remove("show");
-    replayHint.classList.remove("show");
-    requestAnimationFrame(tick);
-  }
-
-  /* ===== 画布自适应缩放 ===== */
-  function fit() {
-    var s = Math.min(window.innerWidth / 720, window.innerHeight / 960) * 0.98;
-    stage.style.transform = "translate(-50%, -50%) scale(" + s + ")";
-  }
-  window.addEventListener("resize", fit);
-  fit();
-
-  /* ===== 交互 ===== */
-  stage.addEventListener("click", function () {
-    if (frozenT !== null) play(); else pause();
-  });
-  replayBtn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    restart();
-  });
-  followBtn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    var b = followBtn;
-    if (b.textContent === "关注") {
-      b.textContent = "已关注";
-      b.style.background = "#ff2442";
-      b.style.color = "#fff";
-      b.style.animation = "none";
-    } else {
-      b.textContent = "关注";
-      b.style.background = "#fff";
-      b.style.color = "#111";
-      b.style.animation = "";
-    }
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.code === "Space") {
-      e.preventDefault();
-      if (frozenT !== null) play(); else pause();
-    }
+  /* 入场:从 0 宽度生长到目标宽度 */
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      bars.forEach(function (b) { b.style.width = b._w + '%'; });
+    });
   });
 
-  /* ===== 启动 ===== */
-  startTs = performance.now();
-  requestAnimationFrame(tick);
+  /* ============ 实时数据刷新(每 2.4s) ============ */
+  var tick = 0;
+  function updateStat(statEl, valEl, v) {
+    valEl.textContent = fmt(v);
+    statEl.classList.remove('flash');
+    void statEl.offsetWidth; /* 重启动画 */
+    statEl.classList.add('flash');
+  }
+
+  function refresh() {
+    tick++;
+    var big = (tick % 5 === 0); /* 每隔几次来一次较大的跳动 */
+    bars.forEach(function (b) {
+      var w = b._w + (Math.random() - 0.5) * (big ? 30 : 13);
+      w += (baseWidth(b._idx) - w) * 0.22; /* 向基准回归,防止长期漂移 */
+      b._w = Math.max(9, Math.min(97, w));
+      b.style.width = b._w + '%';
+    });
+    bidTotal += (Math.random() - 0.5) * 22000 + (875000 - bidTotal) * 0.06;
+    askTotal += (Math.random() - 0.5) * 26000 + (1020000 - askTotal) * 0.06;
+    updateStat(bidStat, bidVal, bidTotal);
+    updateStat(askStat, askVal, askTotal);
+    latencyEl.textContent = 'updated ' + Math.round(16 + Math.random() * 40) + 'ms ago';
+  }
+
+  setTimeout(function () {
+    bars.forEach(function (b) { b.style.setProperty('--d', '0s'); });
+    setInterval(refresh, 2400);
+  }, 8000);
+
+  /* ============ 悬停交互:高亮 + 末端光点 + 十字线 + 提示卡 ============ */
+  function hideTip() {
+    tip.classList.remove('show');
+    cross.style.opacity = '0';
+    var hot = chart.querySelector('.bar.hot');
+    if (hot) hot.classList.remove('hot');
+  }
+
+  function showTip(b) {
+    var r = b.getBoundingClientRect();
+    var cr = chart.getBoundingClientRect();
+    tip.innerHTML =
+      '<div class="t-side ' + b._side + '">' + (b._side === 'bid' ? 'BID' : 'ASK') + '</div>' +
+      '<div>$' + b._price.toFixed(2) + '</div>' +
+      '<div>' + b._vol.toFixed(1) + 'K SOL</div>';
+    tip.classList.add('show');
+    tip.classList.toggle('below', r.top < 96); /* 顶部空间不足时翻到下方 */
+    var half = tip.offsetWidth / 2;
+    var x = Math.min(Math.max(r.right, cr.left + half + 8), cr.right - half - 8);
+    tip.style.left = x + 'px';
+    tip.style.top = (r.top < 96 ? r.bottom : r.top) + 'px';
+    cross.style.left = (r.right - cr.left) + 'px';
+    cross.style.opacity = '1';
+    var hot = chart.querySelector('.bar.hot');
+    if (hot && hot !== b) hot.classList.remove('hot');
+    b.classList.add('hot');
+  }
+
+  chart.addEventListener('pointerover', function (e) {
+    var b = e.target.closest ? e.target.closest('.bar') : null;
+    if (b && chart.contains(b)) showTip(b);
+  });
+  chart.addEventListener('pointerout', function (e) {
+    var b = e.target.closest ? e.target.closest('.bar') : null;
+    if (b && chart.contains(b)) hideTip();
+  });
+  chart.addEventListener('pointerleave', hideTip);
 })();
 </script>
 </body>
