@@ -1,185 +1,225 @@
-// HUD / 菜单 / 记分板（纯 DOM 操作）
-import { TEAM_INFO } from './config';
+// ============================================================
+// HUD —— 小地图 / 血量 / 弹药 / 比分 / 击杀播报 / 准星
+// ============================================================
+import { BOXES, ZONES, T_SPAWNS } from './mapdata';
+import type { TeamId } from './types';
+import { TEAM_COLOR } from './types';
 
-export interface KillEntry {
-  killer: string; killerTeam: number; victim: string; victimTeam: number;
-  headshot: boolean; weapon: string; t: number;
-}
-
-export interface ScoreRow {
-  name: string; team: number; kills: number; deaths: number; isPlayer: boolean;
-}
-
-function el<T extends HTMLElement>(id: string): T {
-  const e = document.getElementById(id);
-  if (!e) throw new Error(`缺少元素 #${id}`);
-  return e as T;
+export interface MinimapBlip {
+  x: number; z: number; team: TeamId; isPlayer?: boolean;
+  yaw?: number; // 玩家朝向
+  revealUntil?: number; // 敌人开火暴露的截止时间 (秒, now 时间)
+  dead?: boolean;
 }
 
 export class HUD {
-  onStart: (() => void) | null = null;
-  onRestart: (() => void) | null = null;
-  onResume: (() => void) | null = null;
-
-  private killFeedEl = el('killfeed');
-  private hpBar = el('hp-fill');
-  private hpText = el('hp-text');
-  private ammoMag = el('ammo-mag');
-  private ammoReserve = el('ammo-reserve');
-  private scoreBlue = el('score-blue');
-  private scoreRed = el('score-red');
-  private timerEl = el('match-timer');
-  private hitmarkerEl = el('hitmarker');
-  private vignette = el('dmg-vignette');
-  private deathOverlay = el('death-overlay');
-  private deathInfo = el('death-info');
-  private respawnT = el('respawn-t');
-  private msgEl = el('center-msg');
-  private scoreboardEl = el('scoreboard');
-  private menuEl = el('menu');
-  private hudEl = el('hud');
-  private pauseEl = el('pause');
-  private endEl = el('end-screen');
-  private endTitle = el('end-title');
-  private endStats = el('end-stats');
-  private vignetteT = 0;
-  private msgT = 0;
-  private hmT = 0;
+  private root: HTMLElement;
+  private mapCanvas: HTMLCanvasElement;
+  private mapCtx: CanvasRenderingContext2D;
+  private hpBar: HTMLElement;
+  private hpNum: HTMLElement;
+  private ammoNum: HTMLElement;
+  private ammoReserve: HTMLElement;
+  private scoreT: HTMLElement;
+  private scoreCT: HTMLElement;
+  private timer: HTMLElement;
+  killfeed: HTMLElement;
+  private hitmark: HTMLElement;
+  private vignette: HTMLElement;
+  private lowhp: HTMLElement;
+  private hint: HTMLElement;
+  private crosshair: HTMLElement;
+  private respawnOverlay: HTMLElement;
+  private respawnTimer: HTMLElement;
+  private mapSize = 240;
+  private mapScale = 1.78; // 像素/米
+  private mapOffX = 0;
+  private mapOffZ = 0;
 
   constructor() {
-    el<HTMLButtonElement>('btn-start').addEventListener('click', () => this.onStart?.());
-    el<HTMLButtonElement>('btn-restart').addEventListener('click', () => this.onRestart?.());
-    el<HTMLButtonElement>('btn-resume').addEventListener('click', () => this.onResume?.());
+    this.root = document.getElementById('hud')!;
+    this.mapCanvas = document.getElementById('minimap') as HTMLCanvasElement;
+    this.mapCtx = this.mapCanvas.getContext('2d')!;
+    this.mapCanvas.width = this.mapSize;
+    this.mapCanvas.height = this.mapSize;
+    this.hpBar = document.getElementById('hp-bar')!;
+    this.hpNum = document.getElementById('hp-num')!;
+    this.ammoNum = document.getElementById('ammo-num')!;
+    this.ammoReserve = document.getElementById('ammo-reserve')!;
+    this.scoreT = document.getElementById('score-t')!;
+    this.scoreCT = document.getElementById('score-ct')!;
+    this.timer = document.getElementById('match-timer')!;
+    this.killfeed = document.getElementById('killfeed')!;
+    this.hitmark = document.getElementById('hitmarker')!;
+    this.vignette = document.getElementById('dmg-vignette')!;
+    this.lowhp = document.getElementById('lowhp')!;
+    this.hint = document.getElementById('hint')!;
+    this.crosshair = document.getElementById('crosshair')!;
+    this.respawnOverlay = document.getElementById('respawn')!;
+    this.respawnTimer = document.getElementById('respawn-timer')!;
+    // 地图居中: 世界 x∈[-62,62], z∈[-54,54]
+    this.mapOffX = 62; this.mapOffZ = 54;
   }
 
-  showMenu(show: boolean): void {
-    this.menuEl.classList.toggle('hidden', !show);
+  show(): void { this.root.classList.add('visible'); }
+  hide(): void { this.root.classList.remove('visible'); }
+
+  // ----------------------------------------------------------
+  private w2m(x: number, z: number): [number, number] {
+    return [
+      (x + this.mapOffX) * this.mapScale,
+      (z + this.mapOffZ) * this.mapScale,
+    ];
   }
 
-  showHUD(show: boolean): void {
-    this.hudEl.classList.toggle('hidden', !show);
+  // ----------------------------------------------------------
+  drawMinimap(blips: MinimapBlip[], now: number): void {
+    const g = this.mapCtx;
+    const S = this.mapSize;
+    g.clearRect(0, 0, S, S);
+    // 底
+    g.fillStyle = 'rgba(24,20,14,0.88)';
+    g.fillRect(0, 0, S, S);
+    // 区域
+    for (const z of ZONES) {
+      const [x1, y1] = this.w2m(z.x1, z.z1);
+      const [x2, y2] = this.w2m(z.x2, z.z2);
+      g.fillStyle = z.id === 'A' || z.id === 'B' ? 'rgba(255,160,60,0.16)' : 'rgba(120,140,160,0.07)';
+      g.fillRect(x1, y1, x2 - x1, y2 - y1);
+      if (z.id === 'A' || z.id === 'B') {
+        g.fillStyle = z.color;
+        g.font = 'bold 17px monospace';
+        g.textAlign = 'center';
+        g.fillText(z.id, (x1 + x2) / 2, (y1 + y2) / 2 + 6);
+        g.font = '9px monospace';
+        g.fillStyle = 'rgba(255,255,255,0.55)';
+        g.fillText(z.label, (x1 + x2) / 2, (y1 + y2) / 2 + 20);
+      }
+    }
+    // 墙体
+    g.fillStyle = '#a8874f';
+    for (const b of BOXES) {
+      if (b.kind !== 'wall') continue;
+      const [x1, y1] = this.w2m(b.x - b.w / 2, b.z - b.d / 2);
+      const [x2, y2] = this.w2m(b.x + b.w / 2, b.z + b.d / 2);
+      g.fillRect(x1, y1, Math.max(x2 - x1, 1.5), Math.max(y2 - y1, 1.5));
+    }
+    //  mask体
+    g.fillStyle = 'rgba(150,120,80,0.55)';
+    for (const b of BOXES) {
+      if (b.kind === 'crate' || b.kind === 'sandbag') {
+        const [x1, y1] = this.w2m(b.x - b.w / 2, b.z - b.d / 2);
+        const [x2, y2] = this.w2m(b.x + b.w / 2, b.z + b.d / 2);
+        g.fillRect(x1, y1, x2 - x1, y2 - y1);
+      }
+    }
+    // 点
+    for (const b of blips) {
+      if (b.dead) continue;
+      const [mx, my] = this.w2m(b.x, b.z);
+      if (b.isPlayer) {
+        // 玩家箭头
+        g.save();
+        g.translate(mx, my);
+        g.rotate(Math.atan2(-Math.sin(b.yaw ?? 0), -Math.cos(b.yaw ?? 0)) * -1 + Math.PI);
+        g.fillStyle = '#ffffff';
+        g.beginPath();
+        g.moveTo(0, -6); g.lineTo(4.4, 5); g.lineTo(0, 2.4); g.lineTo(-4.4, 5);
+        g.closePath(); g.fill();
+        g.restore();
+      } else {
+        const revealed = b.revealUntil !== undefined && now < b.revealUntil;
+        if (!revealed) continue; // 敌人仅开火暴露时可见
+        const age = b.revealUntil !== undefined ? 1 - (b.revealUntil - now) / 3.5 : 0;
+        g.globalAlpha = Math.max(0.25, 1 - age);
+        g.fillStyle = TEAM_COLOR[b.team];
+        g.beginPath();
+        g.arc(mx, my, 3.6, 0, Math.PI * 2);
+        g.fill();
+        g.globalAlpha = 1;
+        g.strokeStyle = 'rgba(0,0,0,0.6)';
+        g.lineWidth = 1;
+        g.stroke();
+      }
+    }
+    // 边框 + 指北
+    g.strokeStyle = 'rgba(255,180,84,0.5)';
+    g.lineWidth = 2;
+    g.strokeRect(1, 1, S - 2, S - 2);
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+    g.font = 'bold 10px monospace';
+    g.textAlign = 'left';
+    g.fillText('N ↑', 6, 12);
+    g.fillText('战术地图', 6, S - 6);
   }
 
-  showPause(show: boolean): void {
-    this.pauseEl.classList.toggle('hidden', !show);
+  // ----------------------------------------------------------
+  setHealth(hp: number): void {
+    const v = Math.max(0, Math.round(hp));
+    this.hpNum.textContent = String(v);
+    this.hpBar.style.width = `${v}%`;
+    this.hpBar.style.background = v > 55 ? 'linear-gradient(90deg,#7fd48a,#a8e6a1)'
+      : v > 25 ? 'linear-gradient(90deg,#e8b34a,#f2cd7a)'
+        : 'linear-gradient(90deg,#e84a3a,#f27a6a)';
+    this.lowhp.style.opacity = v <= 30 && v > 0 ? '1' : '0';
   }
 
-  showHitmarker(head: boolean): void {
-    this.hmT = 0.18;
-    this.hitmarkerEl.classList.toggle('head', head);
-    this.hitmarkerEl.classList.remove('show');
-    void this.hitmarkerEl.offsetWidth; // 重启动画
-    this.hitmarkerEl.classList.add('show');
+  setAmmo(ammo: number, reserve: number, reloading: boolean): void {
+    this.ammoNum.textContent = reloading ? '--' : String(ammo);
+    this.ammoReserve.textContent = reserve > 900 ? '/ ∞' : `/ ${reserve}`;
   }
 
-  flashDamage(): void {
-    this.vignetteT = 0.5;
-  }
-
-  killFeedAdd(e: KillEntry): void {
-    const div = document.createElement('div');
-    div.className = 'kf-row';
-    const kc = TEAM_INFO[e.killerTeam].css;
-    const vc = TEAM_INFO[e.victimTeam].css;
-    div.innerHTML = `<span style="color:${kc}">${e.killer}</span>` +
-      `<span class="kf-weapon">[${e.weapon}${e.headshot ? ' 爆头' : ''}]</span>` +
-      `<span style="color:${vc}">${e.victim}</span>`;
-    this.killFeedEl.prepend(div);
-    while (this.killFeedEl.children.length > 5) this.killFeedEl.lastChild!.remove();
-    setTimeout(() => { div.classList.add('fade'); }, 4200);
-    setTimeout(() => { div.remove(); }, 5000);
-  }
-
-  setHP(hp: number): void {
-    const k = Math.max(hp, 0) / 100;
-    this.hpBar.style.width = `${k * 100}%`;
-    this.hpBar.style.background = k > 0.5 ? '#7fd069' : k > 0.25 ? '#e8b93c' : '#e0483c';
-    this.hpText.textContent = `${Math.max(Math.ceil(hp), 0)}`;
-  }
-
-  setAmmo(mag: number, reserve: number, reloading: boolean): void {
-    this.ammoMag.textContent = reloading ? '--' : `${mag}`;
-    this.ammoReserve.textContent = `${reserve}`;
-  }
-
-  setScore(blue: number, red: number): void {
-    this.scoreBlue.textContent = `${blue}`;
-    this.scoreRed.textContent = `${red}`;
+  setScore(t: number, ct: number): void {
+    this.scoreT.textContent = String(t);
+    this.scoreCT.textContent = String(ct);
   }
 
   setTimer(sec: number): void {
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
-    this.timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    this.timer.textContent = `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  centerMsg(text: string, dur = 2.2): void {
-    this.msgEl.textContent = text;
-    this.msgEl.classList.add('show');
-    this.msgT = dur;
+  setCrosshairSpread(px: number, visible: boolean): void {
+    this.crosshair.style.setProperty('--gap', `${px}px`);
+    this.crosshair.style.opacity = visible ? '1' : '0';
   }
 
-  showDeath(killerName: string, team: number): void {
-    this.deathInfo.innerHTML = `阵亡于 <span style="color:${TEAM_INFO[team].css}">${killerName}</span>`;
-    this.deathOverlay.classList.remove('hidden');
+  flashHitmarker(): void {
+    this.hitmark.classList.remove('show');
+    void this.hitmark.offsetWidth;
+    this.hitmark.classList.add('show');
   }
 
-  setRespawnT(sec: number): void {
-    this.respawnT.textContent = `${Math.ceil(sec)}`;
+  flashDamage(): void {
+    this.vignette.classList.remove('show');
+    void this.vignette.offsetWidth;
+    this.vignette.classList.add('show');
   }
 
-  hideDeath(): void {
-    this.deathOverlay.classList.add('hidden');
+  killfeedAdd(killer: string, killerTeam: TeamId, victim: string, victimTeam: TeamId): void {
+    const div = document.createElement('div');
+    div.className = 'kf-entry';
+    div.innerHTML =
+      `<span style="color:${TEAM_COLOR[killerTeam]}">${killer}</span>` +
+      `<span class="kf-weapon">[步枪]</span>` +
+      `<span style="color:${TEAM_COLOR[victimTeam]}">${victim}</span>`;
+    this.killfeed.prepend(div);
+    while (this.killfeed.children.length > 5) this.killfeed.lastChild!.remove();
+    setTimeout(() => { div.classList.add('fade'); }, 3600);
+    setTimeout(() => { div.remove(); }, 4400);
   }
 
-  showScoreboard(rows: ScoreRow[]): void {
-    const sorted = [...rows].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-    let html = '<table><tr><th></th><th>玩家</th><th>击杀</th><th>阵亡</th></tr>';
-    for (const r of sorted) {
-      const c = TEAM_INFO[r.team].css;
-      html += `<tr class="${r.isPlayer ? 'me' : ''}">` +
-        `<td class="dot" style="background:${c}"></td>` +
-        `<td>${r.name}</td><td>${r.kills}</td><td>${r.deaths}</td></tr>`;
-    }
-    html += '</table>';
-    this.scoreboardEl.innerHTML = html;
-    this.scoreboardEl.classList.remove('hidden');
+  showRespawn(sec: number): void {
+    this.respawnOverlay.classList.add('visible');
+    this.respawnTimer.textContent = sec.toFixed(1);
   }
+  hideRespawn(): void { this.respawnOverlay.classList.remove('visible'); }
 
-  hideScoreboard(): void {
-    this.scoreboardEl.classList.add('hidden');
-  }
-
-  showEnd(victory: boolean, blue: number, red: number, rows: ScoreRow[]): void {
-    this.endTitle.textContent = victory ? '胜 利' : '战 败';
-    this.endTitle.className = victory ? 'win' : 'lose';
-    const me = rows.find(r => r.isPlayer);
-    const sorted = [...rows].sort((a, b) => b.kills - a.kills);
-    let html = `<p>最终比分 <b>${blue} : ${red}</b></p><table><tr><th></th><th>玩家</th><th>击杀</th><th>阵亡</th></tr>`;
-    for (const r of sorted) {
-      const c = TEAM_INFO[r.team].css;
-      html += `<tr class="${r.isPlayer ? 'me' : ''}">` +
-        `<td class="dot" style="background:${c}"></td>` +
-        `<td>${r.name}</td><td>${r.kills}</td><td>${r.deaths}</td></tr>`;
-    }
-    html += '</table>';
-    this.endStats.innerHTML = html;
-    void me;
-    this.endEl.classList.remove('hidden');
-  }
-
-  update(dt: number): void {
-    if (this.vignetteT > 0) {
-      this.vignetteT -= dt;
-      this.vignette.style.opacity = `${Math.max(this.vignetteT, 0) * 1.6}`;
-    }
-    if (this.msgT > 0) {
-      this.msgT -= dt;
-      if (this.msgT <= 0) this.msgEl.classList.remove('show');
-    }
-    if (this.hmT > 0) {
-      this.hmT -= dt;
-      if (this.hmT <= 0) this.hitmarkerEl.classList.remove('show');
-    }
+  setHint(text: string): void {
+    this.hint.textContent = text;
+    this.hint.style.opacity = text ? '1' : '0';
   }
 }
+
+export { T_SPAWNS };

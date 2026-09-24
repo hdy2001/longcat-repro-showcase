@@ -1,57 +1,63 @@
-// 玩家：第一人称控制器（Rapier 角色控制器）+ 武器视图模型
+// ============================================================
+// 玩家控制器 —— 运动学胶囊 + Rapier 角色控制器 + 鼠标视角 + 步枪手感
+// ============================================================
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CFG } from './config';
+
+export const PLAYER_R = 0.38;
+export const PLAYER_HH = 0.62;      // 圆柱半高, 总高 ~2.0
+export const EYE_H = 1.62;
+const WALK_SPEED = 5.4;
+const JUMP_V = 5.0;
+const GRAVITY = 14;
+
+export interface PlayerWeaponState {
+  ammo: number;        // 弹匣内
+  reserve: number;     // 备弹
+  reloading: boolean;
+  reloadEnd: number;
+  nextFire: number;    // 下次可开火时间戳
+  bloom: number;       // 连射扩散
+}
 
 export class Player {
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
   controller: RAPIER.KinematicCharacterController;
-  mesh: THREE.Group;
-
-  hp = CFG.playerHP;
-  alive = true;
-
-  yaw = 0;
+  yaw = Math.PI;       // 初始面向北 (-z)
   pitch = 0;
+  hp = 100;
+  alive = false;
+  weapon: PlayerWeaponState = {
+    ammo: 30, reserve: 9999, reloading: false, reloadEnd: 0, nextFire: 0, bloom: 0,
+  };
   keys = new Set<string>();
-  reloading = false;
-  reloadT = 0;
-  mag = CFG.magSize;
-  reserve = CFG.reserve;
-  lastShot = 0;
-  triggerHeld = false;
-  adsHeld = false;
-  adsK = 0;             // 0..1
-  spreadBloom = 0;      // 连射扩散
+  // 视角感受
   recoilPitch = 0;
   recoilYaw = 0;
-  bobT = 0;
-  stepT = 0;
-  fovKick = 0;
+  bobPhase = 0;
+  private vy = 0;
+  private grounded = false;
+  /** 枪口世界坐标 (供特效/弹道起点) */
+  muzzle = new THREE.Vector3();
+  /** 视线方向 */
+  lookDir = new THREE.Vector3(0, 0, -1);
+  stepCb: (() => void) | null = null;
+  onFire: ((origin: THREE.Vector3, dir: THREE.Vector3) => void) | null = null;
+  private fireHeld = false;
 
-  onShot: (() => void) | null = null;
-  onReload: (() => void) | null = null;
-  onStep: ((sprint: boolean) => void) | null = null;
-  onAmmoChanged: (() => void) | null = null;
-
-  constructor(world: RAPIER.World, camera: THREE.PerspectiveCamera, spawn: [number, number]) {
+  constructor(private world: RAPIER.World, x: number, z: number) {
     this.body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn[0], 0.9, spawn[1]),
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 1.2, z),
     );
     this.collider = world.createCollider(
-      RAPIER.ColliderDesc.capsule(0.5, CFG.radius).setFriction(0.2),
+      RAPIER.ColliderDesc.capsule(PLAYER_HH, PLAYER_R).setFriction(0.2),
       this.body,
     );
     this.controller = world.createCharacterController(0.02);
-    this.controller.enableAutostep(0.45, 0.2, true);
-    this.controller.setMaxSlopeClimbAngle(0.8);
-    this.controller.setMinSlopeSlideAngle(0.9);
-    this.controller.setApplyImpulsesToDynamicBodies(false);
-
-    // 武器视图模型（挂在相机上）
-    this.mesh = buildViewModel();
-    camera.add(this.mesh);
+    this.controller.enableAutostep(0.55, 0.25, false);
+    this.controller.enableSnapToGround(0.6);
+    this.controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
   }
 
   get pos(): THREE.Vector3 {
@@ -59,177 +65,143 @@ export class Player {
     return new THREE.Vector3(t.x, t.y, t.z);
   }
 
-  get eyePos(): THREE.Vector3 {
-    const t = this.body.translation();
-    return new THREE.Vector3(t.x, t.y + CFG.eyeHeight, t.z);
-  }
-
-  get forward(): THREE.Vector3 {
-    return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-  }
-
-  lookDelta(dx: number, dy: number): void {
-    const s = 0.0021 * (1 - this.adsK * 0.45);
-    this.yaw -= dx * s;
-    this.pitch -= dy * s;
-    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
-  }
-
-  startReload(): void {
-    if (this.reloading || this.mag >= CFG.magSize || this.reserve <= 0 || !this.alive) return;
-    this.reloading = true;
-    this.reloadT = CFG.reloadTime;
-    this.onReload?.();
-  }
-
-  update(dt: number, now: number): void {
-    if (!this.alive) return;
-
-    // ---- 移动 ----
-    const f = this.forward;
-    const r = new THREE.Vector3(-f.z, 0, f.x);
-    const wish = new THREE.Vector3();
-    if (this.keys.has('KeyW')) wish.add(f);
-    if (this.keys.has('KeyS')) wish.sub(f);
-    if (this.keys.has('KeyD')) wish.add(r);
-    if (this.keys.has('KeyA')) wish.sub(r);
-    const sprint = this.keys.has('ShiftLeft') && !this.adsHeld && wish.dot(f) > 0;
-    let speed = sprint ? CFG.sprintSpeed : this.adsHeld ? CFG.adsSpeed : CFG.walkSpeed;
-    if (wish.lengthSq() > 0) wish.normalize();
-
-    // 跳跃：对运动学刚体直接位移 + 维护垂直速度
-    if (this.controller.computedGrounded()) this.vy = -0.5;
-    if (this.keys.has('Space') && this.controller.computedGrounded()) this.vy = CFG.jumpVel;
-    this.vy += CFG.worldGravity * dt;
-    const t = this.body.translation();
-    const desired = { x: wish.x * speed * dt, y: this.vy * dt, z: wish.z * speed * dt };
-    this.controller.computeColliderMovement(this.collider, desired);
-    const m = this.controller.computedMovement();
-    const nt = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z };
-    this.body.setNextKinematicTranslation(nt);
-
-    // 脚步声
-    if (wish.lengthSq() > 0 && this.controller.computedGrounded()) {
-      this.stepT -= dt * (sprint ? 1.5 : 1);
-      if (this.stepT <= 0) {
-        this.stepT = 0.42;
-        this.onStep?.(sprint);
-      }
-    }
-
-    // ---- 视角 ----
-    this.bobT += dt * (wish.lengthSq() > 0 ? (sprint ? 11 : 8) : 2);
-    const bobY = Math.sin(this.bobT * 2) * 0.018 * (1 - this.adsK);
-    const bobX = Math.cos(this.bobT) * 0.01 * (1 - this.adsK);
-
-    // ---- 射击 ----
-    this.spreadBloom = Math.max(0, this.spreadBloom - dt * 0.25);
-    this.recoilPitch = Math.max(0, this.recoilPitch - dt * 0.09);
-    this.recoilYaw = Math.max(-1, Math.min(1, this.recoilYaw - this.recoilYaw * dt * 9));
-
-    if (this.reloading) {
-      this.reloadT -= dt;
-      if (this.reloadT <= 0) {
-        const need = CFG.magSize - this.mag;
-        const take = Math.min(need, this.reserve);
-        this.mag += take;
-        this.reserve -= take;
-        this.reloading = false;
-        this.onAmmoChanged?.();
-      }
-    }
-
-    if (this.triggerHeld && !this.reloading && now - this.lastShot >= CFG.fireInterval) {
-      if (this.mag > 0) {
-        this.lastShot = now;
-        this.mag--;
-        this.spreadBloom = Math.min(1, this.spreadBloom + 0.16);
-        this.recoilPitch += CFG.recoil;
-        this.recoilYaw += (Math.random() - 0.5) * CFG.recoil * 0.5;
-        this.pitch += CFG.recoil * 0.35;
-        this.yaw += (Math.random() - 0.5) * CFG.recoil * 0.3;
-        this.onShot?.();
-        if (this.mag === 0) this.startReload();
-        this.onAmmoChanged?.();
-      } else {
-        this.startReload();
-      }
-    }
-
-    this.adsK += ((this.adsHeld ? 1 : 0) - this.adsK) * Math.min(dt * 10, 1);
-
-    // ---- 相机 ----
-    const cam = this.mesh.parent as THREE.PerspectiveCamera;
-    cam.position.set(this.eyePos.x + bobX, this.eyePos.y + bobY, this.eyePos.z);
-    cam.rotation.order = 'YXZ';
-    cam.rotation.y = this.yaw + this.recoilYaw * 0.02;
-    cam.rotation.x = this.pitch - this.recoilPitch * 0.035;
-    const targetFov = 75 - this.adsK * 28 + this.fovKick;
-    if (Math.abs(cam.fov - targetFov) > 0.1) {
-      cam.fov += (targetFov - cam.fov) * Math.min(dt * 12, 1);
-      cam.updateProjectionMatrix();
-    }
-
-    // ---- 视图模型姿态 ----
-    const vm = this.mesh;
-    vm.position.set(0.28 - this.adsK * 0.145, -0.26 + this.adsK * 0.075 + bobY * 0.4, -0.5 + this.adsK * 0.1);
-    vm.rotation.x = -this.recoilPitch * 0.12;
-    const rl = this.reloading ? Math.sin(Math.min((CFG.reloadTime - this.reloadT) / CFG.reloadTime, 1) * Math.PI) : 0;
-    vm.rotation.x -= rl * 0.7;
-    vm.position.y -= rl * 0.12;
-    vm.visible = true;
-  }
-
-  private vy = 0;
-
-  get isMoving(): boolean { return this.keys.size > 0; }
-
-  currentSpread(): number {
-    const move = this.isMoving ? CFG.spreadMove : 0;
-    return CFG.spreadBase + move * (1 - this.adsK * 0.6) + this.spreadBloom * CFG.spreadMove * 2.4 - (this.adsK * (CFG.spreadBase - CFG.spreadAds));
-  }
-
-  teleport(x: number, z: number): void {
-    this.body.setTranslation({ x, y: 0.9, z }, true);
+  spawn(x: number, z: number): void {
+    this.hp = 100;
+    this.alive = true;
+    this.weapon.ammo = 30;
+    this.weapon.reserve = 9999;
+    this.weapon.reloading = false;
+    this.weapon.bloom = 0;
+    this.body.setTranslation({ x, y: 1.2, z }, true);
+    this.body.setLinvel?.({ x: 0, y: 0, z: 0 }, true);
     this.vy = 0;
   }
 
   die(): void {
     this.alive = false;
-    this.mesh.visible = false;
   }
 
-  revive(): void {
-    this.alive = true;
-    this.hp = CFG.playerHP;
-    this.mag = CFG.magSize;
-    this.reserve = CFG.reserve;
-    this.reloading = false;
-    this.spreadBloom = 0;
+  look(dx: number, dy: number, sens = 0.0021): void {
+    this.yaw -= dx * sens;
+    this.pitch -= dy * sens;
+    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
   }
-}
 
-// ---------- 步枪视图模型 ----------
-function buildViewModel(): THREE.Group {
-  const g = new THREE.Group();
-  const metal = new THREE.MeshLambertMaterial({ color: 0x2e2a26 });
-  const wood = new THREE.MeshLambertMaterial({ color: 0x6b4a2a });
+  startFire(): void { this.fireHeld = true; }
+  stopFire(): void { this.fireHeld = false; }
 
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.rotation.x = rx;
-    g.add(m);
-    return m;
-  };
+  reload(now: number): void {
+    const w = this.weapon;
+    if (w.reloading || w.ammo >= 30 || w.reserve <= 0) return;
+    w.reloading = true;
+    w.reloadEnd = now + 2.0;
+  }
 
-  add(new THREE.BoxGeometry(0.055, 0.09, 0.5), metal, 0, 0, -0.1);            // 机匣
-  add(new THREE.CylinderGeometry(0.016, 0.016, 0.42, 8), metal, 0, 0.012, -0.5, Math.PI / 2); // 枪管
-  add(new THREE.BoxGeometry(0.05, 0.07, 0.22), wood, 0, -0.01, -0.32);        // 护木
-  add(new THREE.BoxGeometry(0.045, 0.16, 0.07), wood, 0, -0.11, 0.06, 0.35); // 握把
-  add(new THREE.BoxGeometry(0.04, 0.2, 0.09), wood, 0, -0.14, 0.16, 0.15);    // 枪托
-  const mag = add(new THREE.BoxGeometry(0.045, 0.22, 0.08), metal, 0, -0.16, -0.08, 0.25); // 弹匣
-  mag.name = 'mag';
-  add(new THREE.BoxGeometry(0.02, 0.05, 0.02), metal, 0, 0.065, -0.28);      // 准星
-  return g;
+  /** 每帧: now 秒 */
+  update(dt: number, now: number, frozen: boolean): void {
+    if (!this.alive) return;
+    const w = this.weapon;
+
+    // ---------- 换弹 ----------
+    if (w.reloading && now >= w.reloadEnd) {
+      const need = 30 - w.ammo;
+      const take = Math.min(need, w.reserve);
+      w.ammo += take;
+      w.reserve -= take;
+      w.reloading = false;
+    }
+
+    // ---------- 移动 ----------
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    let mx = 0, mz = 0;
+    if (!frozen) {
+      if (this.keys.has('KeyW')) mz += 1;
+      if (this.keys.has('KeyS')) mz -= 1;
+      if (this.keys.has('KeyD')) mx += 1;
+      if (this.keys.has('KeyA')) mx -= 1;
+    }
+    const moving = mx !== 0 || mz !== 0;
+    const wish = new THREE.Vector3();
+    wish.addScaledVector(fwd, mz).addScaledVector(right, mx);
+    if (wish.lengthSq() > 0) wish.normalize();
+
+    // 重力 + 跳跃
+    this.vy -= GRAVITY * dt;
+    if (!frozen && this.keys.has('Space') && this.grounded) {
+      this.vy = JUMP_V;
+      this.grounded = false;
+    }
+    const delta = { x: wish.x * WALK_SPEED * dt, y: this.vy * dt, z: wish.z * WALK_SPEED * dt };
+    this.controller.computeColliderMovement(this.collider, delta);
+    const m = this.controller.computedMovement();
+    const t = this.body.translation();
+    this.body.setNextKinematicTranslation({ x: t.x + m.x, y: t.y + m.y, z: t.z + m.z });
+    this.grounded = this.controller.computedGrounded();
+    if (this.grounded && this.vy < 0) this.vy = -0.5;
+
+    // 掉出世界兜底
+    if (t.y < -10) this.body.setTranslation({ x: 0, y: 2, z: 40 }, true);
+
+    // ---------- 视角 ----------
+    // 呼吸/走路晃动
+    if (moving && this.grounded) {
+      this.bobPhase += dt * 9;
+      this.stepCb?.();
+    }
+    const bobY = moving && this.grounded ? Math.sin(this.bobPhase * 2) * 0.035 : 0;
+    const bobX = moving && this.grounded ? Math.cos(this.bobPhase) * 0.02 : 0;
+    // 后坐力恢复
+    this.recoilPitch *= Math.max(0, 1 - dt * 9);
+    this.recoilYaw *= Math.max(0, 1 - dt * 9);
+    w.bloom = Math.max(0, w.bloom - dt * 3.5);
+
+    const eye = this.pos;
+    this.muzzle.set(
+      eye.x + fwd.x * 0.7 + right.x * 0.25,
+      eye.y + EYE_H - 0.12,
+      eye.z + fwd.z * 0.7 + right.z * 0.25,
+    );
+    const dir = new THREE.Vector3(
+      -Math.sin(this.yaw) * Math.cos(this.pitch + this.recoilPitch),
+      Math.sin(this.pitch + this.recoilPitch),
+      -Math.cos(this.yaw) * Math.cos(this.pitch + this.recoilPitch),
+    );
+    this.lookDir.copy(dir);
+
+    // ---------- 开火 ----------
+    if (this.fireHeld && !frozen && !w.reloading && now >= w.nextFire) {
+      if (w.ammo <= 0) {
+        this.reload(now);
+      } else {
+        w.ammo--;
+        w.nextFire = now + 0.1; // 600 RPM
+        w.bloom = Math.min(w.bloom + 0.35, 2.2);
+        this.recoilPitch += 0.006 + Math.random() * 0.004;
+        this.recoilYaw += (Math.random() - 0.5) * 0.005;
+        // 散布: 基础 0.35° + bloom
+        const spread = (0.006 + w.bloom * 0.011) * (moving ? 1.8 : 1);
+        const shot = this.lookDir.clone();
+        shot.x += (Math.random() - 0.5) * 2 * spread;
+        shot.y += (Math.random() - 0.5) * 2 * spread;
+        shot.z += (Math.random() - 0.5) * 2 * spread;
+        shot.normalize();
+        this.onFire?.(this.muzzle.clone(), shot);
+      }
+    }
+    void bobY; void bobX;
+  }
+
+  /** 相机矩阵应用 */
+  applyCamera(cam: THREE.PerspectiveCamera): void {
+    const eye = this.pos;
+    const bobY = this.alive ? 0 : 0;
+    cam.position.set(eye.x, eye.y + EYE_H + bobY, eye.z);
+    const dir = new THREE.Vector3(
+      -Math.sin(this.yaw) * Math.cos(this.pitch + this.recoilPitch),
+      Math.sin(this.pitch + this.recoilPitch),
+      -Math.cos(this.yaw) * Math.cos(this.pitch + this.recoilPitch),
+    );
+    cam.lookAt(cam.position.clone().add(dir));
+  }
 }

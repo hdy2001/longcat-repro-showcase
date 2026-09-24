@@ -1,158 +1,253 @@
-// 程序化 Canvas 纹理：沙地 / 石墙 / 木箱 / 沙袋 / 迷彩 / 天空
+// ============================================================
+// 程序化纹理 —— 全部用 Canvas 生成, 无任何外部资源
+// ============================================================
 import * as THREE from 'three';
-import { CAMO_DATA_URI } from './camo';
 
-function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, s: number) => void, repeat = 1): THREE.Texture {
+function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d')!;
-  draw(g, size);
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')!];
+}
+
+/** 确定性伪随机 */
+function mulberry(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function toTexture(c: HTMLCanvasElement, repeat = 1): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
+  t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
-  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
-function noise(g: CanvasRenderingContext2D, s: number, n: number, alpha: number, dark = true): void {
-  for (let i = 0; i < n; i++) {
-    const v = Math.random();
-    g.fillStyle = dark && v < 0.5
-      ? `rgba(60,40,20,${alpha * Math.random()})`
-      : `rgba(255,240,210,${alpha * Math.random()})`;
-    g.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 2, 1 + Math.random() * 2);
-  }
-}
-
-export function makeSandTexture(): THREE.Texture {
-  return canvasTex(256, (g, s) => {
-    g.fillStyle = '#c8a870';
-    g.fillRect(0, 0, s, s);
-    // 大块色斑
-    for (let i = 0; i < 14; i++) {
-      g.fillStyle = `rgba(${150 + Math.random() * 60 | 0},${115 + Math.random() * 45 | 0},${60 + Math.random() * 30 | 0},0.25)`;
-      g.beginPath();
-      g.ellipse(Math.random() * s, Math.random() * s, 20 + Math.random() * 50, 15 + Math.random() * 35, Math.random() * 3, 0, 7);
-      g.fill();
-    }
-    noise(g, s, 2600, 0.16);
-    noise(g, s, 800, 0.1, false);
-  });
-}
-
-export function makeWallTexture(): THREE.Texture {
-  return canvasTex(256, (g, s) => {
-    g.fillStyle = '#b39468';
-    g.fillRect(0, 0, s, s);
-    // 石缝水平线
-    g.strokeStyle = 'rgba(70,50,30,0.55)';
-    g.lineWidth = 2;
-    for (let y = 0; y <= s; y += 32) {
-      g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(s, y + 0.5); g.stroke();
-    }
-    // 竖缝错位
-    g.lineWidth = 1.5;
-    for (let row = 0; row < s / 32; row++) {
-      const off = (row % 2) * 42;
-      for (let x = off; x <= s; x += 84) {
-        g.beginPath(); g.moveTo(x + 0.5, row * 32); g.lineTo(x + 0.5, row * 32 + 32); g.stroke();
-      }
-    }
-    // 顶部日晒褪色渐变
-    const grad = g.createLinearGradient(0, 0, 0, s);
-    grad.addColorStop(0, 'rgba(255,235,200,0.28)');
-    grad.addColorStop(0.35, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(60,40,20,0.22)');
+// ------------------------------------------------------------
+// 沙地
+// ------------------------------------------------------------
+export function sandTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(512, 512);
+  const rnd = mulberry(777);
+  g.fillStyle = '#d3ac72';
+  g.fillRect(0, 0, 512, 512);
+  // 大块色斑
+  for (let i = 0; i < 60; i++) {
+    const x = rnd() * 512, y = rnd() * 512, r = 20 + rnd() * 70;
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    const tone = rnd() > 0.5 ? '214,186,138' : '196,164,112';
+    grad.addColorStop(0, `rgba(${tone},0.35)`);
+    grad.addColorStop(1, `rgba(${tone},0)`);
     g.fillStyle = grad;
-    g.fillRect(0, 0, s, s);
-    noise(g, s, 1500, 0.14);
-  });
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // 噪点
+  for (let i = 0; i < 9000; i++) {
+    const v = 150 + rnd() * 105;
+    g.fillStyle = `rgba(${v},${v * 0.82 | 0},${v * 0.55 | 0},${0.12 + rnd() * 0.25})`;
+    g.fillRect(rnd() * 512, rnd() * 512, 1.5, 1.5);
+  }
+  // 风纹
+  g.strokeStyle = 'rgba(160,128,84,0.18)';
+  g.lineWidth = 2;
+  for (let i = 0; i < 26; i++) {
+    g.beginPath();
+    const y0 = rnd() * 512;
+    g.moveTo(0, y0);
+    g.bezierCurveTo(170, y0 + rnd() * 30 - 15, 340, y0 + rnd() * 30 - 15, 512, y0 + rnd() * 24 - 12);
+    g.stroke();
+  }
+  return toTexture(c, 24);
 }
 
-export function makeCrateTexture(): THREE.Texture {
-  return canvasTex(128, (g, s) => {
-    g.fillStyle = '#9a7443';
-    g.fillRect(0, 0, s, s);
-    // 木板
-    for (let i = 0; i < 4; i++) {
-      g.fillStyle = `rgba(${120 + Math.random() * 50 | 0},${85 + Math.random() * 35 | 0},${45 + Math.random() * 20 | 0},0.5)`;
-      g.fillRect(0, i * 32 + 1, s, 30);
-    }
-    g.strokeStyle = 'rgba(50,32,15,0.8)';
-    g.lineWidth = 3;
-    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(0, i * 32); g.lineTo(s, i * 32); g.stroke(); }
-    // 边框 + 交叉撑
-    g.lineWidth = 7;
-    g.strokeRect(4, 4, s - 8, s - 8);
-    g.beginPath(); g.moveTo(6, 6); g.lineTo(s - 6, s - 6); g.moveTo(s - 6, 6); g.lineTo(6, s - 6); g.stroke();
-    noise(g, s, 700, 0.2);
-  });
-}
-
-export function makeSandbagTexture(): THREE.Texture {
-  return canvasTex(128, (g, s) => {
-    g.fillStyle = '#b8a06a';
-    g.fillRect(0, 0, s, s);
-    // 袋块
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        const x = c * 44 + (r % 2) * 20, y = r * 44;
-        g.fillStyle = `rgba(${165 + Math.random() * 30 | 0},${140 + Math.random() * 25 | 0},${85 + Math.random() * 20 | 0},0.9)`;
-        g.beginPath();
-        g.roundRect(x + 2, y + 2, 42, 40, 12);
-        g.fill();
-      }
-    }
-    noise(g, s, 900, 0.18);
-  });
-}
-
-export function makeCamoTexture(): THREE.Texture {
-  const t = new THREE.Texture();
-  const img = new Image();
-  img.onload = () => { t.needsUpdate = true; };
-  img.src = CAMO_DATA_URI;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-// 竖直渐变天空
-export function makeSkyTexture(): THREE.Texture {
-  const c = document.createElement('canvas');
-  c.width = 4; c.height = 512;
-  const g = c.getContext('2d')!;
-  const grad = g.createLinearGradient(0, 0, 0, 512);
-  grad.addColorStop(0, '#1e63c8');
-  grad.addColorStop(0.45, '#4a90e0');
-  grad.addColorStop(0.75, '#9cc8ee');
-  grad.addColorStop(1, '#e8d9b0');
+// ------------------------------------------------------------
+// 黄褐色石墙 (砖石 + 风化)
+// ------------------------------------------------------------
+export function stoneWallTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(512, 256);
+  const rnd = mulberry(4242);
+  g.fillStyle = '#c49a62';
+  g.fillRect(0, 0, 512, 256);
+  // 砖缝
+  const bh = 32, bw = 86;
+  for (let row = 0; row < 256 / bh; row++) {
+    const y = row * bh;
+    g.fillStyle = `rgba(90,64,36,${0.25 + rnd() * 0.15})`;
+    g.fillRect(0, y, 512, 3);
+    const off = (row % 2) * bw / 2;
+    for (let x = off; x < 512; x += bw) g.fillRect(x, y, 3, bh);
+  }
+  // 砖面明暗
+  for (let i = 0; i < 512 / 86 * 256 / 32; i++) {
+    const x = rnd() * 512, y = rnd() * 256;
+    g.fillStyle = rnd() > 0.5 ? 'rgba(255,230,180,0.10)' : 'rgba(80,54,26,0.12)';
+    g.fillRect(x, y, bw - 4, bh - 5);
+  }
+  // 风化斑驳
+  for (let i = 0; i < 380; i++) {
+    const x = rnd() * 512, y = rnd() * 256, r = 2 + rnd() * 9;
+    g.fillStyle = `rgba(120,88,50,${0.05 + rnd() * 0.12})`;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  // 底部沙尘堆积渐变
+  const grad = g.createLinearGradient(0, 256, 0, 190);
+  grad.addColorStop(0, 'rgba(150,118,70,0.55)');
+  grad.addColorStop(1, 'rgba(150,118,70,0)');
   g.fillStyle = grad;
-  g.fillRect(0, 0, 4, 512);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  g.fillRect(0, 190, 512, 66);
+  return toTexture(c, 1);
 }
 
-// 标签精灵（头顶名字 / A、B 区标记）
-export function makeTextSprite(text: string, color: string, size = 44, bg?: string): THREE.Sprite {
-  const c = document.createElement('canvas');
-  const pad = 16;
-  const m = c.getContext('2d')!;
-  m.font = `bold ${size}px "Arial Black", Arial, sans-serif`;
-  const w = Math.ceil(m.measureText(text).width) + pad * 2;
-  c.width = w; c.height = size + pad * 2;
-  const g = c.getContext('2d')!;
-  if (bg) { g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); }
-  g.font = `bold ${size}px "Arial Black", Arial, sans-serif`;
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)';
-  g.strokeText(text, c.width / 2, c.height / 2);
-  g.fillStyle = color;
-  g.fillText(text, c.width / 2, c.height / 2);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: true, transparent: true }));
-  sp.scale.set(c.width / 90, c.height / 90, 1);
-  return sp;
+// ------------------------------------------------------------
+// 木箱
+// ------------------------------------------------------------
+export function crateTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(256, 256);
+  const rnd = mulberry(99);
+  g.fillStyle = '#a06f3a';
+  g.fillRect(0, 0, 256, 256);
+  // 木板
+  for (let i = 0; i < 4; i++) {
+    const y = i * 64;
+    g.fillStyle = `rgba(60,38,16,0.5)`;
+    g.fillRect(0, y, 256, 4);
+    g.fillStyle = `rgba(${140 + rnd() * 40 | 0},${95 + rnd() * 25 | 0},${45 + rnd() * 15 | 0},0.55)`;
+    g.fillRect(0, y + 4, 256, 60);
+    // 木纹
+    g.strokeStyle = 'rgba(70,45,20,0.35)';
+    for (let j = 0; j < 7; j++) {
+      g.beginPath();
+      const yy = y + 8 + rnd() * 48;
+      g.moveTo(0, yy);
+      g.bezierCurveTo(80, yy + rnd() * 8 - 4, 170, yy + rnd() * 8 - 4, 256, yy);
+      g.stroke();
+    }
+  }
+  // 边框
+  g.strokeStyle = 'rgba(52,32,12,0.85)';
+  g.lineWidth = 14;
+  g.strokeRect(7, 7, 242, 242);
+  g.strokeStyle = 'rgba(255,220,160,0.18)';
+  g.lineWidth = 3;
+  g.strokeRect(16, 16, 224, 224);
+  // 钉子
+  g.fillStyle = 'rgba(40,26,10,0.9)';
+  for (const [x, y] of [[22, 22], [234, 22], [22, 234], [234, 234]]) {
+    g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill();
+  }
+  //  stencil 标记
+  g.fillStyle = 'rgba(235,220,190,0.5)';
+  g.font = 'bold 30px monospace';
+  g.textAlign = 'center';
+  g.fillText('7.62', 128, 118);
+  g.font = 'bold 15px monospace';
+  g.fillText('AMMO', 128, 140);
+  return toTexture(c, 1);
+}
+
+// ------------------------------------------------------------
+// 沙袋
+// ------------------------------------------------------------
+export function sandbagTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(256, 128);
+  const rnd = mulberry(31337);
+  g.fillStyle = '#b39b6b';
+  g.fillRect(0, 0, 256, 128);
+  // 横向袋纹 (两层)
+  for (let row = 0; row < 2; row++) {
+    for (let i = 0; i < 4; i++) {
+      const x = i * 64 + (row % 2) * 32 - 16;
+      const y = row * 64;
+      g.fillStyle = `rgba(${140 + rnd() * 40 | 0},${120 + rnd() * 30 | 0},${75 + rnd() * 20 | 0},0.9)`;
+      g.beginPath();
+      g.roundRect(x + 3, y + 6, 58, 52, 14);
+      g.fill();
+      g.strokeStyle = 'rgba(70,58,32,0.55)';
+      g.lineWidth = 2.5;
+      g.stroke();
+      // 高光
+      g.strokeStyle = 'rgba(255,240,200,0.22)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.roundRect(x + 8, y + 10, 48, 40, 10);
+      g.stroke();
+    }
+  }
+  // 污渍
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = `rgba(90,70,40,${0.05 + rnd() * 0.1})`;
+    g.beginPath();
+    g.arc(rnd() * 256, rnd() * 128, 2 + rnd() * 7, 0, Math.PI * 2);
+    g.fill();
+  }
+  return toTexture(c, 1);
+}
+
+// ------------------------------------------------------------
+// 顶棚 (波纹钢板)
+// ------------------------------------------------------------
+export function roofTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(256, 256);
+  const rnd = mulberry(555);
+  g.fillStyle = '#8d7a5c';
+  g.fillRect(0, 0, 256, 256);
+  for (let x = 0; x < 256; x += 16) {
+    g.fillStyle = 'rgba(60,48,32,0.5)';
+    g.fillRect(x, 0, 3, 256);
+    g.fillStyle = 'rgba(255,240,210,0.14)';
+    g.fillRect(x + 3, 0, 3, 256);
+  }
+  for (let i = 0; i < 200; i++) {
+    g.fillStyle = `rgba(70,54,34,${0.06 + rnd() * 0.1})`;
+    g.fillRect(rnd() * 256, rnd() * 256, 3 + rnd() * 8, 2 + rnd() * 5);
+  }
+  return toTexture(c, 2);
+}
+
+// ------------------------------------------------------------
+// 油桶 (军绿)
+// ------------------------------------------------------------
+export function barrelTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(128, 256);
+  const rnd = mulberry(2024);
+  g.fillStyle = '#6b7055';
+  g.fillRect(0, 0, 128, 256);
+  g.fillStyle = 'rgba(30,32,22,0.6)';
+  g.fillRect(0, 30, 128, 5);
+  g.fillRect(0, 123, 128, 5);
+  g.fillRect(0, 220, 128, 5);
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = `rgba(${100 + rnd() * 40 | 0},${60 + rnd() * 20 | 0},30,${0.08 + rnd() * 0.14})`;
+    g.fillRect(rnd() * 128, rnd() * 256, 2 + rnd() * 5, 2 + rnd() * 6);
+  }
+  g.fillStyle = 'rgba(230,220,190,0.55)';
+  g.font = 'bold 22px monospace';
+  g.textAlign = 'center';
+  g.save();
+  g.translate(64, 128); g.rotate(-Math.PI / 2);
+  g.fillText('FUEL', 0, 7);
+  g.restore();
+  return toTexture(c, 1);
+}
+
+// ------------------------------------------------------------
+// 岩石 (装饰)
+// ------------------------------------------------------------
+export function rockTexture(): THREE.CanvasTexture {
+  const [c, g] = makeCanvas(128, 128);
+  const rnd = mulberry(88);
+  g.fillStyle = '#b08d5f';
+  g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 260; i++) {
+    const v = 130 + rnd() * 90;
+    g.fillStyle = `rgba(${v},${v * 0.78 | 0},${v * 0.52 | 0},${0.1 + rnd() * 0.25})`;
+    g.fillRect(rnd() * 128, rnd() * 128, 2 + rnd() * 4, 2 + rnd() * 4);
+  }
+  return toTexture(c, 1);
 }

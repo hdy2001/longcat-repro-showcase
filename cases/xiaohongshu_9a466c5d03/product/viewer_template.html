@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>应县木塔 · 结构查看器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #141a24;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 16px; left: 16px; width: 268px; z-index: 10;
+    background: rgba(16, 22, 32, 0.86); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 12px;
+    padding: 16px 18px; color: #dfe6ee; user-select: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+  }
+  #ui h1 { font-size: 19px; font-weight: 600; letter-spacing: 1px; color: #f3e9d2; }
+  #ui h1 span { display: block; font-size: 11px; font-weight: 400; color: #8fa0b3;
+    margin-top: 3px; letter-spacing: 0.5px; }
+  .sec { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .sec-title { font-size: 11px; color: #7e8fa3; letter-spacing: 2px; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-size: 12.5px; }
+  .row label { flex: 0 0 58px; color: #b8c4d2; }
+  .row output { flex: 0 0 30px; text-align: right; color: #8fa0b3; font-size: 11px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px;
+    background: #2c3a4e; outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: #d8b96a; border: 2px solid #141a24; cursor: pointer; }
+  input[type=checkbox] { accent-color: #d8b96a; width: 15px; height: 15px; cursor: pointer; }
+  .btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .btns button {
+    background: #223047; color: #c6d2df; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px; padding: 6px 0; font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .btns button:hover { background: #2e405c; color: #fff; }
+  .btns button.active { background: #d8b96a; color: #1a2230; border-color: #d8b96a; font-weight: 600; }
+  .legend { font-size: 12px; color: #b8c4d2; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .legend i { flex: 0 0 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); }
+  .info { font-size: 11px; line-height: 1.75; color: #8fa0b3; }
+  .info b { color: #c9d5e2; font-weight: 600; }
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 10;
+    color: rgba(223,230,238,0.55); font-size: 12px; letter-spacing: 1px;
+    background: rgba(16,22,32,0.55); padding: 6px 16px; border-radius: 20px; pointer-events: none;
+  }
+  #err {
+    position: fixed; inset: 0; display: none; z-index: 99; color: #e8b0a0;
+    align-items: center; justify-content: center; font-size: 15px; text-align: center; padding: 40px;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+    background: #141a24; color: #d8b96a; font-size: 15px; letter-spacing: 3px; transition: opacity .5s;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="ui">
+  <h1>应县木塔<span>佛宫寺释迦塔 · 辽清宁二年（1056）</span></h1>
+
+  <div class="sec">
+    <div class="sec-title">结构展示</div>
+    <div class="row">
+      <label>分层拆解</label>
+      <input id="explode" type="range" min="0" max="100" value="0">
+      <output id="explodeVal">0%</output>
+    </div>
+    <div class="row">
+      <label>剖切</label>
+      <input id="cut" type="checkbox">
+      <input id="cutpos" type="range" min="0" max="100" value="100" disabled>
+      <output id="cutVal">—</output>
+    </div>
+    <div class="row">
+      <label>自动旋转</label>
+      <input id="spin" type="checkbox" checked>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">视角</div>
+    <div class="btns">
+      <button data-view="home" class="active">全景</button>
+      <button data-view="eye">平视</button>
+      <button data-view="top">俯视</button>
+      <button data-view="in">内部</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">图例</div>
+    <div class="legend">
+      <div><i style="background:#b58a59"></i>木构件（米黄 / 浅棕）</div>
+      <div><i style="background:#97adc3"></i>瓦面（浅蓝灰）</div>
+      <div><i style="background:#85857f"></i>台基（石）</div>
+      <div><i style="background:#3b3d42"></i>塔刹（铁）</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">数据</div>
+    <div class="info">
+      通高 <b>67.31 m</b>，八角平面，外观五层，实为 <b>5 明层 + 4 暗层</b> 共九个结构层。
+      双环柱网（外槽 + 内槽），各层斗拱铺作、梁架、平座勾栏、双跑楼梯、暗层斜撑均按实测比例建模。
+      世界现存最古老、最高大的纯木结构楼阁式建筑。
+    </div>
+  </div>
+</div>
+
+<div id="hint">左键旋转 · 滚轮缩放 · 右键平移</div>
+<div id="loading">模型加载中 …</div>
+<div id="err"></div>
+
+<script>/*__THREE_JS__*/</script>
+<script>/*__GLTF_LOADER__*/</script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------- 基础 ----------
+  var container = document.getElementById('app');
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled = true;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.12;
+  container.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a2230);
+  scene.fog = new THREE.Fog(0x1a2230, 160, 420);
+
+  var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1200);
+
+  // ---------- 灯光 ----------
+  var hemi = new THREE.HemisphereLight(0xeaf2ff, 0x3a4a3a, 0.6);
+  scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xfff1dc, 1.2);
+  sun.position.set(70, -45, 110);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -45; sun.shadow.camera.right = 45;
+  sun.shadow.camera.top = 45; sun.shadow.camera.bottom = -45;
+  sun.shadow.camera.near = 20; sun.shadow.camera.far = 280;
+  sun.shadow.bias = -0.0006;
+  scene.add(sun);
+  var fill = new THREE.DirectionalLight(0xbcd0e8, 0.35);
+  fill.position.set(-50, 60, 40);
+  scene.add(fill);
+
+  // ---------- 轨道控制 ----------
+  function Orbit(cam, dom) {
+    this.cam = cam; this.dom = dom;
+    this.target = new THREE.Vector3(0, 0, 26);
+    this.targetGoal = this.target.clone();
+    this.sph = new THREE.Spherical(80, 1.15, 0.7);
+    this.sphGoal = this.sph.clone();
+    this.dragging = 0; this.px = 0; this.py = 0;
+    var self = this;
+    dom.addEventListener('pointerdown', function (e) {
+      self.dragging = (e.button === 2) ? 2 : 1;
+      self.px = e.clientX; self.py = e.clientY;
+      dom.setPointerCapture(e.pointerId);
+    });
+    dom.addEventListener('pointermove', function (e) {
+      if (!self.dragging) return;
+      var dx = e.clientX - self.px, dy = e.clientY - self.py;
+      self.px = e.clientX; self.py = e.clientY;
+      if (self.dragging === 1) {
+        self.sphGoal.theta -= dx * 0.0055;
+        self.sphGoal.phi -= dy * 0.0055;
+        self.sphGoal.phi = Math.max(0.08, Math.min(Math.PI - 0.08, self.sphGoal.phi));
+      } else {
+        var s = self.sph.r * 0.0011;
+        var right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0);
+        var up = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1);
+        self.targetGoal.addScaledVector(right, -dx * s).addScaledVector(up, dy * s);
+      }
+    });
+    dom.addEventListener('pointerup', function () { self.dragging = 0; });
+    dom.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      self.sphGoal.r *= (e.deltaY > 0) ? 1.1 : 0.9;
+      self.sphGoal.r = Math.max(4, Math.min(320, self.sphGoal.r));
+    }, { passive: false });
+    dom.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+  Orbit.prototype.update = function (dt) {
+    var k = 1 - Math.pow(0.0001, dt);
+    this.sph.radius += (this.sphGoal.radius - this.sph.radius) * k;
+    this.sph.phi += (this.sphGoal.phi - this.sph.phi) * k;
+    this.sph.theta += (this.sphGoal.theta - this.sph.theta) * k;
+    this.target.lerp(this.targetGoal, k);
+    var off = new THREE.Vector3().setFromSpherical(this.sph);
+    this.cam.position.copy(this.target).add(off);
+    this.cam.lookAt(this.target);
+  };
+  var orbit = new Orbit(camera, renderer.domElement);
+  orbit.sph.radius = 135; orbit.sph.phi = 1.22; orbit.sph.theta = 0.68;
+  orbit.sphGoal = orbit.sph.clone();
+  orbit.target.set(0, 0, 30); orbit.targetGoal.copy(orbit.target);
+
+  // ---------- 视角 ----------
+  var VIEWS = {
+    home: { r: 135, phi: 1.22, theta: 0.68, t: [0, 0, 30] },
+    eye:  { r: 165, phi: 1.45, theta: 1.57, t: [0, 0, 10] },
+    top:  { r: 115, phi: 0.10, theta: 0.02, t: [0, 0, 18] },
+    in:   { r: 13, phi: 1.35, theta: 0.8, t: [0, 0, 30] }
+  };
+  function goView(name) {
+    var v = VIEWS[name];
+    orbit.sphGoal.r = v.r; orbit.sphGoal.phi = v.phi; orbit.sphGoal.theta = v.theta;
+    orbit.targetGoal.set(v.t[0], v.t[1], v.t[2]);
+    var btns = document.querySelectorAll('.btns button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].dataset.view === name);
+    if (name === 'in' && !document.getElementById('cut').checked) {
+      document.getElementById('cut').checked = true;
+      document.getElementById('cutpos').disabled = false;
+      applyCut();
+    }
+  }
+  var btns = document.querySelectorAll('.btns button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function () { goView(this.dataset.view); });
+  }
+
+  // ---------- 分层拆解 ----------
+  var explodeNodes = [];
+  function registerExplode(obj) {
+    var m = /^(\d+)_/.exec(obj.name);
+    if (m) explodeNodes.push({ node: obj, idx: parseInt(m[1], 10) });
+  }
+  var explodeT = 0;
+  function applyExplode() {
+    for (var i = 0; i < explodeNodes.length; i++) {
+      var e = explodeNodes[i];
+      e.node.position.y = e.idx * 2.6 * explodeT;
+    }
+  }
+  var explodeSlider = document.getElementById('explode');
+  var explodeVal = document.getElementById('explodeVal');
+  explodeSlider.addEventListener('input', function () {
+    explodeT = explodeSlider.value / 100;
+    explodeVal.textContent = explodeSlider.value + '%';
+    applyExplode();
+  });
+
+  // ---------- 剖切 ----------
+  var clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 30);
+  var clipMats = [];
+  function applyCut() {
+    var on = document.getElementById('cut').checked;
+    var v = document.getElementById('cutpos').value / 100;
+    clipPlane.constant = (1 - v) * 24;   // v=1 → 0（对半剖），v=0 → 24（不剖）
+    document.getElementById('cutVal').textContent = on ? Math.round(v * 100) + '%' : '—';
+    for (var i = 0; i < clipMats.length; i++) {
+      clipMats[i].clippingPlanes = on ? [clipPlane] : null;
+      clipMats[i].clipShadows = on;
+      clipMats[i].needsUpdate = true;
+    }
+  }
+  document.getElementById('cut').addEventListener('change', function () {
+    document.getElementById('cutpos').disabled = !this.checked;
+    applyCut();
+  });
+  document.getElementById('cutpos').addEventListener('input', applyCut);
+
+  // ---------- 自动旋转 ----------
+  var spinChk = document.getElementById('spin');
+
+  // ---------- 加载模型 ----------
+  function b64ToArrayBuffer(b64) {
+    var bin = atob(b64);
+    var len = bin.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  var glbB64 = '/*__GLB_B64__*/';
+  var loader = new THREE.GLTFLoader();
+  loader.parse(b64ToArrayBuffer(glbB64), '', function (gltf) {
+    var model = gltf.scene;
+    model.traverse(function (o) {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+        var mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (var i = 0; i < mats.length; i++) {
+          mats[i].side = THREE.DoubleSide;
+          mats[i].needsUpdate = true;
+          clipMats.push(mats[i]);
+        }
+      }
+      if (o.name) registerExplode(o);
+    });
+    scene.add(model);
+    applyExplode();
+    applyCut();
+    document.getElementById('loading').style.opacity = '0';
+    setTimeout(function () { document.getElementById('loading').style.display = 'none'; }, 600);
+  }, function (err) {
+    var el = document.getElementById('err');
+    el.style.display = 'flex';
+    el.textContent = '模型加载失败：' + (err && err.message ? err.message : err);
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  // ---------- URL 参数（便于测试与分享） ----------
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.has('explode')) {
+      explodeSlider.value = Math.max(0, Math.min(100, parseFloat(q.get('explode')) * 100 || 0));
+      explodeSlider.dispatchEvent(new Event('input'));
+    }
+    if (q.has('view')) goView(q.get('view'));
+    if (q.has('cut')) {
+      document.getElementById('cut').checked = q.get('cut') === '1';
+      document.getElementById('cutpos').disabled = !document.getElementById('cut').checked;
+      if (q.has('cutpos')) document.getElementById('cutpos').value = q.get('cutpos');
+      applyCut();
+    }
+  })();
+
+  // ---------- 主循环 ----------
+  var clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    if (spinChk.checked && !orbit.dragging) orbit.sphGoal.theta += dt * 0.12;
+    orbit.update(dt);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>
