@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天坛 · 祈年殿 ｜ 故宫 · 太和殿 — 粒子点云</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif; }
+
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+  #gl.dragging { cursor: grabbing; }
+
+  /* ---------- 左侧竖排建筑名 ---------- */
+  #titleWrap {
+    position: fixed; left: 34px; top: 50%;
+    transform: translateY(-50%);
+    display: flex; flex-direction: row-reverse;
+    gap: 16px; align-items: flex-start;
+    pointer-events: none; z-index: 10;
+  }
+  .vTitle {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    color: #f2f2f0;
+    letter-spacing: .42em;
+    text-shadow: 0 0 14px rgba(255,255,255,.35);
+    transition: opacity .6s ease;
+  }
+  .vTitle.place { font-size: 15px; opacity: .55; }
+  .vTitle.name  { font-size: 34px; font-weight: 600; }
+
+  #titleWrap.swap .vTitle { opacity: 0; }
+
+  /* ---------- 顶部小标 ---------- */
+  #head {
+    position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,.5); font-size: 12px;
+    letter-spacing: .35em; text-indent: .35em;
+    z-index: 10; pointer-events: none; white-space: nowrap;
+  }
+
+  /* ---------- 底部控件 ---------- */
+  #ui {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 18px; z-index: 10;
+    user-select: none;
+  }
+  .btn {
+    font-family: inherit;
+    color: rgba(240,240,238,.55);
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 9px 22px;
+    font-size: 15px;
+    letter-spacing: .28em; text-indent: .28em;
+    cursor: pointer;
+    transition: all .35s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .btn:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+  .btn.active {
+    color: #fff;
+    border-color: rgba(255,255,255,.75);
+    background: rgba(255,255,255,.1);
+    box-shadow: 0 0 18px rgba(255,255,255,.18), inset 0 0 12px rgba(255,255,255,.06);
+  }
+  #hint {
+    position: fixed; bottom: 30px; right: 30px;
+    color: rgba(255,255,255,.32); font-size: 11px;
+    letter-spacing: .22em; z-index: 10; pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- 开场淡入 ---------- */
+  #veil {
+    position: fixed; inset: 0; background: #000; z-index: 20;
+    pointer-events: none; transition: opacity 1.4s ease;
+  }
+  #veil.off { opacity: 0; }
+
+  @media (max-width: 640px) {
+    #titleWrap { left: 16px; gap: 10px; }
+    .vTitle.name { font-size: 26px; }
+    .vTitle.place { font-size: 12px; }
+    #hint { display: none; }
+    .btn { padding: 8px 16px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+
+<div id="head">粒子 · 古建</div>
+
+<div id="titleWrap">
+  <div class="vTitle name" id="tName">祈年殿</div>
+  <div class="vTitle place" id="tPlace">天坛</div>
+</div>
+
+<div id="ui">
+  <button class="btn active" id="btnQT">天坛 · 祈年殿</button>
+  <button class="btn" id="btnHT">故宫 · 太和殿</button>
+</div>
+
+<div id="hint">拖拽旋转 · 滚轮缩放 · 空格切换</div>
+<div id="veil"></div>
+
+<script>
+"use strict";
+/* =====================================================
+   粒子点云 · 天坛祈年殿 / 故宫太和殿
+   WebGL2 程序化建模 —— 无外部资源，单文件
+   ===================================================== */
+
+const canvas = document.getElementById("gl");
+const gl = canvas.getContext("webgl2", {
+  antialias: true, alpha: false, depth: false,
+  powerPreference: "high-performance"
+});
+if (!gl) { document.body.innerHTML = "<p style='color:#888;padding:40px'>需要支持 WebGL2 的浏览器</p>"; throw new Error("no webgl2"); }
+
+/* ---------------- 基础工具 ---------------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 调色板：白银为主，蓝 / 金 / 绿 点缀 */
+const PAL = {
+  white:      [0.94, 0.95, 0.97],
+  silver:     [0.72, 0.76, 0.82],
+  silverDim:  [0.50, 0.55, 0.62],
+  blueDeep:   [0.05, 0.16, 0.55],
+  blueTile:   [0.10, 0.28, 0.80],
+  blueDark:   [0.04, 0.10, 0.38],
+  gold:       [0.98, 0.76, 0.30],
+  goldDeep:   [0.80, 0.52, 0.16],
+  goldBright: [1.00, 0.88, 0.52],
+  red:        [0.78, 0.16, 0.12],
+  redDeep:    [0.55, 0.09, 0.08],
+  green:      [0.10, 0.66, 0.38],
+  greenDeep:  [0.06, 0.45, 0.26],
+  marble:     [0.86, 0.86, 0.84],
+  marbleDim:  [0.60, 0.61, 0.60],
+  stone:      [0.78, 0.74, 0.66],
+  stoneDim:   [0.52, 0.50, 0.45]
+};
+
+const tmpC = [0, 0, 0];
+function pick(arr, rnd) { return arr[(rnd() * arr.length) | 0]; }
+/* 在原色基础上加抖动，营造颗粒感 */
+function jitter(c, rnd, amt) {
+  const k = 1 + (rnd() - 0.5) * amt;
+  return [c[0] * k, c[1] * k, c[2] * k];
+}
+
+/* ---------------- 场景点云构建器 ----------------
+   每个建筑返回 { pos:Float32Array, col:Float32Array,
+                  size:Float32Array, seed:Float32Array, count } */
+function buildScene(kind, seed) {
+  const rnd = mulberry32(seed);
+  const pos = [], col = [], size = [], seedA = [];
+
+  const P = (x, y, z, c, s) => {
+    pos.push(x, y, z);
+    col.push(c[0], c[1], c[2]);
+    size.push(s);
+    seedA.push(rnd());
+  };
+  /* 沿圆弧的檐口线 */
+  const arc = (cx, cy, cz, r, a0, a1, n, c, s) => {
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (a1 - a0) * (i / (n - 1)) + (rnd() - 0.5) * 0.004;
+      const rr = r + (rnd() - 0.5) * 0.02;
+      P(cx + Math.cos(a) * rr, cy + (rnd() - 0.5) * 0.03, cz + Math.sin(a) * rr, c, s);
+    }
+  };
+  /* 圆环栏杆：扶手 + 望柱 */
+  const circleBalustrade = (cy, r, postN, goldAccent) => {
+    for (let ring = 0; ring < 2; ring++) {
+      const rr = r - ring * 0.14, yy = cy + ring * 0.09;
+      const n = 320 - ring * 60;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        P(Math.cos(a) * rr, yy, Math.sin(a) * rr,
+          jitter(ring ? PAL.marble : PAL.silverDim, rnd, 0.25), 0.5 + rnd() * 0.35);
+      }
+    }
+    for (let i = 0; i < postN; i++) {
+      const a = (i / postN) * Math.PI * 2;
+      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      const H = 0.52 + rnd() * 0.05;
+      const n = 9;
+      for (let j = 0; j < n; j++) {
+        const yy = cy + (j / (n - 1)) * H;
+        const w = 0.075 * (1 - 0.35 * Math.sin((j / (n - 1)) * Math.PI));
+        P(px + (rnd() - 0.5) * w, yy, pz + (rnd() - 0.5) * w,
+          jitter(i % 6 === 0 ? PAL.gold : PAL.marble, rnd, 0.25), 0.55 + rnd() * 0.3);
+      }
+      if (i % 2 === 0) P(px, cy + H + 0.10, pz, jitter(PAL.gold, rnd, 0.3), 0.8); // 柱头小狮/宝珠
+    }
+    if (goldAccent) arc(cx0, cy + 0.02, cz0, r + 0.02, 0, Math.PI * 2, 200, jitter(PAL.gold, rnd, 0.4), 0.6);
+  };
+  let cx0 = 0, cz0 = 0;
+
+  /* 矩形栏杆：太和殿三台 */
+  const rectBalustrade = (cy, hx, hz, postN) => {
+    const per = 2 * (2 * hx + 2 * hz);
+    const put = (x, z) => {
+      const H = 0.5 + rnd() * 0.04, n = 8;
+      for (let j = 0; j < n; j++) {
+        const yy = cy + (j / (n - 1)) * H;
+        const w = 0.07 * (1 - 0.3 * Math.sin((j / (n - 1)) * Math.PI));
+        P(x + (rnd() - 0.5) * w, yy, z + (rnd() - 0.5) * w,
+          jitter(PAL.marble, rnd, 0.25), 0.5 + rnd() * 0.3);
+      }
+    };
+    for (let i = 0; i < postN; i++) {
+      let d = (i / postN) * per, x, z;
+      if (d < 2 * hx)            { x = -hx + d;        z = -hz; }
+      else if (d < 2 * hx + 2*hz){ x = hx;             z = -hz + (d - 2*hx); }
+      else if (d < 4 * hx + 2*hz){ x = hx - (d - 2*hx - 2*hz); z = hz; }
+      else                       { x = -hx;            z = hz - (d - 4*hx - 2*hz); }
+      put(x, z);
+      P(x, cy + 0.58, z, jitter(PAL.marble, rnd, 0.2), 0.75);
+    }
+    /* 内外两圈扶手 */
+    for (let ring = 0; ring < 2; ring++) {
+      const rr = 0.10 * (1 - ring), y = cy + 0.1 + ring * 0.24;
+      const n = 700;
+      for (let i = 0; i < n; i++) {
+        let d = (i / n) * per, x, z;
+        if (d < 2 * hx)             { x = -hx + d - rr * 0;  z = -hz + rr; }
+        else if (d < 2*hx + 2*hz)   { x = hx - rr;            z = -hz + (d - 2*hx); }
+        else if (d < 4*hx + 2*hz)   { x = hx - (d - 2*hx - 2*hz); z = hz - rr; }
+        else                        { x = -hx + rr;           z = hz - (d - 4*hx - 2*hz); }
+        P(x + (rnd() - 0.5) * 0.04, y, z + (rnd() - 0.5) * 0.04,
+          jitter(PAL.silverDim, rnd, 0.3), 0.45 + rnd() * 0.25);
+      }
+    }
+  };
+
+  /* 阶梯踏步 */
+  const steps = (y0, y1, rIn, rOut, n, cTop) => {
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const yy = y0 + (y1 - y0) * (t0 + t1) / 2;
+      const rr = rIn + (rOut - rIn) * (t0 + t1) / 2;
+      const nA = 46;
+      for (let j = 0; j < nA; j++) {
+        const a = (j / nA) * Math.PI * 2;
+        P(Math.cos(a) * rr + (rnd() - 0.5) * 0.05, yy, Math.sin(a) * rr + (rnd() - 0.5) * 0.05,
+          jitter(rnd() < 0.85 ? PAL.marble : cTop, rnd, 0.3), 0.5 + rnd() * 0.3);
+      }
+    }
+  };
+  /* 矩形台阶（三层须弥座，自下而上逐层内收） */
+  const rectSteps = (tiers) => {
+    for (const t of tiers) {
+      const { y0, y1, hx, hz } = t;
+      const rows = 14;
+      for (let i = 0; i < rows; i++) {
+        const f0 = i / rows, f1 = (i + 1) / rows;
+        const yy = y0 + (y1 - y0) * (f0 + f1) / 2;
+        const ex = hx * (1 - f0 * 0.06), ez = hz * (1 - f0 * 0.06);
+        const n = 380;
+        for (let j = 0; j < n; j++) {
+          const side = (j / n * 4) | 0, d = (j / n * 4) % 1;
+          let x, z;
+          if (side === 0)      { x = -ex + 2 * ex * d; z = -ez; }
+          else if (side === 1) { x = ex;                 z = -ez + 2 * ez * d; }
+          else if (side === 2) { x = ex - 2 * ex * d;   z = ez; }
+          else                 { x = -ex;                z = ez - 2 * ez * d; }
+          P(x + (rnd() - 0.5) * 0.06, yy, z + (rnd() - 0.5) * 0.06,
+            jitter(rnd() < 0.85 ? PAL.marble : PAL.stoneDim, rnd, 0.3), 0.45 + rnd() * 0.28);
+        }
+      }
+    }
+  };
+  /* 中央御路坡道 + 两侧踏跺 */
+  const rampFront = (z, y0, y1, w, depth) => {
+    const n = 4200;
+    for (let i = 0; i < n; i++) {
+      const f = rnd();
+      const yy = y0 + (y1 - y0) * f;
+      const zz = z + depth * (f - 0.5);
+      const xx = (rnd() - 0.5) * w * 0.92;
+      P(xx, yy, zz + (rnd() - 0.5) * 0.05,
+        jitter(rnd() < 0.7 ? PAL.stone : PAL.marble, rnd, 0.3), 0.45 + rnd() * 0.3);
+    }
+    /* 御路中央云龙浮雕带 */
+    const n2 = 900;
+    for (let i = 0; i < n2; i++) {
+      const f = rnd();
+      const yy = y0 + (y1 - y0) * f;
+      const zz = z + depth * (f - 0.5);
+      P((rnd() - 0.5) * 0.7, yy + 0.05, zz, jitter(PAL.stone, rnd, 0.35), 0.5 + rnd() * 0.3);
+    }
+    for (const sgn of [-1, 1]) {
+      const rows = 16;
+      for (let i = 0; i < rows; i++) {
+        const f = i / rows;
+        const yy = y0 + (y1 - y0) * f;
+        const n = 160;
+        for (let j = 0; j < n; j++) {
+          const xx = sgn * (w * 0.62 + rnd() * 1.05);
+          P(xx + (rnd() - 0.5) * 0.07, yy, z + depth * (f - 0.5) + (rnd() - 0.5) * 0.07,
+            jitter(PAL.stone, rnd, 0.3), 0.45 + rnd() * 0.28);
+        }
+      }
+    }
+  };
+  /* 地面广场 */
+  const plaza = (rIn, rOut, n, baseY) => {
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2;
+      const rr = Math.sqrt(rnd() * (rOut * rOut - rIn * rIn) + rIn * rIn);
+      const fade = 1 - (rr - rIn) / (rOut - rIn);
+      P(Math.cos(a) * rr, baseY + (rnd() - 0.5) * 0.06, Math.sin(a) * rr,
+        jitter(rnd() < 0.6 ? PAL.silverDim : PAL.stoneDim, rnd, 0.5), 0.4 + rnd() * 0.35 * fade);
+    }
+  };
+  /* 圆柱（柱子） */
+  const column = (x, z, y0, y1, r, c, n) => {
+    for (let i = 0; i < n; i++) {
+      const yy = y0 + (y1 - y0) * rnd();
+      const a = rnd() * Math.PI * 2, rr = r * (1 + (rnd() - 0.5) * 0.3);
+      P(x + Math.cos(a) * rr, yy, z + Math.sin(a) * rr, jitter(c, rnd, 0.3), 0.5 + rnd() * 0.3);
+    }
+  };
+  /* 矩形墙面 */
+  const wallBox = (hx, y0, y1, hz, c, n, colStripes) => {
+    for (let i = 0; i < n; i++) {
+      const f = rnd();
+      let x, z;
+      if (f < 0.4)       { x = (rnd() - 0.5) * 2 * hx; z = -hz; }
+      else if (f < 0.55) { x = (rnd() - 0.5) * 2 * hx; z = hz; }
+      else if (f < 0.775){ x = -hx; z = (rnd() - 0.5) * 2 * hz; }
+      else               { x = hx;  z = (rnd() - 0.5) * 2 * hz; }
+      const yy = y0 + (y1 - y0) * rnd();
+      P(x, yy, z, jitter(c, rnd, 0.35), 0.5 + rnd() * 0.3);
+    }
+    if (colStripes) {
+      /* 檐柱列 */
+      const nC = 12;
+      for (let i = 0; i <= nC; i++) {
+        const x = -hx + (2 * hx * i) / nC;
+        for (const z of [-hz, hz]) column(x, z, y0, y1, 0.11, PAL.red, 26);
+      }
+    }
+  };
+
+  /* ================= 祈年殿 ================= */
+  if (kind === "qinian") {
+    /* 三重檐圆形攒尖顶 · 蓝琉璃瓦 · 圆形三重白石台基 */
+    const roof = (yR, rEave, rTop, conc, tileC, n) => {
+      for (let i = 0; i < n; i++) {
+        const f = Math.pow(rnd(), 0.62);
+        const yS = yR + (1 - f) * conc;
+        const r = rEave + (rTop - rEave) * Math.pow(f, 1.55);
+        const a = rnd() * Math.PI * 2;
+        P(Math.cos(a) * r, yS, Math.sin(a) * r, jitter(tileC, rnd, 0.4), 0.45 + rnd() * 0.3);
+      }
+      /* 檐口线（起翘） */
+      arc(0, yR + 0.34, 0, rEave + 0.10, 0, Math.PI * 2, 420, jitter(PAL.goldDeep, rnd, 0.5), 0.55);
+    };
+    const wallRing = (r, y0, y1, c1, c2, n, band) => {
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, rr = r + (rnd() - 0.5) * 0.05;
+        const y = y0 + (y1 - y0) * rnd();
+        P(Math.cos(a) * rr, y, Math.sin(a) * rr, jitter(rnd() < 0.8 ? c1 : c2, rnd, 0.35), 0.5 + rnd() * 0.3);
+      }
+      if (band) {
+        arc(0, y1 - 0.12, 0, r + 0.06, 0, Math.PI * 2, 500, jitter(PAL.green, rnd, 0.45), 0.55);
+        arc(0, y1 - 0.24, 0, r + 0.06, 0, Math.PI * 2, 320, jitter(PAL.goldDeep, rnd, 0.45), 0.4);
+      }
+    };
+
+    /* 台基三层 + 栏杆 */
+    circleBalustrade(2.05, 13.0, 56, true);
+    circleBalustrade(4.15, 11.2, 48, false);
+    circleBalustrade(6.25, 9.4, 40, false);
+    steps(0.10, 2.00, 13.0, 17.0, 8, PAL.stoneDim);
+    steps(2.10, 4.10, 11.2, 13.0, 6, PAL.stoneDim);
+    steps(4.20, 6.20, 9.4, 11.2, 5, PAL.stoneDim);
+    plaza(17, 34, 9000, 0);
+
+    /* 底层殿身 + 门窗 */
+    wallRing(7.35, 6.30, 11.0, PAL.red, PAL.redDeep, 26000, true);
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      for (let k = 0; k < 6; k++) {
+        const aa = a + (rnd() - 0.5) * 0.09;
+        const yy = 6.6 + rnd() * 3.8;
+        P(Math.cos(aa) * 7.40, yy, Math.sin(aa) * 7.40,
+          jitter(rnd() < 0.25 ? PAL.gold : PAL.greenDeep, rnd, 0.5), 0.6 + rnd() * 0.35);
+      }
+    }
+    /* 副阶檐柱 */
+    for (let i = 0; i < 32; i++) {
+      const a = (i / 32) * Math.PI * 2;
+      column(Math.cos(a) * 7.35, Math.sin(a) * 7.35, 6.35, 7.6, 0.10, PAL.red, 22);
+    }
+
+    /* 三重檐 */
+    roof(7.60, 8.35, 6.55, 3.6, PAL.blueTile, 30000);
+    wallRing(6.45, 11.15, 12.6, PAL.red, PAL.marble, 5200, true);
+    roof(12.55, 6.75, 4.55, 3.5, PAL.blueTile, 26000);
+    wallRing(4.45, 12.75, 13.9, PAL.red, PAL.marble, 3600, true);
+    roof(13.85, 4.95, 0.85, 4.4, PAL.blueTile, 24000);
+    wallRing(0.85, 14.05, 14.75, PAL.blueDark, PAL.blueTile, 1000, false);
+
+    /* 鎏金宝顶 */
+    arc(0, 15.55, 0, 0.62, 0, Math.PI * 2, 260, jitter(PAL.gold, rnd, 0.4), 0.8);
+    for (let i = 0; i < 900; i++) {
+      const a = rnd() * Math.PI * 2, ph = rnd() * Math.PI * 2;
+      const rr = 0.60 * Math.sqrt(rnd());
+      P(Math.cos(a) * rr, 14.75 + rnd() * 0.85, Math.sin(a) * rr,
+        jitter(rnd() < 0.5 ? PAL.gold : PAL.goldBright, rnd, 0.45), 0.55 + rnd() * 0.5);
+    }
+    /* 四根龙井柱 + 十二根金柱（结构暗示） */
+    for (const [px, pz] of [[2.6, 2.6], [-2.6, 2.6], [2.6, -2.6], [-2.6, -2.6]])
+      column(px, pz, 6.4, 14.0, 0.13, PAL.red, 40);
+  }
+
+  /* ================= 太和殿 ================= */
+  else {
+    /* 重檐庑殿顶 · 金黄琉璃瓦 · 三层汉白玉须弥座 */
+    const frieze = (y, hx, hz, n) => {
+      for (let i = 0; i < n; i++) {
+        const f = rnd();
+        let x, z;
+        if (f < 0.3)       { x = (rnd() - 0.5) * 2 * hx; z = -hz; }
+        else if (f < 0.45) { x = (rnd() - 0.5) * 2 * hx; z = hz; }
+        else if (f < 0.65) { x = -hx; z = (rnd() - 0.5) * 2 * hz; }
+        else               { x = hx;  z = (rnd() - 0.5) * 2 * hz; }
+        P(x + (rnd() - 0.5) * 0.06, y + (rnd() - 0.5) * 0.06, z + (rnd() - 0.5) * 0.06,
+          jitter(rnd() < 0.6 ? PAL.green : PAL.goldDeep, rnd, 0.5), 0.5 + rnd() * 0.3);
+      }
+    };
+    /* 庑殿顶：前后两坡 + 左右山面（曲面 + 檐口起翘） */
+    const hipRoof = (yEave, yRidge, hwE, hdE, hwR, hdR, conc, tileC, n) => {
+      const prof = (f) => {
+        const t = Math.min(1, Math.max(0, (f - 0.82) / 0.18));
+        return yEave + (1 - f) * conc + 0.85 * t * t;
+      };
+      for (let i = 0; i < n; i++) {
+        const face = rnd();           // 0-0.62 前后坡, 0.62-1 山面
+        const f = Math.pow(rnd(), 0.7);
+        const wE = hwR + (hwE - hwR) * f, dE = hdR + (hdE - hdR) * f;
+        const y = prof(f);
+        let x, z;
+        if (face < 0.62) {
+          const side = face < 0.31 ? 1 : -1;
+          x = (rnd() - 0.5) * 2 * wE;
+          z = side * dE * (0.55 + 0.45 * Math.cos((f) * 0.9)) * 0.98;
+          z = side * dE * (1 - f * 0.06);
+        } else {
+          const side = face < 0.81 ? 1 : -1;
+          z = (rnd() - 0.5) * 2 * dE * 0.96;
+          x = side * wE * (1 - f * 0.06);
+        }
+        P(x, y, z, jitter(tileC, rnd, 0.42), 0.45 + rnd() * 0.3);
+      }
+      /* 檐口亮线 */
+      const nE = 900;
+      for (let i = 0; i < nE; i++) {
+        const f = 0.97 + rnd() * 0.03;
+        const wE = hwR + (hwE - hwR) * f, dE = hdR + (hdE - hdR) * f;
+        const y = prof(f) + 0.30 + (rnd() - 0.5) * 0.05;
+        const side = rnd() < 0.5 ? 1 : -1;
+        const x = (rnd() - 0.5) * 2 * wE;
+        P(x, y, side * dE, jitter(PAL.goldDeep, rnd, 0.5), 0.5);
+        if (rnd() < 0.5) {
+          const z2 = (rnd() - 0.5) * 2 * dE;
+          P(side * wE, y, z2, jitter(PAL.goldDeep, rnd, 0.5), 0.5);
+        }
+      }
+      /* 正脊 + 垂脊 + 戗脊 + 脊兽 */
+      const nR = 700;
+      for (let i = 0; i < nR; i++) {
+        const f = rnd();
+        const x = -hwR + 2 * hwR * f;
+        const zz = (hdR - hdR) * (1 - Math.abs(f - 0.5) * 2);
+        P(x, yRidge + 0.10, zz, jitter(rnd() < 0.3 ? PAL.gold : PAL.goldDeep, rnd, 0.45), 0.55 + rnd() * 0.35);
+        /* 正脊两端鸱吻 */
+        if (f < 0.02 || f > 0.98) {
+          for (let k = 0; k < 90; k++)
+            P(x + (rnd() - 0.5) * 0.35, yRidge + rnd() * 0.75, zz + (rnd() - 0.5) * 0.3,
+              jitter(PAL.gold, rnd, 0.4), 0.55 + rnd() * 0.4);
+        }
+      }
+      for (const s of [-1, 1]) {
+        for (let i = 0; i < 130; i++) {
+          const f = i / 130;
+          const x = s * (hwR + (hwE - hwR) * Math.pow(f, 1.3));
+          const z = s * hdE;
+          const y = yRidge + 0.05 + (yEave - yRidge) * Math.pow(f, 1.25) + 0.28 * Math.pow(Math.min(1, f * 3), 2);
+          P(x, y, z, jitter(PAL.goldDeep, rnd, 0.5), 0.5);
+        }
+      }
+    };
+
+    /* 三台须弥座 + 栏杆 */
+    rectBalustrade(1.05, 14.6, 11.2, 84);
+    rectBalustrade(2.10, 13.2, 9.8, 72);
+    rectBalustrade(3.15, 11.8, 8.5, 60);
+    rectSteps([
+      { y0: 0.02, y1: 1.00, hx: 14.6, hz: 11.2 },
+      { y0: 1.10, y1: 2.05, hx: 13.2, hz: 9.8 },
+      { y0: 2.15, y1: 3.10, hx: 11.8, hz: 8.5 }
+    ]);
+    plaza(19, 36, 10000, 0);
+    /* 正面三路踏跺：中御路 + 东西台阶；侧面各一路 */
+    rampFront(0, 0.05, 3.05, 5.6, 16.5);
+    rampFront(0, 0.05, 3.05, 5.6, 16.5); // 加密御路
+    for (const s of [-1, 1]) {
+      const rows = 16;
+      for (let i = 0; i < rows; i++) {
+        const f = i / rows;
+        const yy = 0.05 + 3.0 * f;
+        const n = 300;
+        for (let j = 0; j < n; j++) {
+          P(s * (7.4 + rnd() * 1.6), yy, (rnd() - 0.5) * 15.5,
+            jitter(PAL.stone, rnd, 0.3), 0.45 + rnd() * 0.28);
+        }
+      }
+    }
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 900; i++) {
+        P(s * 14.8, 0.05 + rnd() * 2.9, (rnd() - 0.5) * 10,
+          jitter(PAL.stone, rnd, 0.3), 0.45 + rnd() * 0.25);
+      }
+    }
+
+    /* 殿身：七开间红墙 */
+    wallBox(9.5, 3.10, 6.40, 6.40, PAL.red, 22000, true);
+    /* 檐下斗栱彩画带 */
+    frieze(6.15, 9.55, 6.45, 3600);
+    /* 门窗隔扇 */
+    for (let i = 0; i < 3600; i++) {
+      const x = (rnd() - 0.5) * 17.4, y = 3.4 + rnd() * 2.4;
+      P(x, y, -6.44, jitter(rnd() < 0.3 ? PAL.gold : PAL.redDeep, rnd, 0.5), 0.55 + rnd() * 0.3);
+    }
+
+    /* 下檐（副阶） */
+    hipRoof(6.45, 9.15, 11.0, 8.05, 9.6, 7.0, 2.6, PAL.gold, 26000);
+    /* 上檐 */
+    hipRoof(9.35, 13.6, 10.3, 7.4, 5.6, 3.6, 4.2, PAL.gold, 30000);
+    /* 上檐檐柱廊 */
+    for (let i = 0; i <= 14; i++) {
+      const x = -10.1 + (20.2 * i) / 14;
+      for (const z of [-7.2, 7.2]) column(x, z, 6.6, 9.3, 0.10, PAL.red, 26);
+    }
+    for (const s of [-1, 1]) {
+      for (let i = 1; i < 7; i++) {
+        const z = -7.2 + (14.4 * i) / 7;
+        column(s * 10.1, z, 6.6, 9.3, 0.10, PAL.red, 26);
+      }
+    }
+    /* 檐下额枋彩绘（和玺彩画：青绿 + 金龙） */
+    frieze(9.05, 10.35, 7.45, 2600);
+    /* 匾额 */
+    for (let i = 0; i < 700; i++) {
+      P((rnd() - 0.5) * 2.2, 8.2 + rnd() * 0.8, -7.6, jitter(PAL.blueDeep, rnd, 0.4), 0.6 + rnd() * 0.35);
+      P((rnd() - 0.5) * 2.4, 8.2 + rnd() * 0.8, -7.65, jitter(PAL.gold, rnd, 0.5), 0.5 + rnd() * 0.3);
+    }
+  }
+
+  return {
+    pos: new Float32Array(pos),
+    col: new Float32Array(col),
+    size: new Float32Array(size),
+    seed: new Float32Array(seedA),
+    count: size.length
+  };
+}
+
+/* ---------------- 背景星尘 ---------------- */
+function buildStars(seed) {
+  const rnd = mulberry32(seed);
+  const n = 1400, pos = new Float32Array(n * 2), ph = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    pos[i * 2] = (rnd() * 2 - 1) * 1.35;
+    pos[i * 2 + 1] = (rnd() * 2 - 1) * 1.35;
+    ph[i] = rnd();
+  }
+  return { pos, ph, n };
+}
+
+/* ---------------- 着色器 ---------------- */
+const VS = `#version 300 es
+precision highp float;
+in vec3 aPos;
+in vec3 aCol;
+in float aSize;
+in float aSeed;
+uniform mat4 uVP;
+uniform float uTime;
+uniform float uPix;
+uniform float uDPR;
+out vec3 vCol;
+out float vTw;
+void main() {
+  float t = uTime * 0.9 + aSeed * 43.0;
+  vec3 p = aPos;
+  p.x += sin(t * 0.80 + p.y * 0.7) * 0.050;
+  p.y += cos(t * 0.62 + p.x * 0.9) * 0.042;
+  p.z += sin(t * 0.70 + p.x * 0.5 + 2.0) * 0.050;
+  vec4 clip = uVP * vec4(p, 1.0);
+  gl_Position = clip;
+  float dist = max(clip.w, 0.001);
+  /* aSize 为世界单位；uPix ≈ 半屏高 / tan(fov/2)，得透视正确的像素大小 */
+  gl_PointSize = clamp(aSize * uPix / dist, 0.7, 5.2 * uDPR);
+  float tw = 0.62 + 0.38 * sin(uTime * (0.8 + aSeed * 2.2) + aSeed * 60.0);
+  vTw = tw;
+  vCol = aCol;
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec3 vCol;
+in float vTw;
+uniform float uReveal;
+out vec4 outColor;
+void main() {
+  vec2 d = gl_PointCoord - 0.5;
+  float r2 = dot(d, d);
+  if (r2 > 0.25) discard;
+  float core = exp(-r2 * 26.0);
+  float glow = exp(-r2 * 7.0) * 0.30;
+  float a = (core + glow) * vTw * uReveal;
+  vec3 c = vCol * (core * 1.35 + glow);
+  outColor = vec4(c * a, a);
+}`;
+
+const VS_STAR = `#version 300 es
+precision highp float;
+in vec2 aPos;
+in float aPh;
+uniform float uTime;
+uniform float uAspect;
+out float vA;
+void main() {
+  vec2 p = aPos;
+  p.x /= uAspect;
+  gl_Position = vec4(p, 0.999, 1.0);
+  gl_PointSize = 1.0 + fract(aPh * 7.31) * 1.6;
+  vA = 0.10 + 0.22 * (0.5 + 0.5 * sin(uTime * (0.3 + aPh) + aPh * 40.0));
+}`;
+const FS_STAR = `#version 300 es
+precision highp float;
+in float vA;
+out vec4 outColor;
+void main() {
+  vec2 d = gl_PointCoord - 0.5;
+  float r2 = dot(d, d);
+  if (r2 > 0.25) discard;
+  float a = exp(-r2 * 18.0) * vA;
+  outColor = vec4(vec3(0.85, 0.88, 0.95) * a, a);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s) + "\n" + src);
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+    throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+const prog = program(VS, FS);
+const progStar = program(VS_STAR, FS_STAR);
+const loc = {
+  aPos: gl.getAttribLocation(prog, "aPos"),
+  aCol: gl.getAttribLocation(prog, "aCol"),
+  aSize: gl.getAttribLocation(prog, "aSize"),
+  aSeed: gl.getAttribLocation(prog, "aSeed"),
+  uVP: gl.getUniformLocation(prog, "uVP"),
+  uTime: gl.getUniformLocation(prog, "uTime"),
+  uPix: gl.getUniformLocation(prog, "uPix"),
+  uDPR: gl.getUniformLocation(prog, "uDPR"),
+  uReveal: gl.getUniformLocation(prog, "uReveal")
+};
+const locS = {
+  aPos: gl.getAttribLocation(progStar, "aPos"),
+  aPh: gl.getAttribLocation(progStar, "aPh"),
+  uTime: gl.getUniformLocation(progStar, "uTime"),
+  uAspect: gl.getUniformLocation(progStar, "uAspect")
+};
+
+/* ---------------- 几何缓冲 ---------------- */
+const MAXP = 260000;
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+/* pos / col 每点 3 floats = 12 字节；size / seed 每点 4 字节 */
+const mkBuf = (floats) => {
+  const b = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, MAXP * floats * 4, gl.DYNAMIC_DRAW);
+  return b;
+};
+const bPos = mkBuf(3), bCol = mkBuf(3), bSize = mkBuf(1), bSeed = mkBuf(1);
+const attr = (b, locn, n) => {
+  gl.enableVertexAttribArray(locn);
+  gl.vertexAttribPointer(locn, n, gl.FLOAT, false, 0, 0);
+};
+attr(bPos, loc.aPos, 3); attr(bCol, loc.aCol, 3);
+attr(bSize, loc.aSize, 1); attr(bSeed, loc.aSeed, 1);
+
+/* 星尘 */
+const star = buildStars(99);
+const vaoStar = gl.createVertexArray();
+gl.bindVertexArray(vaoStar);
+const sbPos = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, sbPos);
+gl.bufferData(gl.ARRAY_BUFFER, star.pos, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(locS.aPos);
+gl.vertexAttribPointer(locS.aPos, 2, gl.FLOAT, false, 0, 0);
+const sbPh = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, sbPh);
+gl.bufferData(gl.ARRAY_BUFFER, star.ph, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(locS.aPh);
+gl.vertexAttribPointer(locS.aPh, 1, gl.FLOAT, false, 0, 0);
+gl.bindVertexArray(null);
+
+/* ---------------- 场景数据与相机 ---------------- */
+const scenes = {
+  qinian: { data: null, azimuth: 0.0,        dist: 82, targetY: 8.2, name: "祈年殿", place: "天坛", seed: 7 },
+  taihe:   { data: null, azimuth: 2.05,       dist: 90, targetY: 6.4, name: "太和殿", place: "故宫", seed: 21 }
+};
+scenes.qinian.data = buildScene("qinian", scenes.qinian.seed);
+scenes.taihe.data = buildScene("taihe", scenes.taihe.seed);
+
+let current = "qinian";
+let az = scenes.qinian.azimuth, azFrom = az, azTo = az;
+let dist = scenes.qinian.dist, distFrom = dist, distTo = dist;
+let tgtY = scenes.qinian.targetY, tgtYFrom = tgtY, tgtYTo = tgtY;
+let transT = 1, reveal = 1;
+let switchSeed = 1;
+
+const tName = document.getElementById("tName");
+const tPlace = document.getElementById("tPlace");
+const titleWrap = document.getElementById("titleWrap");
+const btnQT = document.getElementById("btnQT");
+const btnHT = document.getElementById("btnHT");
+
+function uploadScene(d) {
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bPos);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.pos);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bCol);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.col);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bSize);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.size);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bSeed);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.seed);
+  gl.bindVertexArray(null);
+  return d.count;
+}
+let count = uploadScene(scenes.qinian.data);
+
+function switchTo(kind) {
+  if (kind === current && transT >= 1) return;
+  current = kind;
+  const s = scenes[kind];
+  switchSeed++;
+  s.data = buildScene(kind === "qinian" ? "qinian" : "taihe", s.seed * 1000 + switchSeed * 37);
+  count = uploadScene(s.data);
+  azFrom = az; azTo = s.azimuth;
+  distFrom = dist; distTo = s.dist;
+  tgtYFrom = tgtY; tgtYTo = s.targetY;
+  transT = 0;
+  reveal = 0;
+
+  /* 竖排标题淡出 → 替换 → 淡入 */
+  titleWrap.classList.add("swap");
+  setTimeout(() => {
+    tName.textContent = s.name;
+    tPlace.textContent = s.place;
+    titleWrap.classList.remove("swap");
+  }, 480);
+
+  btnQT.classList.toggle("active", kind === "qinian");
+  btnHT.classList.toggle("active", kind === "taihe");
+}
+btnQT.addEventListener("click", () => switchTo("qinian"));
+btnHT.addEventListener("click", () => switchTo("taihe"));
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") { e.preventDefault(); switchTo(current === "qinian" ? "taihe" : "qinian"); }
+});
+
+/* ---------------- 交互：拖拽旋转 / 滚轮缩放 ---------------- */
+let dragging = false, lastX = 0, lastY = 0;
+let userAz = 0, userEl = 0, tUserAz = 0, tUserEl = 0;
+
+canvas.addEventListener("pointerdown", (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.classList.add("dragging");
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  tUserAz -= dx * 0.005;
+  tUserEl = Math.max(-0.12, Math.min(0.62, tUserEl + dy * 0.003));
+});
+const endDrag = () => { dragging = false; canvas.classList.remove("dragging"); };
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  distTo = Math.max(38, Math.min(130, distTo * Math.exp(e.deltaY * 0.0009)));
+}, { passive: false });
+
+/* ---------------- 矩阵与渲染 ---------------- */
+function perspective(fovY, asp, n, f) {
+  const t = 1 / Math.tan(fovY / 2), out = new Float32Array(16);
+  out[0] = t / asp; out[5] = t;
+  out[10] = (f + n) / (n - f); out[11] = -1;
+  out[14] = (2 * f * n) / (n - f);
+  return out;
+}
+function lookAt(ex, ey, ez, tx, ty, tz) {
+  let fx = tx - ex, fy = ty - ey, fz = tz - ez;
+  let fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+  let sx = fy * 0 - fz * 1 * -1, sy = fz * 0 - fx * 0, sz = fx * 1 - fy * 0;
+  // 上向量 (0,1,0) 与视线叉乘
+  sx = -fz; sy = 0; sz = fx;
+  const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+  const ux = fy * sz - fz * sy, uy = fz * sx - fx * sz, uz = fx * sy - fy * sx;
+  const m = new Float32Array(16);
+  m[0] = sx; m[1] = ux; m[2] = -fx;
+  m[4] = sy; m[5] = uy; m[6] = -fy;
+  m[8] = sz; m[9] = uz; m[10] = -fz;
+  m[12] = -(sx * ex + sy * ey + sz * ez);
+  m[13] = -(ux * ex + uy * ey + uz * ez);
+  m[14] = -(-fx * ex + -fy * ey + -fz * ez);
+  m[15] = 1;
+  return m;
+}
+function mulMat(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c * 4 + r] =
+      a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] +
+      a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  }
+  return o;
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+  return dpr;
+}
+
+const start = performance.now();
+let lastFrame = start;
+
+function frame(now) {
+  const t = (now - start) / 1000;
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+
+  /* 相机参数过渡 */
+  if (transT < 1) transT = Math.min(1, transT + dt / 1.15);
+  const e = transT < 0.5 ? 4 * transT ** 3 : 1 - Math.pow(-2 * transT + 2, 3) / 2;
+  az = azFrom + (azTo - azFrom) * e;
+  dist = distFrom + (distTo - distFrom) * e;
+  tgtY = tgtYFrom + (tgtYTo - tgtYFrom) * e;
+  userAz += (tUserAz - userAz) * Math.min(1, dt * 8);
+  userEl += (tUserEl - userEl) * Math.min(1, dt * 8);
+  if (transT >= 1 && reveal < 1) reveal = Math.min(1, reveal + dt / 1.5);
+
+  const dpr = resize();
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+
+  const asp = canvas.width / canvas.height;
+  const totalAz = az + userAz + Math.sin(t * 0.05) * 0.03; // 缓慢漂移
+  const el = 0.16 + userEl;
+  const ex = dist * Math.sin(totalAz) * Math.cos(el);
+  const ey = dist * Math.sin(el) + tgtY;
+  const ez = dist * Math.cos(totalAz) * Math.cos(el);
+  const VP = mulMat(perspective(0.74, asp, 1, 300), lookAt(ex, ey, ez, 0, tgtY, 0));
+
+  /* 星尘 */
+  gl.useProgram(progStar);
+  gl.bindVertexArray(vaoStar);
+  gl.uniform1f(locS.uTime, t);
+  gl.uniform1f(locS.uAspect, Math.max(asp, 0.4));
+  gl.drawArrays(gl.POINTS, 0, star.n);
+
+  /* 建筑点云 */
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+  gl.uniformMatrix4fv(loc.uVP, false, VP);
+  gl.uniform1f(loc.uTime, t);
+  gl.uniform1f(loc.uPix, canvas.height * 0.375);
+  gl.uniform1f(loc.uDPR, dpr);
+  const rip = 1 + 0.5 * (1 - e) * Math.sin(e * Math.PI * 7); // 切换瞬间的轻微闪烁
+  gl.uniform1f(loc.uReveal, reveal * (transT < 1 ? rip : 1));
+  gl.drawArrays(gl.POINTS, 0, count);
+
+  gl.bindVertexArray(null);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* 开场 */
+requestAnimationFrame(() => {
+  setTimeout(() => document.getElementById("veil").classList.add("off"), 150);
+});
+</script>
+</body>
+</html>
