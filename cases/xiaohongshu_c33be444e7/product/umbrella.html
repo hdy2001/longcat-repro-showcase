@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f5efe2">
+<meta name="description" content="3D古伞展览馆：汉代车盖、唐代华盖、宋代绿油纸伞、元代油布伞、清代余杭油纸伞、民国绸伞——可拖拽旋转、点击开合的交互式伞文化展厅。">
+<title>古伞展览馆 · 3D Umbrella Gallery</title>
+<script>window.__errs=[];window.onerror=function(m,s,l){window.__errs.push(m+' @'+l);};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --cream:#f5efe2; --ink:#3d3125; --ink-soft:#7a6a52; --seal:#a83a2c;
+  --serif:"Songti SC","STSong","STZhongsong","Noto Serif SC","SimSun",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-snap-type:y proximity;-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans);background:var(--cream);color:var(--ink);
+  overflow-x:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none;
+}
+/* 宣纸纹理：细颗粒 + 纤维丝，全局覆盖 */
+body::before{
+  content:"";position:fixed;inset:0;z-index:9990;pointer-events:none;opacity:.42;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.36 0 0 0 0 0.28 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(97deg,rgba(120,100,70,.045) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(3deg,rgba(255,252,244,.05) 0 2px,transparent 2px 7px);
+}
+button{font-family:inherit}
+img{max-width:100%}
+
+/* ============ 时间轴首页 ============ */
+#screen-timeline{position:relative;z-index:1}
+.t-top{
+  position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;gap:11px;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;pointer-events:none;
+}
+.seal{
+  width:34px;height:34px;border-radius:8px;background:var(--seal);color:#fbf3e2;
+  font-family:var(--serif);font-size:19px;display:grid;place-items:center;transform:rotate(-4deg);
+  box-shadow:0 2px 8px rgba(60,20,10,.35);border:1px solid rgba(255,240,220,.35);
+}
+.t-title{font-family:var(--serif);font-size:15px;letter-spacing:.3em;color:#5a4632;line-height:1.25}
+.t-title span{display:block;font-family:var(--sans);font-size:8.5px;letter-spacing:.3em;color:#8a7457;margin-top:2px}
+.t-count{
+  margin-left:auto;font-size:10.5px;letter-spacing:.2em;color:#8a7457;
+  border:1px solid rgba(130,105,70,.4);padding:5px 11px;border-radius:999px;background:rgba(246,239,226,.65);
+}
+.t-lead{text-align:center;padding:96px 30px 8px;scroll-snap-align:start}
+.t-lead h2{font-family:var(--serif);font-size:22px;letter-spacing:.42em;margin:0 0 12px;color:#54432e;font-weight:600}
+.t-lead p{font-size:12px;line-height:2.1;color:#7a6748;letter-spacing:.1em;margin:0}
+.t-lead .rule{width:46px;height:2px;background:var(--seal);margin:16px auto 0;opacity:.7;border-radius:2px}
+
+.card{
+  min-height:100svh;min-height:100vh;position:relative;scroll-snap-align:start;
+  display:flex;opacity:0;transform:translateY(30px);
+  transition:opacity .8s ease var(--d,0s),transform .85s cubic-bezier(.25,.7,.3,1) var(--d,0s);
+}
+.card.in{opacity:1;transform:none}
+.card-bg{position:absolute;inset:0;background:linear-gradient(180deg,var(--deep) 0%,var(--mid) 36%,var(--pale) 63%,var(--cream) 100%)}
+.card-bg::after{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.34 0 0 0 0 0.26 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(99deg,rgba(120,100,70,.05) 0 1px,transparent 1px 4px);
+}
+.card-inner{
+  position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;
+  padding:calc(66px + env(safe-area-inset-top)) 26px calc(24px + env(safe-area-inset-bottom));
+  text-align:center;
+}
+.c-paint{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:1}
+.c-paint svg{width:100%;height:104px;display:block}
+.c-era{font-size:12px;letter-spacing:.35em;color:rgba(248,240,222,.78)}
+.c-era b{display:block;font-family:var(--serif);font-size:15px;letter-spacing:.52em;margin-bottom:9px;color:#f8f0de;font-weight:600}
+.c-name{font-family:var(--serif);margin:16px 0 0;color:#f6edda;font-weight:600}
+.c-name{font-size:37px;letter-spacing:.2em}
+.c-name em{display:block;font-style:normal;font-family:var(--sans);font-size:10.5px;letter-spacing:.42em;color:rgba(248,240,222,.62);margin-top:11px}
+
+.c-umb{margin:12px 0 4px;background:none;border:0;cursor:pointer;position:relative;padding:8px 14px}
+.c-umb:focus-visible{outline:2px dashed rgba(248,240,222,.7);outline-offset:4px;border-radius:12px}
+.c-umb svg{height:192px;width:auto;display:block;overflow:visible}
+.c-umb-hint{display:block;font-size:10.5px;letter-spacing:.3em;color:rgba(248,240,222,.6);margin-top:4px;transition:opacity .5s}
+.c-umb.umb-open .c-umb-hint{opacity:.45}
+
+/* 闭合伞线稿（SVG 开合动画） */
+.u-panel{
+  fill:rgba(246,240,228,.10);stroke:#f4ecdb;stroke-width:1.15;stroke-linejoin:round;
+  transform-box:view-box;transform-origin:100px 60px;
+  transform:rotate(var(--ca)) scaleY(1);
+  transition:transform 1.05s cubic-bezier(.3,.75,.25,1);transition-delay:calc(var(--i)*45ms);
+}
+.umb-open .u-panel{transform:rotate(var(--oa)) scaleY(.74)}
+.u-arc{
+  fill:none;stroke:#f4ecdb;stroke-width:1.3;opacity:0;
+  transform-box:view-box;transform-origin:100px 60px;transform:scale(.5);
+  transition:opacity .5s ease .5s,transform .65s cubic-bezier(.3,.75,.25,1) .5s;
+}
+.umb-open .u-arc{opacity:1;transform:scale(1)}
+.u-tip{opacity:0;transition:opacity .4s ease .66s}
+.umb-open .u-tip{opacity:1}
+.u-band{transition:opacity .3s ease}
+.umb-open .u-band{opacity:0}
+.u-static{stroke:#f4ecdb;fill:none;stroke-linecap:round}
+
+.c-desc{
+  max-width:302px;font-size:13px;line-height:1.95;color:#5a4a38;margin:14px auto 0;
+  transform:translateY(12px);opacity:.35;
+  transition:transform .8s cubic-bezier(.3,.7,.3,1) .4s,opacity .6s ease .4s;
+}
+.card:has(.c-umb.umb-open) .c-desc{transform:none;opacity:.95}
+.c-mats{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;max-width:320px}
+.mat{font-size:11px;letter-spacing:.12em;color:#6b5732;border:1px solid rgba(120,98,58,.45);border-radius:999px;padding:5px 12px;background:rgba(255,251,240,.35)}
+.c-foot{margin-top:auto;padding-top:16px}
+.c-enter{
+  background:linear-gradient(180deg,rgba(60,45,30,.18),rgba(60,45,30,.06));
+  border:1px solid rgba(90,72,45,.5);color:#4c3d2a;font-size:13px;letter-spacing:.3em;
+  padding:11px 24px 11px 30px;border-radius:999px;cursor:pointer;
+}
+.c-enter:active{transform:scale(.96)}
+.t-foot{text-align:center;padding:28px 0 42px;font-size:10.5px;letter-spacing:.36em;color:#8a7457}
+
+/* ============ 详情页 ============ */
+#screen-detail{
+  position:fixed;inset:0;z-index:50;visibility:hidden;transform:translateY(103%);
+  transition:transform .55s cubic-bezier(.32,.72,.24,1),visibility 0s linear .55s;
+}
+#screen-detail.on{visibility:visible;transform:none;transition:transform .55s cubic-bezier(.32,.72,.24,1),visibility 0s}
+.d-bg{position:absolute;inset:0;background:linear-gradient(180deg,var(--deep,#2a1210) 0%,var(--mid,#6b2f22) 38%,var(--pale,#b98d72) 66%,var(--cream) 100%)}
+.d-scroll{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:2;padding-bottom:96px}
+.d-head{position:relative;text-align:center;padding:calc(58px + env(safe-area-inset-top)) 24px 4px}
+.d-back{
+  position:absolute;left:14px;top:calc(14px + env(safe-area-inset-top));
+  background:rgba(250,243,228,.16);border:1px solid rgba(250,243,228,.42);color:#f8f0de;
+  font-size:12px;letter-spacing:.14em;padding:8px 14px;border-radius:999px;cursor:pointer;z-index:3;
+}
+.d-back:active{transform:scale(.95)}
+.d-head-mtn{position:absolute;inset:0;pointer-events:none;z-index:1}
+.d-head-mtn svg{width:100%;height:116px;display:block;opacity:.55}
+.d-name{position:relative;font-family:var(--serif);color:#f6edda;font-size:31px;letter-spacing:.18em;margin:30px 0 0;font-weight:600;z-index:2}
+.d-name em{display:block;font-style:normal;font-family:var(--sans);font-size:10.5px;letter-spacing:.42em;color:rgba(248,240,222,.6);margin-top:9px}
+.d-dyn{position:relative;font-size:12px;letter-spacing:.42em;color:rgba(248,240,222,.85);margin-top:13px;z-index:2}
+
+.d-stage{
+  position:relative;margin:12px 18px 0;border-radius:22px;height:min(44svh,340px);min-height:230px;
+  background:rgba(251,245,230,.16);border:1px solid rgba(251,245,230,.3);
+  box-shadow:0 18px 42px rgba(40,20,10,.3),inset 0 1px 0 rgba(255,255,255,.18);overflow:hidden;
+}
+.d-stage-mtn{position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:1}
+.d-stage-mtn svg{width:100%;height:104px;display:block;opacity:.5}
+.d-canvas-wrap{position:absolute;inset:0;z-index:2;touch-action:none;cursor:grab}
+.d-canvas-wrap:active{cursor:grabbing}
+.d-canvas-wrap canvas{display:block;width:100%;height:100%}
+.d-stage-hint{position:absolute;left:0;right:0;bottom:46px;text-align:center;font-size:10.5px;letter-spacing:.26em;color:rgba(248,240,222,.75);z-index:3;pointer-events:none}
+.d-toggle{
+  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;
+  background:rgba(43,28,16,.55);color:#f8f0de;border:1px solid rgba(248,240,222,.45);
+  font-size:11.5px;letter-spacing:.3em;padding:8px 18px 8px 24px;border-radius:999px;cursor:pointer;
+}
+.d-toggle:active{transform:translateX(-50%) scale(.94)}
+
+.d-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px 22px 0}
+.chip{font-size:11px;letter-spacing:.13em;color:#5d4c33;border:1px solid rgba(122,100,62,.5);border-radius:999px;padding:6px 13px;background:rgba(255,251,240,.6)}
+.chip-dyn{background:var(--seal);border-color:var(--seal);color:#fbf3e2}
+.d-note{text-align:center;font-size:10.5px;color:#8a7457;margin:10px 34px 0;letter-spacing:.05em}
+.d-tag{text-align:center;font-family:var(--serif);font-size:14px;letter-spacing:.32em;color:#54432e;margin:13px 0 0}
+
+.d-tabs{position:relative;display:flex;justify-content:center;gap:36px;margin:22px 24px 0;border-bottom:1px solid rgba(122,100,62,.3)}
+.d-tabs button{background:none;border:0;font-family:var(--serif);font-size:15px;letter-spacing:.3em;color:#8a7457;padding:10px 4px 13px;cursor:pointer;position:relative;transition:color .3s}
+.d-tabs button.on{color:#4c3a26;font-weight:600}
+.d-tab-ink{position:absolute;bottom:-1px;left:0;height:2px;width:52px;background:var(--seal);transition:transform .35s cubic-bezier(.3,.7,.3,1),width .35s cubic-bezier(.3,.7,.3,1);border-radius:2px}
+.d-panels{position:relative;margin:0 24px;padding:18px 2px 4px;min-height:130px}
+.d-panel{display:none;font-size:13px;line-height:2.05;color:#4c3d2a;letter-spacing:.04em}
+.d-panel.on{display:block;animation:dpIn .45s ease}
+@keyframes dpIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.d-src{margin:14px 22px 6px;background:#fbf5e9;border:1px solid #e4d6b6;border-radius:16px;padding:18px 20px 12px;box-shadow:0 8px 24px rgba(90,70,40,.12)}
+.d-src h2{font-family:var(--serif);font-size:14px;letter-spacing:.36em;color:#6b5732;margin:0 0 13px;text-align:center;font-weight:600}
+.d-src ul{list-style:none;margin:0;padding:0}
+.d-src li{position:relative;padding:0 0 11px 17px;font-size:12px;line-height:1.8;color:#5a4a35}
+.d-src li:last-child{padding-bottom:4px}
+.d-src li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;border-radius:50%;background:var(--seal);opacity:.75}
+.d-src li b{display:block;color:#4c3a26;font-weight:600}
+.d-src li span{color:#8a7457}
+.d-end{text-align:center;font-size:10px;letter-spacing:.42em;color:#a08a63;padding:26px 0 20px}
+
+.d-pager{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;padding:8px 20px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(245,239,226,0),rgba(245,239,226,.94) 42%)}
+.pg-side{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;cursor:pointer;color:#5d4c33;padding:0 4px}
+.pg-side:active .pg-btn{transform:scale(.92)}
+.pg-btn{width:50px;height:50px;border-radius:50%;border:1px solid rgba(122,100,62,.5);background:rgba(255,251,240,.8);color:#5d4c33;font-size:19px;display:grid;place-items:center}
+.pg-label{font-size:9.5px;letter-spacing:.1em;color:#8a7457;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-mid{align-self:center;background:rgba(255,251,240,.8);border:1px solid rgba(122,100,62,.5);color:#5d4c33;font-size:11.5px;letter-spacing:.3em;padding:10px 16px 10px 22px;border-radius:999px;cursor:pointer}
+.pg-mid:active{transform:scale(.95)}
+
+@media (prefers-reduced-motion:reduce){
+  .card{transition:none;opacity:1;transform:none}
+  .u-panel,.u-arc,.c-desc{transition:none}
+  #screen-detail{transition:none}
+}
+@media (max-height:640px){
+  .c-umb svg{height:168px}
+  .d-stage{min-height:200px}
+}
+</style>
+</head>
+<body>
+
+<main id="screen-timeline">
+  <header class="t-top">
+    <div class="seal">伞</div>
+    <div class="t-title">古伞展览馆<span>3D UMBRELLA GALLERY</span></div>
+    <div class="t-count">六件藏品 · 可开合</div>
+  </header>
+
+  <div class="t-lead">
+    <h2>一伞一世界</h2>
+    <p>自汉代车盖至民国绸伞，千年伞史，六件代表性藏品。<br>轻点闭合的伞，观其撑开之姿；进入展厅，赏三维开合之美。</p>
+    <div class="rule"></div>
+  </div>
+
+  <div id="tList"></div>
+
+  <footer class="t-foot">向下滚动 · 一览千年伞史</footer>
+</main>
+
+<section id="screen-detail" aria-hidden="true">
+  <div class="d-bg"></div>
+  <div class="d-scroll" id="dScroll">
+    <header class="d-head">
+      <button class="d-back" id="btnBack" aria-label="返回时间轴">‹ 返回</button>
+      <div class="d-head-mtn" id="dMtn"></div>
+      <h1 class="d-name"><span id="dNameCn"></span><em id="dNameEn"></em></h1>
+      <div class="d-dyn" id="dDynasty"></div>
+    </header>
+
+    <div class="d-stage" id="dStage">
+      <div class="d-stage-mtn" id="dStageMtn"></div>
+      <div class="d-canvas-wrap" id="dCanvasWrap"></div>
+      <div class="d-stage-hint">单指拖拽旋转 · 轻点伞面开合</div>
+      <button class="d-toggle" id="btnToggle">收 伞</button>
+    </div>
+
+    <div class="d-chips" id="dChips"></div>
+    <p class="d-note" id="dNote"></p>
+    <p class="d-tag" id="dTag"></p>
+
+    <nav class="d-tabs" id="dTabs">
+      <button data-tab="0" class="on">概述</button>
+      <button data-tab="1">工艺</button>
+      <button data-tab="2">文化</button>
+      <i class="d-tab-ink" id="dInk"></i>
+    </nav>
+    <div class="d-panels">
+      <div class="d-panel on" id="dp0"></div>
+      <div class="d-panel" id="dp1"></div>
+      <div class="d-panel" id="dp2"></div>
+    </div>
+
+    <section class="d-src" id="dSources">
+      <h2>史料与出处</h2>
+      <ul id="dSrcList"></ul>
+    </section>
+
+    <div class="d-end">— 展 览 馆 完 —</div>
+  </div>
+
+  <nav class="d-pager">
+    <button class="pg-side" id="btnPrev" aria-label="上一件"><span class="pg-btn">‹</span><span class="pg-label" id="pgPrev"></span></button>
+    <button class="pg-mid" id="btnSrc">史料出处</button>
+    <button class="pg-side" id="btnNext" aria-label="下一件"><span class="pg-btn">›</span><span class="pg-label" id="pgNext"></span></button>
+  </nav>
+</section>
+
+<script>
+/* ==================== 数据 ==================== */
+const U = [
+  {
+    id:'han', dynasty:'汉代', era:'公元前206年 — 公元220年',
+    name:'车盖', en:'CHARIOT CANOPY',
+    theme:{deep:'#26100d', mid:'#6b2b1f', pale:'#b98d72', accent:'#d98a5f', cloth:'#8a5138'},
+    mats:['青铜盖弓','漆木柄','麻帛盖面'],
+    tagline:'车马仪仗之盖，威仪所系',
+    brief:'武威雷台汉墓铜车马仪仗俑，伞盖插于车舆中央。',
+    desc:'汉代伞具以车盖为盛：武威雷台汉墓出土的铜车马仪仗俑，伞盖插于车舆中央，由隶仆执掌，蔽日遮阳、彰显威仪。车盖并非手持之伞，而是车舆之上的仪仗重器。',
+    craft:'盖弓以青铜铸成，汉承秦制——秦陵铜车马伞盖用二十二根盖弓，开合结构已相当成熟。伞柄插入车舆中央的“盖斗”，可拆卸装卸；盖面绷麻布或丝帛，髹漆彩绘，盖缘垂铃，车行则有声。',
+    culture:'车盖是权力与等级的象征。《后汉书·舆服志》载皇帝乘舆用“羽盖”，百官车盖之色、形制各有等差。由车盖到步伞，伞制自此走入日常生活。',
+    sources:[
+      ['《后汉书·舆服志》','车服制度与盖之等差'],
+      ['武威雷台汉墓铜车马仪仗俑','伞盖插于车舆中央 · 中国国家博物馆藏'],
+      ['秦始皇帝陵一号铜车马','二十二根盖弓的秦代规制 · 秦始皇帝陵博物院藏']
+    ],
+    note:'伞骨数目依传统常见规制。',
+    ribs:22, handle:'mount'
+  },
+  {
+    id:'tang', dynasty:'唐代', era:'公元618年 — 公元907年',
+    name:'华盖', en:'IMPERIAL CANOPY',
+    theme:{deep:'#2a1020', mid:'#7a3355', pale:'#c99ab4', accent:'#e0b46a', cloth:'#9c4a63'},
+    mats:['竹木为骨','绛纱罗绮','金铜宝饰'],
+    tagline:'绛纱宝珠，仪仗佛国',
+    brief:'敦煌壁画中，帝王与菩萨身后皆有华盖。',
+    desc:'唐代华盖是仪仗与佛国中的庄严之器：天子出行、仪卫簇拥，敦煌壁画中帝王与菩萨身后常见华盖飘扬，富丽堂皇。',
+    craft:'以竹木为骨，外罩绛纱、罗绮或织锦，盖顶饰宝珠，盖沿垂璎珞流苏；伞骨二十八根。唐代织造与漆工并举，华盖色彩以绛、紫、金为主，极尽华美。',
+    culture:'华盖源于佛教庄严具，“华”即莲花装饰之谓，后泛指帝王、贵族仪仗之盖。唐代夹纻造像与壁画中的华盖图像，是丝绸之路文化交流的见证。',
+    sources:[
+      ['敦煌莫高窟壁画（如初唐第220窟）','菩萨与帝王身后的华盖图像'],
+      ['《大唐开元礼》','仪仗用盖之制'],
+      ['唐 · 张彦远《历代名画记》','华盖与供养图像之记']
+    ],
+    note:'唐、元伞具无实物图像存世，本模型为推测性复原，伞骨数目依传统规制。',
+    ribs:28, handle:'straight'
+  },
+  {
+    id:'song', dynasty:'宋代', era:'公元960年 — 公元1279年',
+    name:'绿油纸伞', en:'GREEN OIL-PAPER UMBRELLA',
+    theme:{deep:'#0f1f18', mid:'#2e5a46', pale:'#9cc0aa', accent:'#6fae8b', cloth:'#3f7d5e'},
+    mats:['楮皮纸','毛竹骨','桐油柿漆'],
+    tagline:'青绿一山，江南一伞',
+    brief:'青翠染色，宋人山水审美的一抹绿。',
+    desc:'宋代油纸伞由庙堂走入市井，成为百姓日常用具。绿色油纸伞以纸面髹油、青翠染色，色调清雅，最合宋人崇尚的山水审美。',
+    craft:'伞面以楮皮纸或竹纸多层裱糊，伞骨二十八根，以毛竹劈制、打磨光润；通体涂刷桐油（或柿油）防水固色，绿色取自植物染。临安城中伞铺林立，《梦粱录》有载。',
+    culture:'宋人尚雅，伞色青绿如远山含黛。南宋临安商业繁盛，伞肆、花伞、伞铺皆为都门市景；至若白娘子西湖借伞，油纸伞又成江南浪漫的千年意象。',
+    sources:[
+      ['宋 · 吴自牧《梦粱录》','临安伞铺、花伞之市'],
+      ['宋 · 孟元老《东京梦华录》','伞之民用与市井'],
+      ['中国伞博物馆展陈','宋代伞具之制']
+    ],
+    note:'伞骨数目依传统常见规制。',
+    ribs:28, handle:'hook'
+  },
+  {
+    id:'yuan', dynasty:'元代', era:'公元1271年 — 公元1368年',
+    name:'油布伞', en:'OILCLOTH UMBRELLA',
+    theme:{deep:'#291c0f', mid:'#7d5a30', pale:'#d3b183', accent:'#e2a958', cloth:'#b57a35'},
+    mats:['棉布','桐油','竹骨'],
+    tagline:'布面桐油，坚韧耐用',
+    brief:'棉纺兴起，布面之伞比油纸伞更坚固耐用。',
+    desc:'棉纺业兴起后，以棉布为伞面材料的油布伞出现，比油纸伞更加坚固耐用。元代黄道婆改进棉纺技术（《南村辍耕录》有载），棉纺织业大发展，为布面伞奠定了材料基础。',
+    craft:'棉布绷于二十八根竹骨之上，反复涂刷桐油，阴干成膜，防水耐磨。伞面厚实挺括，多为赭黄、棕褐色调，伞骨收束紧密，可经风雨。',
+    culture:'油布伞坚韧实用，成为商旅、渔樵、市井劳作的随身之物。元代杂剧散曲中常见“伞”的意象，折射出游牧与农耕文明交融下的日常图景。',
+    sources:[
+      ['中国伞博物馆基本陈列第二单元「油纸伞与油布伞」','布面伞之兴'],
+      ['元 · 陶宗仪《南村辍耕录》','黄道婆改进棉纺技术'],
+      ['《人民日报 · 海外版》2026-07-03《开合之间，「张」显中国智慧》','棉纺业兴起后油布伞出现，较油纸伞更坚固耐用']
+    ],
+    note:'唐、元伞具无实物图像存世，本模型为推测性复原，伞骨数目依传统规制。',
+    ribs:28, handle:'hook'
+  },
+  {
+    id:'qing', dynasty:'清代', era:'公元1644年 — 公元1912年',
+    name:'余杭油纸伞', en:'YUHANG OIL-PAPER UMBRELLA',
+    theme:{deep:'#2e2010', mid:'#8a6a35', pale:'#e3cd96', accent:'#e8bd63', cloth:'#dfb878'},
+    mats:['皮纸','竹骨','桐油'],
+    tagline:'乾隆旧业，九房伞店',
+    brief:'清乾隆三十四年，董文远九房伞店始制。',
+    desc:'清代油纸伞产地分化，余杭、婺源甲路、福州等地齐名。余杭纸伞可追溯至清乾隆三十四年（1769）董文远九房伞店；福州油纸伞与脱胎漆器、角梳并称“福州三宝”，清末民初福州伞店达三百余家。',
+    craft:'余杭油纸伞以毛竹为骨、皮纸为面，涂刷桐油与柿油，伞面可绘书画。全伞三十余道工序：选竹、制骨、穿伞、糊纸、绘花、上油，伞骨三十二根，全凭匠人手工完成。',
+    culture:'江南婚俗以油纸伞为陪嫁吉物，取“伞”与“散”谐音的祈愿——不散、团圆。2008年，余杭油纸伞制作技艺列入国家级非物质文化遗产名录。',
+    sources:[
+      ['中国伞博物馆展陈','清乾隆三十四年（1769）董文远九房伞店'],
+      ['《福州地方志》','福州伞业与“福州三宝”之说'],
+      ['国家级非物质文化遗产名录（2008）','余杭油纸伞制作技艺']
+    ],
+    note:'伞骨数目依传统常见规制。',
+    ribs:32, handle:'hook'
+  },
+  {
+    id:'minguo', dynasty:'民国', era:'公元1912年 — 公元1949年',
+    name:'绸伞', en:'SILK UMBRELLA',
+    theme:{deep:'#121a28', mid:'#36435e', pale:'#aeb9cf', accent:'#8ea3c8', cloth:'#4d6484'},
+    mats:['杭绸电力纺','细竹骨','透明桐油'],
+    tagline:'细骨轻绸，海派风雅',
+    brief:'细骨薄绸，民国都市女性的风雅配饰。',
+    desc:'民国以降，绸伞盛行于江南都会。伞骨细如丝、伞面薄如蝉翼，轻若流云，多为闺秀、名流所持，兼具实用与装饰，是旗袍时代的重要配饰。',
+    craft:'选优质湖竹剖为细骨，多至三十二根；伞面以杭绸、电力纺裱糊，髹以透明桐油，薄可透光；细骨密撑，收拢后仅一拳之握。',
+    culture:'旗袍与绸伞是民国都市女性的典型装束，月份牌广告中常见执伞倩影，伞遂为海派风雅的文化符号。',
+    sources:[
+      ['中国伞博物馆民国伞藏品','三十二骨绸伞实物'],
+      ['上海档案馆藏日用工业同业公会档案','民国伞业调查'],
+      ['月份牌广告执伞图像','海派服饰文化']
+    ],
+    note:'伞骨数目依传统常见规制。',
+    ribs:32, handle:'straight'
+  }
+];
+const N_ALL = U.length;
+const $ = s => document.querySelector(s);
+
+/* ==================== 顶部古画点缀（淡色山水） ==================== */
+function mountainsSVG(){
+  return `<svg viewBox="0 0 375 120" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,78 C60,52 96,64 140,40 C180,20 220,58 268,38 C312,22 344,54 375,42 L375,120 L0,120 Z" fill="#f6eedc" opacity="0.10"/>
+    <path d="M0,96 C70,80 110,92 160,74 C210,58 250,88 300,70 C330,60 356,76 375,68 L375,120 L0,120 Z" fill="#f6eedc" opacity="0.07"/>
+    <circle cx="302" cy="26" r="9" fill="#f6eedc" opacity="0.12"/>
+  </svg>`;
+}
+
+/* ==================== 闭合伞 SVG 线稿 ==================== */
+function umbrellaSVG(u, uid){
+  const N = 9, px = 100, py = 60, len = 150, hw = 5.5;
+  const closedStep = 1.6, openStep = 14.2;
+  let panels = '';
+  for (let i = 0; i < N; i++) {
+    const ca = (i - (N - 1) / 2) * closedStep;
+    const oa = (i - (N - 1) / 2) * openStep;
+    panels += `<path class="u-panel" style="--i:${i};--ca:${ca.toFixed(2)}deg;--oa:${oa.toFixed(2)}deg" d="M${px},${py} L${px-hw},${py+len} Q${px},${py+len+6} ${px+hw},${py+len} Z"/>`;
+  }
+  /* 撑开后的伞缘弧线（ scallop ）与伞骨端 */
+  const r = len * 0.74;
+  const tip = deg => { const a = deg * Math.PI / 180; return [px + r * Math.sin(a), py + r * Math.cos(a)]; };
+  const angs = []; for (let i = 0; i < N; i++) angs.push((i - (N - 1) / 2) * openStep);
+  let arc = '';
+  for (let k = 0; k < N - 1; k++) {
+    const [x1, y1] = tip(angs[k]), [x2, y2] = tip(angs[k + 1]);
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const dx = mx - px, dy = my - py, dl = Math.hypot(dx, dy) || 1;
+    const cx = px + dx / dl * (dl + 7), cy = py + dy / dl * (dl + 7);
+    arc += (k === 0 ? `M${x1.toFixed(1)},${y1.toFixed(1)} ` : '') + `Q${cx.toFixed(1)},${cy.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)} `;
+  }
+  let tips = '';
+  [0, 2, 4, 6, 8].forEach(k => {
+    const [x, y] = tip(angs[k]);
+    tips += `<circle class="u-tip" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7" fill="${u.theme.accent}"/>
+             <line class="u-tip" x1="${x.toFixed(1)}" y1="${(y - 5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y - 1).toFixed(1)}" stroke="${u.theme.accent}" stroke-width="1" stroke-linecap="round"/>`;
+  });
+  let handle = '';
+  if (u.handle === 'hook') {
+    handle = `<path class="u-static" stroke-width="2" d="M100,206 L100,252 M100,252 C100,272 88,283 75,279 C66,276 64,267 71,263"/>`;
+  } else if (u.handle === 'mount') {
+    handle = `<path class="u-static" stroke-width="2" d="M100,206 L100,244 M78,244 L122,244 M88,250 L112,250"/>`;
+  } else {
+    handle = `<path class="u-static" stroke-width="2" d="M100,206 L100,280 M96,272 L104,272"/>`;
+  }
+  return `<svg class="umb" viewBox="0 0 200 300" role="img" aria-label="${u.name}线稿，点击开合" data-uid="${uid}">
+    <line class="u-static" stroke-width="1.2" x1="100" y1="52" x2="100" y2="56"/>
+    <path class="u-static" fill="${u.theme.accent}" stroke="none" d="M100,34 L104,41 L100,48 L96,41 Z"/>
+    ${panels}
+    <path class="u-arc" d="${arc}"/>
+    ${tips}
+    <rect class="u-band" x="90.5" y="147" width="19" height="5" rx="2.4" fill="rgba(246,240,228,.5)" stroke="none"/>
+    <circle class="u-band" cx="111" cy="149.5" r="1.8" fill="${u.theme.accent}" stroke="none"/>
+    ${handle}
+  </svg>`;
+}
+
+/* ==================== 时间轴渲染 ==================== */
+function renderTimeline(){
+  const list = $('#tList');
+  list.innerHTML = U.map((u, i) => `
+    <article class="card" style="--d:${i * 0.08}s;--deep:${u.theme.deep};--mid:${u.theme.mid};--pale:${u.theme.pale};--accent:${u.theme.accent}">
+      <div class="card-bg"></div>
+      <div class="c-paint">${mountainsSVG()}</div>
+      <div class="card-inner">
+        <div class="c-era"><b>${u.dynasty}</b>${u.era}</div>
+        <h1 class="c-name">${u.name}<em>${u.en}</em></h1>
+        <button class="c-umb" data-i="${i}" aria-label="开合${u.name}">
+          ${umbrellaSVG(u, 'c' + i)}
+          <span class="c-umb-hint">轻点伞面 · 观开合之姿</span>
+        </button>
+        <p class="c-desc">${u.brief}</p>
+        <div class="c-mats">${u.mats.map(m => `<span class="mat">${m}</span>`).join('')}</div>
+        <div class="c-foot"><button class="c-enter" data-i="${i}">进入展厅 →</button></div>
+      </div>
+    </article>`).join('');
+
+  list.addEventListener('click', e => {
+    const umb = e.target.closest('.c-umb');
+    if (umb) { umb.classList.toggle('umb-open'); return; }
+    const enter = e.target.closest('.c-enter');
+    if (enter) openDetail(+enter.dataset.i);
+  });
+
+  const io = new IntersectionObserver(es => es.forEach(en => {
+    if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+  }), { threshold: 0.12 });
+  list.querySelectorAll('.card').forEach(c => io.observe(c));
+}
+renderTimeline();
+
+/* ==================== 详情页：内容与导航 ==================== */
+const screenDetail = $('#screen-detail');
+let cur = 0, backTo = 0, firstVisit = true;
+
+function fillDetail(u){
+  $('#dNameCn').textContent = u.name;
+  $('#dNameEn').textContent = u.en;
+  $('#dDynasty').textContent = `${u.dynasty} · ${u.era}`;
+  $('#dTag').textContent = u.tagline;
+  $('#dNote').textContent = u.note || '';
+  $('#dChips').innerHTML =
+    `<span class="chip chip-dyn">${u.dynasty}</span><span class="chip">${u.era}</span>` +
+    u.mats.map(m => `<span class="chip">${m}</span>`).join('');
+  $('#dp0').textContent = u.desc;
+  $('#dp1').textContent = u.craft;
+  $('#dp2').textContent = u.culture;
+  $('#dSrcList').innerHTML = u.sources.map(s =>
+    `<li><b>${s[0]}</b><span>${s[1]}</span></li>`).join('');
+  $('#pgPrev').textContent = U[(cur - 1 + N_ALL) % N_ALL].dynasty + ' · ' + U[(cur - 1 + N_ALL) % N_ALL].name;
+  $('#pgNext').textContent = U[(cur + 1) % N_ALL].dynasty + ' · ' + U[(cur + 1) % N_ALL].name;
+  const r = screenDetail.style;
+  r.setProperty('--deep', u.theme.deep);
+  r.setProperty('--mid', u.theme.mid);
+  r.setProperty('--pale', u.theme.pale);
+  $('#dMtn').innerHTML = mountainsSVG();
+  $('#dStageMtn').innerHTML = mountainsSVG();
+}
+
+/* 标签页 */
+const dTabs = $('#dTabs'), dInk = $('#dInk');
+function moveInk(){
+  const b = dTabs.querySelector('.on');
+  dInk.style.transform = `translateX(${b.offsetLeft}px)`;
+  dInk.style.width = b.offsetWidth + 'px';
+}
+dTabs.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  dTabs.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.d-panel').forEach(p => p.classList.remove('on'));
+  $('#dp' + b.dataset.tab).classList.add('on');
+  moveInk();
+});
+window.addEventListener('resize', moveInk);
+
+/* ==================== 详情页：Three.js 3D 伞 ==================== */
+let renderer, scene, camera, umbG, model, ribs = [], rimLoop, canopyG, innerCone, handleG;
+let clothTex, shadowTex, initUmb = null, accMat = null;
+let t = 1, targetT = 1, clock, rafOn = false;
+let rotX = 0, rotY = 0, velX = 0, velY = 0, lastInteract = 0;
+let downX = 0, downY = 0, downT = 0, dragging = false, moved = 0;
+
+const APEX = 0.98, POLE_TOP = 0.98, POLE_BOT = -1.52;
+const lerp = THREE.MathUtils ? THREE.MathUtils.lerp : (a, b, t) => a + (b - a) * t;
+
+function makeClothTex(n){
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 2400; i++) {
+    g.fillStyle = `rgba(${90 + Math.random() * 40 | 0},${75 + Math.random() * 30 | 0},${50 + Math.random() * 25 | 0},${(Math.random() * 0.06).toFixed(3)})`;
+    g.fillRect(Math.random() * 512, Math.random() * 512, 1.6, 1.6);
+  }
+  g.strokeStyle = 'rgba(70,50,30,.16)'; g.lineWidth = 2;
+  for (let i = 0; i < n; i++) {
+    const x = (i + 0.5) / n * 512;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke();
+  }
+  g.strokeStyle = 'rgba(70,50,30,.22)'; g.lineWidth = 3;
+  for (let i = 0; i < n; i++) {
+    const x0 = i / n * 512, x1 = (i + 1) / n * 512, cx = (x0 + x1) / 2;
+    g.beginPath(); g.moveTo(x0, 498); g.quadraticCurveTo(cx, 528, x1, 498); g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+function makeShadowTex(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(128, 128, 10, 128, 128, 126);
+  gr.addColorStop(0, 'rgba(30,18,8,.5)'); gr.addColorStop(1, 'rgba(30,18,8,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+
+function buildHandle(type){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x4a382a, roughness: .55, metalness: .1 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.024, .024, POLE_TOP - POLE_BOT, 10), mat);
+  pole.position.y = (POLE_TOP + POLE_BOT) / 2;
+  g.add(pole);
+  if (type === 'hook') {
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(.1, .021, 10, 22, Math.PI * 1.15), mat);
+    hook.position.set(0, POLE_BOT, 0);
+    hook.rotation.z = Math.PI * 0.42;
+    g.add(hook);
+  } else if (type === 'mount') {
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .92, 10), mat);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(0, -1.42, 0);
+    g.add(bar);
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(.14, .17, .07, 14), mat);
+    plate.position.set(0, -1.5, 0);
+    g.add(plate);
+  } else {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(.034, .034, .16, 10), mat);
+    cap.position.set(0, -1.44, 0);
+    g.add(cap);
+  }
+  return g;
+}
+
+function initScene(u){
+  initUmb = u;
+  const wrap = $('#dCanvasWrap');
+  if (renderer) {           /* 换伞重建前先销毁旧 renderer */
+    wrap.removeChild(renderer.domElement);
+    renderer.dispose();
+  }
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  wrap.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(40, 1, .1, 100);
+  camera.position.set(0, 1.08, 6.3);
+  camera.lookAt(0, -.08, 0);
+
+  scene.add(new THREE.HemisphereLight(0xfff7e6, 0x7a6a50, .95));
+  const d1 = new THREE.DirectionalLight(0xfff2dd, 1.05); d1.position.set(3.5, 5, 4); scene.add(d1);
+  const d2 = new THREE.DirectionalLight(0xd9e2ff, .35); d2.position.set(-4, 2, -3); scene.add(d2);
+
+  umbG = new THREE.Group(); scene.add(umbG);
+  model = new THREE.Group(); umbG.add(model);
+
+  canopyG = new THREE.Group(); model.add(canopyG);
+  const geo = new THREE.ConeGeometry(1.7, .45, 48, 1, true);
+  clothTex = makeClothTex(u.ribs);
+  const mat = new THREE.MeshStandardMaterial({
+    color: u.theme.cloth, map: clothTex, roughness: .62, metalness: .04,
+    side: THREE.DoubleSide, transparent: true, opacity: .97
+  });
+  canopyG.add(new THREE.Mesh(geo, mat));
+  const innerMat = new THREE.MeshStandardMaterial({
+    color: u.theme.mid, roughness: .7, metalness: 0, side: THREE.DoubleSide,
+    transparent: true, opacity: .5
+  });
+  innerCone = new THREE.Mesh(geo, innerMat);
+  innerCone.scale.set(.965, .985, .965);
+  canopyG.add(innerCone);
+
+  handleG = buildHandle(u.handle); model.add(handleG);
+
+  /* 伞顶饰 */
+  accMat = new THREE.MeshStandardMaterial({ color: u.theme.accent, roughness: .35, metalness: .45 });
+  const fin = new THREE.Mesh(new THREE.SphereGeometry(.05, 14, 10), accMat);
+  fin.position.y = APEX + .075; model.add(fin);
+  const finTip = new THREE.Mesh(new THREE.ConeGeometry(.032, .13, 10), accMat);
+  finTip.position.y = APEX + .16; model.add(finTip);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(.06, .075, .09, 12),
+    new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: .5 }));
+  hub.position.y = APEX - .045; model.add(hub);
+
+  /* 伞骨（线条） */
+  const ribMat = new THREE.LineBasicMaterial({ color: 0x4a3626, transparent: true, opacity: .6 });
+  for (let i = 0; i < u.ribs; i++) {
+    const th = i / u.ribs * Math.PI * 2;
+    const line = new THREE.Line(new THREE.BufferGeometry(), ribMat);
+    model.add(line);
+    ribs.push({ line, th });
+  }
+  rimLoop = new THREE.Line(new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0x4a3626, transparent: true, opacity: .5 }));
+  model.add(rimLoop);
+
+  /* 地面软影 */
+  if (!shadowTex) shadowTex = makeShadowTex();
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(1.8, 40),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+  sh.rotation.x = -Math.PI / 2; sh.position.y = -1.74;
+  umbG.add(sh);
+
+  applyT(t);
+  bindPointer();
+  resize();
+  window.addEventListener('resize', resize);
+  clock = new THREE.Clock();
+  lastInteract = performance.now();
+  if (!rafOn) { rafOn = true; tick(); }
+}
+
+function applyT(e){
+  const h = lerp(1.95, .45, e);           // 伞面锥高
+  const r = lerp(.085, 1, e);            // 伞面半径系数
+  canopyG.scale.set(r, h / .45, r);
+  canopyG.position.y = APEX - h / 2;
+  const R = 1.7 * r, rimY = APEX - h - .015;
+  const pts = [];
+  ribs.forEach(rb => {
+    const rx = R * Math.cos(rb.th), rz = R * Math.sin(rb.th);
+    const mx = rx / 2, my = (APEX + rimY) / 2 - .05 * e, mz = rz / 2;
+    const arr = [];
+    for (let k = 0; k <= 8; k++) {
+      const s = k / 8, i1 = 1 - s;
+      arr.push(new THREE.Vector3(
+        i1 * i1 * 0 + 2 * i1 * s * mx + s * s * rx,
+        i1 * i1 * APEX + 2 * i1 * s * my + s * s * rimY,
+        i1 * i1 * 0 + 2 * i1 * s * mz + s * s * rz
+      ));
+    }
+    rb.line.geometry.setFromPoints(arr);
+  });
+  const seg = 64;
+  for (let i = 0; i <= seg; i++) {
+    const a = i / seg * Math.PI * 2;
+    pts.push(new THREE.Vector3(R * Math.cos(a), rimY, R * Math.sin(a)));
+  }
+  rimLoop.geometry.setFromPoints(pts);
+}
+
+function resize(){
+  if (!renderer) return;
+  const wrap = $('#dCanvasWrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function bindPointer(){
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', e => {
+    dragging = true; moved = 0;
+    downX = e.clientX; downY = e.clientY; downT = performance.now();
+    velX = velY = 0;
+    el.setPointerCapture(e.pointerId);
+    lastInteract = performance.now();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - downX, dy = e.clientY - downY;
+    moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+    rotY += dx * .008;
+    rotX += dy * .005;
+    rotX = Math.max(-.55, Math.min(.75, rotX));
+    velY = dx * .008; velX = dy * .005;
+    downX = e.clientX; downY = e.clientY;
+    lastInteract = performance.now();
+  });
+  const up = e => {
+    if (!dragging) return;
+    dragging = false;
+    lastInteract = performance.now();
+    const dt = performance.now() - downT;
+    if (moved < 9 && dt < 400) toggleUmb();   // 轻点 → 开合
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', () => { dragging = false; });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), .05);
+  const now = performance.now();
+  if (Math.abs(t - targetT) > .0008) {
+    t += (targetT - t) * Math.min(1, dt * 5.4);
+    if (Math.abs(t - targetT) <= .0008) t = targetT;
+    applyT(t);
+  }
+  if (!dragging) {
+    rotY += velY; rotX += velX;
+    rotX = Math.max(-.55, Math.min(.75, rotX));
+    velX *= .93; velY *= .93;
+    if (!reduceMotion && now - lastInteract > 2800) rotY += dt * .28;
+  }
+  model.rotation.y = rotY;
+  model.rotation.x = rotX;
+  renderer.render(scene, camera);
+}
+
+function toggleUmb(fromButton){
+  targetT = targetT > .5 ? 0 : 1;
+  $('#btnToggle').textContent = targetT > .5 ? '收 伞' : '撑 开';
+  lastInteract = performance.now();
+}
+
+function applyUmb(u){
+  if (!renderer || initUmb !== u) {
+    if (renderer) {   /* 换伞：重建模型与配色 */
+      umbG.remove(model);
+      model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      ribs = [];
+      canopyG = null; innerCone = null; handleG = null;
+      if (clothTex) clothTex.dispose();
+    }
+    rotX = 0; rotY = 0; velX = velY = 0;
+    initScene(u);
+  } else {
+    /* 仅换色（同伞重现） */
+    canopyG.children[0].material.color.set(u.theme.cloth);
+    canopyG.children[1].material.color.set(u.theme.mid);
+    if (accMat) accMat.color.set(u.theme.accent);
+    clothTex.dispose(); clothTex = makeClothTex(u.ribs);
+    canopyG.children[0].material.map = clothTex;
+    canopyG.children[0].material.needsUpdate = true;
+    t = 1; targetT = 1;
+  }
+  $('#btnToggle').textContent = '收 伞';
+}
+
+/* ==================== 屏幕切换 ==================== */
+function openDetail(i){
+  cur = i; backTo = i;
+  const u = U[i];
+  fillDetail(u);
+  applyUmb(u);
+  screenDetail.classList.add('on');
+  screenDetail.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('#dScroll').scrollTop = 0;
+  moveInk();
+  if (firstVisit) {   /* 首次进入：先收伞，稍后自动撑开展示开合动画 */
+    firstVisit = false;
+    t = 0; targetT = 0; applyT(0);
+    setTimeout(() => { if (cur === i && targetT === 0) { targetT = 1; } }, 620);
+  }
+}
+function closeDetail(){
+  screenDetail.classList.remove('on');
+  screenDetail.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  const card = $('#tList').children[backTo];
+  if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+$('#btnBack').addEventListener('click', closeDetail);
+$('#btnToggle').addEventListener('click', () => toggleUmb(true));
+$('#btnPrev').addEventListener('click', () => { cur = (cur - 1 + N_ALL) % N_ALL; openDetailKeep(cur); });
+$('#btnNext').addEventListener('click', () => { cur = (cur + 1) % N_ALL; openDetailKeep(cur); });
+$('#btnSrc').addEventListener('click', () => {
+  $('#dSources').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+function openDetailKeep(i){
+  cur = i;
+  fillDetail(U[i]);
+  applyUmb(U[i]);
+  $('#dScroll').scrollTop = 0;
+  moveInk();
+}
+document.addEventListener('keydown', e => {
+  if (!screenDetail.classList.contains('on')) return;
+  if (e.key === 'Escape') closeDetail();
+  if (e.key === 'ArrowLeft') $('#btnPrev').click();
+  if (e.key === 'ArrowRight') $('#btnNext').click();
+});
+document.addEventListener('gesturestart', e => e.preventDefault());
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+</script>
+</body>
+</html>

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>应县木塔 · 3D 复原</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#9dbfd8;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;}
+  #app{position:fixed;inset:0;}
+  #app canvas{display:block;}
+  .overlay{position:fixed;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.45);z-index:10;pointer-events:none;}
+  #title{top:18px;left:22px;}
+  #title h1{margin:0;font-size:30px;letter-spacing:6px;font-weight:700;}
+  #title p{margin:4px 0 0;font-size:12.5px;opacity:.92;letter-spacing:1px;}
+  #hint{left:22px;bottom:18px;font-size:12.5px;background:rgba(18,24,32,.45);
+    padding:7px 14px;border-radius:16px;backdrop-filter:blur(4px);}
+  #btns{bottom:18px;left:50%;transform:translateX(-50%);pointer-events:auto;display:flex;gap:10px;}
+  #btns button{padding:8px 20px;border-radius:20px;border:1px solid rgba(255,255,255,.4);
+    background:rgba(18,24,32,.55);color:#fff;font-size:13px;letter-spacing:2px;cursor:pointer;
+    backdrop-filter:blur(4px);transition:background .2s;}
+  #btns button:hover{background:rgba(60,80,110,.65);}
+  #ref{right:16px;bottom:16px;pointer-events:auto;font-size:12px;max-width:250px;
+    background:rgba(18,24,32,.55);border-radius:10px;padding:6px;backdrop-filter:blur(4px);}
+  #ref summary{cursor:pointer;color:#fff;outline:none;padding:2px 6px;letter-spacing:1px;}
+  #ref img{width:100%;border-radius:6px;margin-top:4px;display:block;}
+  #ref p{margin:6px 4px 2px;opacity:.85;line-height:1.5;}
+  #loadingWrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;color:#fff;background:rgba(20,28,38,.35);z-index:20;transition:opacity .5s;}
+  #loading{width:44px;height:44px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;
+    border-radius:50%;animation:spin 1s linear infinite;margin-bottom:14px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loadText{font-size:14px;letter-spacing:2px;text-shadow:0 1px 4px rgba(0,0,0,.4);}
+  #errbox{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:30;display:none;
+    background:rgba(160,30,30,.92);color:#fff;padding:10px 18px;border-radius:8px;font-size:13.5px;
+    max-width:80%;text-align:center;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="title" class="overlay"><h1>应县木塔</h1><p>佛宫寺释迦塔 · 辽 · 太平十一年（1056） · 五明四暗 六重檐</p></div>
+<div id="hint" class="overlay">🖱 左键拖拽 旋转 &nbsp;·&nbsp; 滚轮 缩放 &nbsp;·&nbsp; 右键拖拽 平移 &nbsp;·&nbsp; 双击 进入 / 退出塔内</div>
+<div id="btns" class="overlay">
+  <button id="btnIn" type="button">进入塔内</button>
+  <button id="btnOut" type="button">外部环绕</button>
+</div>
+<details id="ref">
+  <summary>参考照片 · 结构说明</summary>
+  <img src="inputs/img_00.jpg" alt="应县木塔参考照片" onerror="this.parentNode.parentNode.style.display='none'">
+  <p>模型要点：八角台基踏道 · 副阶 · 五明层（外廊栏杆 / 直棂窗 / 檐下斗拱）· 四暗层（X 形斜撑）· 内外两圈柱网筒中筒梁架 · 顶部塔刹。</p>
+</details>
+
+<div id="loadingWrap"><div id="loading"></div><div id="loadText">正在加载 3D 场景…</div></div>
+<div id="errbox"></div>
+<noscript><div style="position:fixed;inset:0;background:#222;color:#fff;display:flex;align-items:center;justify-content:center;">需要启用 JavaScript 才能查看 3D 模型。</div></noscript>
+
+<script>
+/* ---------- 加载器：CDN 失败时自动切换备用源 ---------- */
+(function(){
+  var SOURCES=['https://cdn.jsdelivr.net/npm/three@0.128.0','https://unpkg.com/three@0.128.0'];
+  window.__errs=[];
+  window.addEventListener('error',function(e){ window.__errs.push(String(e.message||e)); });
+  function showError(m){
+    var e=document.getElementById('errbox'); if(e){ e.style.display='block'; e.textContent=m; }
+    var l=document.getElementById('loadingWrap'); if(l) l.style.display='none';
+  }
+  window.showError=showError;
+  var i=0;
+  function loadThree(){
+    if(i>=SOURCES.length){ showError('3D 引擎加载失败（需要联网加载 Three.js）。请检查网络后重新打开本页面。'); return; }
+    var s=document.createElement('script');
+    s.src=SOURCES[i]+'/build/three.min.js';
+    s.onload=function(){ loadControls(); };
+    s.onerror=function(){ i++; loadThree(); };
+    document.head.appendChild(s);
+  }
+  var j=0;
+  function loadControls(){
+    if(j>=SOURCES.length){ showError('3D 引擎加载失败（需要联网加载 Three.js）。请检查网络后重新打开本页面。'); return; }
+    var s=document.createElement('script');
+    s.src=SOURCES[j]+'/examples/js/controls/OrbitControls.js';
+    s.onload=function(){ if(window.init) window.init(); else showError('初始化失败。'); };
+    s.onerror=function(){ j++; loadControls(); };
+    document.head.appendChild(s);
+  }
+  loadThree();
+})();
+</script>
+
+<script>
+/* ================= 应县木塔 3D 复原 ================= */
+window.init=function(){
+'use strict';
+var D2R=Math.PI/180, C22=Math.cos(22.5*D2R), S22=Math.sin(22.5*D2R);
+function apo(r){ return r*C22; }            // 外接圆半径 -> 边心距
+function sideLen(r){ return 2*r*S22; }       // 八边形边长
+function RD(mx,mz,am,r){ return [mx+Math.cos(am)*r, mz+Math.sin(am)*r]; }   // 沿法向偏移
+function TG(mx,mz,am,t){ return [mx-Math.sin(am)*t, mz+Math.cos(am)*t]; }  // 沿切向偏移
+
+/* ---------- 渲染器 / 场景 / 相机 ---------- */
+var container=document.getElementById('app');
+var renderer;
+try{ renderer=new THREE.WebGLRenderer({antialias:true}); }
+catch(e){ window.showError('当前浏览器不支持 WebGL，无法渲染 3D 场景。'); return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+container.appendChild(renderer.domElement);
+renderer.domElement.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9dbfd8);
+scene.fog=new THREE.Fog(0x9dbfd8,110,280);
+
+var camera=new THREE.PerspectiveCamera(55,window.innerWidth/window.innerHeight,0.1,800);
+camera.position.set(36,22,42);
+
+var controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(0,13,0);
+controls.enableDamping=true;
+controls.dampingFactor=0.08;
+controls.minDistance=0.4;
+controls.maxDistance=180;
+controls.autoRotate=true;
+controls.autoRotateSpeed=0.5;
+controls.addEventListener('start',function(){ controls.autoRotate=false; });
+
+/* ---------- 灯光 ---------- */
+scene.add(new THREE.HemisphereLight(0xcfe2f5,0x86977a,0.85));
+var sun=new THREE.DirectionalLight(0xffe9c4,1.15);
+sun.position.set(55,75,30);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-30; sun.shadow.camera.right=30;
+sun.shadow.camera.top=50;  sun.shadow.camera.bottom=-8;
+sun.shadow.camera.near=20; sun.shadow.camera.far=190;
+sun.shadow.bias=-0.0006;
+scene.add(sun);
+var innerLight=new THREE.PointLight(0xffd9a0,0.5,32,1);
+innerLight.position.set(0,5.4,0);
+scene.add(innerLight);
+
+/* ---------- 材质 ---------- */
+function std(c,r,m){ return new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m||0,flatShading:true}); }
+var matWood  =std(0xb5854f,0.82);
+var matWoodDk=std(0x8a5c33,0.88);
+var matWall  =std(0xa14a30,0.9);
+var matInDk  =std(0x2c1a0f,0.95);
+var matRoof  =std(0x4d5560,0.88,0.04);
+var matRidge =std(0x39404a,0.9,0.04);
+var matStone =std(0xcfc3a4,0.95);
+var matStone2=std(0xb3a98d,0.95);
+var matGold  =std(0xd9a441,0.38,0.65);
+var matLeaf  =std(0x506b39,0.9);
+var matTrunk =std(0x68492e,0.9);
+var matGround=std(0x77875c,1.0);
+
+/* ---------- 几何工具：合并同类件，控制 draw call ---------- */
+function xf(g,x,y,z,ry,rx,rz,s){
+  if(s!==undefined&&s!==1) g.scale(s,s,s);
+  if(ry) g.rotateY(ry);
+  if(rx) g.rotateX(rx);
+  if(rz) g.rotateZ(rz);
+  g.translate(x,y,z);
+  return g;
+}
+function Bucket(){ this.g=[]; }
+Bucket.prototype.box=function(w,h,d,x,y,z,ry,rx,rz,s){
+  this.g.push(xf(new THREE.BoxGeometry(w,h,d),x,y,z,ry,rx,rz,s)); return this;
+};
+Bucket.prototype.cyl=function(rt,rb,h,seg,x,y,z,ry,rx,rz,s){
+  this.g.push(xf(new THREE.CylinderGeometry(rt,rb,h,seg),x,y,z,ry,rx,rz,s)); return this;
+};
+Bucket.prototype.sphere=function(r,x,y,z,ws,hs){
+  this.g.push(xf(new THREE.SphereGeometry(r,ws||14,hs||10),x,y,z)); return this;
+};
+Bucket.prototype.rod=function(x1,y1,z1,x2,y2,z2,r){
+  this.g.push(rodGeom(x1,y1,z1,x2,y2,z2,r)); return this;
+};
+Bucket.prototype.build=function(mat){
+  return new THREE.Mesh(mergeGeoms(this.g),mat);
+};
+function rodGeom(x1,y1,z1,x2,y2,z2,r){
+  var dx=x2-x1, dy=y2-y1, dz=z2-z1;
+  var len=Math.sqrt(dx*dx+dy*dy+dz*dz);
+  var g=new THREE.CylinderGeometry(r,r,len,6);
+  g.translate(0,len/2,0);
+  var q=new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0,1,0), new THREE.Vector3(dx/len,dy/len,dz/len));
+  g.applyQuaternion(q);
+  g.translate(x1,y1,z1);
+  return g;
+}
+function mergeGeoms(geoms){
+  var pos=[],nor=[],i,j;
+  for(i=0;i<geoms.length;i++){
+    var g=geoms[i], ng=g.index?g.toNonIndexed():g;
+    var p=ng.attributes.position.array, n=ng.attributes.normal.array;
+    for(j=0;j<p.length;j++){ pos.push(p[j]); nor.push(n[j]); }
+    if(ng!==g) ng.dispose();
+    g.dispose();
+  }
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  return geo;
+}
+
+/* ---------- 三角形带工具（屋檐 / 环形楼板） ---------- */
+function pushTri(arr,a,b,c){ arr.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]); }
+function firstNY(arr){
+  var ax=arr[3]-arr[0], ay=arr[4]-arr[1], az=arr[5]-arr[2];
+  var bx=arr[6]-arr[0], by=arr[7]-arr[1], bz=arr[8]-arr[2];
+  return az*bx-ax*bz;
+}
+function flipTris(arr){
+  for(var i=0;i<arr.length;i+=9){
+    var t=arr[i+3]; arr[i+3]=arr[i+6]; arr[i+6]=t;
+    t=arr[i+4]; arr[i+4]=arr[i+7]; arr[i+7]=t;
+    t=arr[i+5]; arr[i+5]=arr[i+8]; arr[i+8]=t;
+  }
+}
+function orientUp(arr){ if(firstNY(arr)<0) flipTris(arr); }
+function orientDown(arr){ if(firstNY(arr)>0) flipTris(arr); }
+function orientRadial(arr,out){
+  var ax=arr[3]-arr[0], ay=arr[4]-arr[1], az=arr[5]-arr[2];
+  var bx=arr[6]-arr[0], by=arr[7]-arr[1], bz=arr[8]-arr[2];
+  var nx=ay*bz-az*by, nz=ax*by-ay*bx;
+  var mx=(arr[0]+arr[3]+arr[6])/3, mz=(arr[2]+arr[5]+arr[8])/3;
+  var rx=out?mx:-mx, rz=out?mz:-mz;
+  if(nx*rx+nz*rz<0) flipTris(arr);
+}
+function buildFromTris(arr){
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));
+  g.computeVertexNormals();
+  return g;
+}
+/* 外/内两圈 16 边形环带（角点交替），生成一段环形屋面/板 */
+function loopsFor(rOut,rIn,yOut,yTop,uplift){
+  var outer=[],inner=[],i,a;
+  for(i=0;i<8;i++){
+    a=(i*45+22.5)*D2R;
+    outer.push([Math.cos(a)*rOut, yOut+uplift, Math.sin(a)*rOut]);
+    inner.push([Math.cos(a)*rIn, yTop,        Math.sin(a)*rIn]);
+    a=i*45*D2R;
+    outer.push([Math.cos(a)*rOut*C22, yOut, Math.sin(a)*rOut*C22]);
+    inner.push([Math.cos(a)*rIn*C22,  yTop, Math.sin(a)*rIn*C22]);
+  }
+  return {outer:outer,inner:inner};
+}
+function bandArr(o,n){
+  var arr=[],i,j;
+  for(i=0;i<16;i++){ j=(i+1)%16; pushTri(arr,o[i],o[j],n[i]); pushTri(arr,o[j],n[j],n[i]); }
+  return arr;
+}
+function rimArr(o,oD,out){
+  var arr=[],i,j;
+  for(i=0;i<16;i++){ j=(i+1)%16; pushTri(arr,o[i],oD[i],oD[j]); pushTri(arr,o[i],oD[j],o[j]); }
+  orientRadial(arr,out);
+  return arr;
+}
+function addEaveGeo(rOut,rIn,yEdge,rise,uplift,th,apex){
+  var L=loopsFor(rOut,rIn,yEdge,yEdge+rise,uplift);
+  var o=L.outer, n=L.inner;
+  var i,j,arr=[],arr2=[];
+  var oD=o.map(function(p){ return [p[0],p[1]-th,p[2]]; });
+  if(apex){
+    var apexT=[0,yEdge+rise,0], apexD=[0,yEdge+rise-th,0];
+    for(i=0;i<16;i++){ j=(i+1)%16; pushTri(arr,o[i],o[j],apexT); }
+    orientUp(arr);
+    for(i=0;i<16;i++){ j=(i+1)%16; pushTri(arr2,o[i],apexD,o[j]); }
+    orientDown(arr2);
+  }else{
+    var nD=n.map(function(p){ return [p[0],p[1]-th,p[2]]; });
+    var at=bandArr(o,n);  for(i=0;i<at.length;i++) arr.push(at[i]);
+    orientUp(arr);
+    var ab=bandArr(oD,nD); for(i=0;i<ab.length;i++) arr2.push(ab[i]);
+    orientDown(arr2);
+    arr=arr.concat(arr2,rimArr(o,oD,true),rimArr(n,nD,false));
+    return buildFromTris(arr);
+  }
+  arr=arr.concat(arr2,rimArr(o,oD,true));
+  return buildFromTris(arr);
+}
+
+/* ---------- 斗拱（简化四铺作样式） ---------- */
+function dougong(px,yb,pz,ry,s){
+  s=s||1;
+  var b=bWoodDk;
+  b.box(0.52*s,0.2*s,0.52*s, px,yb+0.1*s,pz, ry,0,0,s);
+  b.box(1.30*s,0.22*s,0.30*s, px,yb+0.32*s,pz, ry+Math.PI/2,0,0,s); // 横拱
+  b.box(0.30*s,0.22*s,1.05*s, px,yb+0.32*s,pz, ry,0,0,s);           // 华拱
+  b.box(0.28*s,0.20*s,0.75*s, px,yb+0.52*s,pz, ry,0,0,s);           // 耍头
+  b.box(1.05*s,0.24*s,0.32*s, px,yb+0.72*s,pz, ry+Math.PI/2,0,0,s);
+  var tx=Math.sin(ry)*0.55*s, tz=Math.cos(ry)*0.55*s;
+  b.box(0.24*s,0.18*s,0.24*s, px+tx,yb+0.5*s,pz+tz, ry,0,0,s);
+  b.box(0.24*s,0.18*s,0.24*s, px-tx,yb+0.5*s,pz-tz, ry,0,0,s);
+}
+
+/* ---------- 构件桶 ---------- */
+var bWood=new Bucket(), bWoodDk=new Bucket(), bWall=new Bucket(), bIn=new Bucket(),
+    bStone=new Bucket(), bGold=new Bucket(), bTrunk=new Bucket(), bLeaf=new Bucket(),
+    bRidge=new Bucket();
+var roofGeos=[], slabGeos=[];
+
+/* ---------- 环境：地面 / 道路 / 树 / 山 / 云 ---------- */
+var ground=new THREE.Mesh(new THREE.CircleGeometry(220,48),matGround);
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+bStone2.box(6,0.12,64, 0,0.06,44); // 南北甬道
+var treePos=[[30,18,1.1],[-33,14,0.9],[45,-6,1.3],[-42,-16,1.0],[22,-32,1.2],[-20,-36,0.85],
+             [58,16,1.25],[-60,24,1.05],[14,55,1.35],[-12,62,0.95],[68,-18,1.15],[-70,-8,1.3],
+             [38,42,0.9],[-40,46,1.2],[4,-48,1.0]];
+treePos.forEach(function(t){
+  var x=t[0],z=t[1],s=t[2];
+  bTrunk.cyl(0.22,0.3,2.6,7, x,1.3*s,z, 0,0,0,s);
+  bLeaf.cyl(0.02,2.0,3.2,8, x,3.4*s,z, 0,0,0,s);
+  bLeaf.cyl(0.02,1.5,2.4,8, x,4.9*s,z, 0,0,0,s);
+});
+var mMat=new THREE.MeshBasicMaterial({color:0xa9bfd4});
+[[150,40,55,60],[-160,-30,70,75],[40,-180,85,85],[-60,170,60,55]].forEach(function(m){
+  var mt=new THREE.Mesh(new THREE.ConeGeometry(m[2],m[3],5),mMat);
+  mt.position.set(m[0],m[3]/2-2,m[1]); scene.add(mt);
+});
+var cMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.7});
+[[-50,52,-90,7],[30,58,-110,9],[80,50,-60,6],[-90,55,30,8],[10,60,100,7]].forEach(function(c){
+  var cl=new THREE.Mesh(new THREE.SphereGeometry(c[3],10,8),cMat);
+  cl.scale.y=0.42; cl.position.set(c[0],c[1],c[2]); scene.add(cl);
+});
+
+/* ---------- 台基（两层八角石台 + 南侧台阶踏道） ---------- */
+bStone.cyl(17,17.7,0.35,8, 0,0.175,0, 22.5*D2R);            // 月台
+bStone.cyl(10.6,11.0,1.2,8, 0,0.95,0, 22.5*D2R);            // 台基下层
+bStone.cyl(9.9,10.2,0.8,8, 0,1.95,0, 22.5*D2R);             // 台基上层
+var BASE_Y=2.35;
+for(var st=0; st<6; st++){                                   // 踏道台阶
+  var topY=BASE_Y-0.4*st;
+  bStone.box(3.6,topY,0.72, 0,topY/2, 9.9+0.36+0.72*st);
+}
+bStone.box(0.45,0.3,4.8,  2.0,1.25,12.4, 0,Math.atan2(1.9,4.4),0);  // 垂带
+bStone.box(0.45,0.3,4.8, -2.0,1.25,12.4, 0,Math.atan2(1.9,4.4),0);
+bWoodDk.cyl(8.95,8.95,0.22,8, 0,BASE_Y+0.11,0, 22.5*D2R);   // 首层楼板
+
+/* ---------- 塔身：副阶 + 五明层 + 四暗层 ---------- */
+var stories=[];
+(function(){
+  var y=BASE_Y;
+  function add(kind,h,ro,ri){ stories.push({kind:kind,y0:y,h:h,ro:ro,ri:ri}); y+=h; }
+  add('porch',2.2, 8.8, 7.6);   // 副阶（底层重檐之下檐）
+  add('ming', 3.6, 8.2, 4.6);   // 明层一
+  add('an',   2.0, 7.5, 4.3);   // 暗层一
+  add('ming', 3.4, 7.4, 4.0);   // 明层二
+  add('an',   2.0, 6.7, 3.8);   // 暗层二
+  add('ming', 3.4, 6.6, 3.6);   // 明层三
+  add('an',   2.0, 5.9, 3.4);   // 暗层三
+  add('ming', 3.4, 5.8, 3.3);   // 明层四
+  add('an',   2.0, 5.1, 3.1);   // 暗层四
+  add('ming', 3.2, 5.0, 3.0);   // 明层五
+})();
+var TOP_Y=stories[stories.length-1].y0+stories[stories.length-1].h;
+
+stories.forEach(function(s,idx){
+  var y0=s.y0, y1=s.y0+s.h, yc=y0+s.h/2;
+  var isMing=s.kind==='ming';
+  var cr=Math.max(0.30-idx*0.008,0.24);   // 柱径逐层收分
+  var k,a,am,ca,sa,mx,mz;
+
+  /* 内外两圈柱 + 柱础 */
+  for(k=0;k<8;k++){
+    a=(k*45+22.5)*D2R; ca=Math.cos(a); sa=Math.sin(a);
+    bWood.cyl(cr,cr*0.9,s.h,10, ca*s.ro,yc,sa*s.ro);
+    bStone.box(cr*2.1,0.24,cr*2.1, ca*s.ro,y0+0.12,sa*s.ro, -a);
+    bWood.cyl(cr*0.85,cr*0.78,s.h,10, ca*s.ri,yc,sa*s.ri);
+    bStone.box(cr*1.8,0.2,cr*1.8, ca*s.ri,y0+0.1,sa*s.ri, -a);
+  }
+
+  /* 层顶梁架：外圈枋 + 内圈枋 +  radial 梁（筒中筒联系梁） */
+  var sl=sideLen(s.ro), sl2=sideLen(s.ri);
+  for(k=0;k<8;k++){
+    am=k*45*D2R; ca=Math.cos(am); sa=Math.sin(am);
+    bWood.box(sl*0.98,0.30,0.34, ca*apo(s.ro),y1-0.20,sa*apo(s.ro), -am);
+    bWood.box(sl*1.02,0.18,0.40, ca*apo(s.ro),y1-0.02,sa*apo(s.ro), -am);
+    bWood.box(sl2*0.96,0.26,0.30, ca*apo(s.ri),y1-0.18,sa*apo(s.ri), -am);
+    a=(k*45+22.5)*D2R;
+    bWood.box(s.ro-s.ri,0.30,0.46, Math.cos(a)*(s.ro+s.ri)/2,y1-0.28,Math.sin(a)*(s.ro+s.ri)/2, -a);
+  }
+
+  if(isMing){
+    var winH=(idx===1)?1.85:1.6;
+    var wTop=y1-0.35;
+    for(k=0;k<8;k++){
+      am=k*45*D2R; mx=Math.cos(am)*apo(s.ro); mz=Math.sin(am)*apo(s.ro);
+      var sl3=sideLen(s.ro)-0.7;
+      var doorBay=(idx===1&&k===2);   // 首层南面开门
+      if(doorBay){
+        /* ---- 板门 ---- */
+        var dw=1.7, dh=2.5, seg=(sl3-dw)/2;
+        bWall.box(seg,wTop-y0-0.3,0.18, TG(mx,mz,am, dw/2+seg/2)[0],(wTop+y0+0.3)/2,TG(mx,mz,am, dw/2+seg/2)[1], -am);
+        bWall.box(seg,wTop-y0-0.3,0.18, TG(mx,mz,am,-(dw/2+seg/2))[0],(wTop+y0+0.3)/2,TG(mx,mz,am,-(dw/2+seg/2))[1], -am);
+        bWall.box(dw+0.5,wTop-(y0+dh+0.2),0.18, mx,(wTop+y0+dh+0.2)/2,mz, -am);
+        bIn.box(dw-0.15,dh-0.1,0.1, RD(mx,mz,am,0.04)[0],y0+dh/2,RD(mx,mz,am,0.04)[1], -am);
+        bWood.box(0.22,dh+0.1,0.28, TG(mx,mz,am, dw/2+0.03)[0],y0+dh/2+0.05,TG(mx,mz,am, dw/2+0.03)[1], -am);
+        bWood.box(0.22,dh+0.1,0.28, TG(mx,mz,am,-(dw/2+0.03))[0],y0+dh/2+0.05,TG(mx,mz,am,-(dw/2+0.03))[1], -am);
+        for(var dr=0;dr<3;dr++) for(var dc=0;dc<3;dc++){
+          var sp=TG(mx,mz,am,(dc-1)*0.52), sr=RD(sp[0],sp[1],am,0.1);
+          bGold.box(0.09,0.09,0.07, sr[0],y0+0.75+dr*0.7,sr[1]);
+        }
+        bStone.box(dw+0.3,0.12,0.4, mx,y0+0.06,mz);
+        var pl=RD(mx,mz,am,0.12);
+        bGold.box(2.0,0.8,0.12, pl[0],y0+3.3,pl[1]);
+      }else{
+        /* ---- 直棂窗（下裙板 + 直棂 + 上部小窗） ---- */
+        var ww=sl3*0.75, wy0=y0+1.05, wy1=wy0+winH;
+        bWall.box(sl3,0.8,0.16, mx,y0+0.65,mz, -am);
+        var bk=RD(mx,mz,am,-0.07);
+        bIn.box(ww,winH,0.08, bk[0],(wy0+wy1)/2,bk[1], -am);
+        for(var bi=0;bi<8;bi++){
+          var off=(bi-3.5)/3.5*(ww/2-0.22);
+          var bp=TG(mx,mz,am,off), br=RD(bp[0],bp[1],am,0.075);
+          bWood.box(0.09,winH,0.07, br[0],(wy0+wy1)/2,br[1], -am);
+        }
+        var r1=RD(mx,mz,am,0.075);
+        bWood.box(ww+0.12,0.1,0.09, r1[0],wy0+0.07,r1[1], -am);
+        bWood.box(ww+0.12,0.1,0.09, r1[0],wy1-0.07,r1[1], -am);
+        var j1=TG(mx,mz,am,ww/2), j2=TG(mx,mz,am,-ww/2);
+        bWood.box(0.14,winH,0.2, j1[0],(wy0+wy1)/2,j1[1], -am);
+        bWood.box(0.14,winH,0.2, j2[0],(wy0+wy1)/2,j2[1], -am);
+        var wy2=wy1+0.28, uh=wTop-wy2-0.08;
+        if(uh>0.3){
+          var ww2=sl3*0.58;
+          bIn.box(ww2,uh,0.08, bk[0],(wy2+wy2+uh)/2,bk[1], -am);
+          for(var bj=0;bj<5;bj++){
+            var off2=(bj-2)/2*(ww2/2-0.2);
+            var bp2=TG(mx,mz,am,off2), br2=RD(bp2[0],bp2[1],am,0.075);
+            bWood.box(0.08,uh,0.07, br2[0],wy2+uh/2,br2[1], -am);
+          }
+          bWood.box(ww2+0.1,0.09,0.09, r1[0],wy2+0.06,r1[1], -am);
+          bWood.box(ww2+0.1,0.09,0.09, r1[0],wy2+uh-0.06,r1[1], -am);
+        }else{
+          bWall.box(sl3,wTop-wy1,0.16, mx,(wTop+wy1)/2,mz, -am);
+        }
+        /* 内壁直棂（自内槽可见） */
+        var bki=RD(mx,mz,am,-0.16);
+        bIn.box(ww,winH,0.08, bki[0],(wy0+wy1)/2,bki[1], -am);
+        for(var bi2=0;bi2<8;bi2++){
+          var off3=(bi2-3.5)/3.5*(ww/2-0.22);
+          var bp3=TG(mx,mz,am,off3), br3=RD(bp3[0],bp3[1],am,-0.26);
+          bWood.box(0.09,winH,0.07, br3[0],(wy0+wy1)/2,br3[1], -am);
+        }
+      }
+    }
+
+    /* 外廊栏杆（寻杖 + 盆唇 + 宝瓶柱） */
+    var rr=s.ro+0.72, sl4=sideLen(rr);
+    for(k=0;k<8;k++){
+      am=k*45*D2R; ca=Math.cos(am)*apo(rr); sa=Math.sin(am)*apo(rr);
+      bWood.box(sl4+0.25,0.12,0.14, ca,y0+0.98,sa, -am);
+      bWood.box(sl4+0.25,0.10,0.12, ca,y0+0.22,sa, -am);
+      for(var rb2=0;rb2<4;rb2++){
+        var toff=(rb2-1.5)/1.5*(sl4/2-0.15);
+        var tp=TG(ca,sa,am,toff);
+        bWood.box(0.1,0.72,0.1, tp[0],y0+0.6,tp[1], -am);
+      }
+    }
+    for(k=0;k<8;k++){
+      a=(k*45+22.5)*D2R;
+      bWood.box(0.18,1.06,0.18, Math.cos(a)*rr,y0+0.53,Math.sin(a)*rr);
+    }
+
+    /* 平坐斗拱（檐廊挑台之下） + 环形楼板（中部留采光井） */
+    if(idx>1){
+      slabGeos.push(addEaveGeo(apo(s.ro)+1.15, apo(s.ri)+0.9, y0, 0, 0, 0.2, false));
+      var fy=y0-0.5;
+      var rO=apo(s.ro)+0.55, rI=apo(s.ri)+0.85, slr=sideLen(s.ro), slr2=sideLen(s.ri);
+      for(k=0;k<8;k++){
+        am=k*45*D2R;
+        bWood.box(slr*0.96,0.26,0.3, Math.cos(am)*rO,fy,Math.sin(am)*rO, -am);
+        bWood.box(slr2*0.96,0.24,0.28, Math.cos(am)*rI,fy,Math.sin(am)*rI, -am);
+        a=(k*45+22.5)*D2R;
+        bWood.box(rO-rI,0.26,0.4, Math.cos(a)*(rO+rI)/2,fy,Math.sin(a)*(rO+rI)/2, -a);
+      }
+    }
+    var rb3=s.ro+0.55, yb3=y0-0.34;
+    for(k=0;k<8;k++){
+      a=(k*45+22.5)*D2R;
+      dougong(Math.cos(a)*rb3,yb3,Math.sin(a)*rb3,-a,0.62);
+      am=k*45*D2R;
+      dougong(Math.cos(am)*rb3,yb3,Math.sin(am)*rb3,-am,0.62);
+    }
+    /* 内槽柱头斗拱（自塔内仰望可见） */
+    var ri2=apo(s.ri)+0.5, yb4=y1-0.88;
+    for(k=0;k<8;k++){
+      a=(k*45+22.5)*D2R;
+      dougong(Math.cos(a)*ri2,yb4,Math.sin(a)*ri2,-a,0.75);
+      am=k*45*D2R;
+      dougong(Math.cos(am)*ri2,yb4,Math.sin(am)*ri2,-am,0.75);
+    }
+  }
+
+  if(s.kind==='an'){
+    /* 暗层：矮墙 + X 形斜撑 + 水平构件 + 短柱 */
+    for(k=0;k<8;k++){
+      am=k*45*D2R; mx=Math.cos(am)*apo(s.ro); mz=Math.sin(am)*apo(s.ro);
+      var sl5=sideLen(s.ro)-0.5;
+      bWall.box(sl5,0.62,0.18, mx,y0+0.31,mz, -am);
+      var bz0=y0+0.62, bz1=y1-0.25, bh=bz1-bz0, byc=(bz0+bz1)/2;
+      var bl=Math.sqrt(sl5*sl5+bh*bh)*0.985, bang=Math.atan2(bh,sl5);
+      var bx=mx-Math.cos(am)*0.1, bz=mz-Math.sin(am)*0.1;
+      bWoodDk.box(0.1,0.2,bl, bx,byc,bz, -am, bang,0);
+      bWoodDk.box(0.1,0.2,bl, bx,byc,bz, -am,-bang,0);
+      bWoodDk.box(sl5*0.92,0.16,0.14, mx,byc,mz, -am);
+      var s1=TG(mx,mz,am,sl5*0.26), s2=TG(mx,mz,am,-sl5*0.26);
+      bWood.box(0.18,bh,0.18, s1[0],byc,s1[1]);
+      bWood.box(0.18,bh,0.18, s2[0],byc,s2[1]);
+    }
+  }
+});
+
+/* ---------- 六重屋檐：副阶檐 + 五层檐（逐层收分）+ 塔刹 ---------- */
+var eaves=[
+  {story:0, rOut:11.9, rise:1.25, uplift:0.85, apex:false},
+  {story:1, rOut:11.0, rise:1.10, uplift:0.75, apex:false},
+  {story:2, rOut:9.6,  rise:1.00, uplift:0.70, apex:false},
+  {story:5, rOut:8.4,  rise:0.90, uplift:0.65, apex:false},
+  {story:7, rOut:7.3,  rise:0.85, uplift:0.60, apex:false},
+  {story:9, rOut:6.3,  rise:3.60, uplift:0.50, apex:true}
+];
+eaves.forEach(function(E){
+  var s=stories[E.story], yEdge=s.y0+s.h;
+  var next=stories[E.story+1];
+  var rIn=E.apex?0:Math.max(next.ro*C22+0.25,2.0);
+  roofGeos.push(addEaveGeo(E.rOut,rIn,yEdge,E.rise,E.uplift,0.22,E.apex));
+  /* 檐下斗拱层 */
+  var rb=s.ro+0.55, yb=yEdge-0.92, k,a,am;
+  for(k=0;k<8;k++){
+    a=(k*45+22.5)*D2R;
+    dougong(Math.cos(a)*rb,yb,Math.sin(a)*rb,-a,1);
+    am=k*45*D2R;
+    dougong(Math.cos(am)*rb,yb,Math.sin(am)*rb,-am,1);
+  }
+  /* 椽子 */
+  for(k=0;k<8;k++){
+    var a0=k*45*D2R;
+    [-13,13].forEach(function(off){
+      var aa=a0+off*D2R;
+      var rE=E.rOut*C22/Math.cos(off*D2R);
+      var len=(rE-rIn)*0.97+0.35, mid=(rE+rIn)/2;
+      var tilt=Math.atan2(E.rise,rE-rIn);
+      bWoodDk.box(len,0.12,0.15, Math.cos(aa)*mid,(yEdge+E.rise*0.5)/2-0.1,Math.sin(aa)*mid, -aa,0,-tilt);
+    });
+  }
+  /* 翼角风铃 */
+  if(!E.apex){
+    for(k=0;k<8;k++){
+      a=(k*45+22.5)*D2R;
+      bGold.cyl(0.03,0.18,0.42,8, Math.cos(a)*E.rOut*0.99, yEdge+E.uplift-0.5, Math.sin(a)*E.rOut*0.99);
+    }
+  }
+  /* 戗脊 + 瓦垄线 */
+  for(k=0;k<8;k++){
+    a=(k*45+22.5)*D2R;
+    var x1=Math.cos(a)*E.rOut, z1=Math.sin(a)*E.rOut, y1=yEdge+E.uplift+0.06;
+    if(E.apex){ bRidge.rod(x1,y1,z1, 0,yEdge+E.rise+0.05,0, 0.12); }
+    else{ bRidge.rod(x1,y1,z1, Math.cos(a)*rIn,yEdge+E.rise+0.06,Math.sin(a)*rIn, 0.12); }
+  }
+  if(!E.apex){
+    for(k=0;k<8;k++){
+      var as2=k*45*D2R, rO=E.rOut*C22, rI2=rIn*C22;
+      var len2=(rO-rI2)*0.94, tilt2=Math.atan2(E.rise,rO-rI2);
+      bRidge.box(len2,0.05,0.09, Math.cos(as2)*(rO+rI2)/2, yEdge+E.rise/2+0.045, Math.sin(as2)*(rO+rI2)/2, -as2,0,-tilt2);
+    }
+  }
+});
+
+/* ---------- 塔刹：刹杆 / 宝盖 / 相轮 / 宝珠 / 刹链 ---------- */
+bGold.cyl(0.7,0.85,0.35,8, 0,TOP_Y+0.35,0);                       // 宝盖
+bGold.cyl(0.09,0.15,5.6,8, 0,TOP_Y+2.75,0);                      // 刹杆
+[0.7,0.62,0.54,0.46,0.38].forEach(function(r,i){                 // 相轮
+  bGold.cyl(r,r*0.92,0.13,10, 0,TOP_Y+1.45+i*0.36,0);
+});
+bGold.sphere(0.34, 0,TOP_Y+3.85,0);                              // 宝珠
+bGold.cyl(0.04,0.04,0.5,6, 0,TOP_Y+4.35,0);
+for(var k2=0;k2<8;k2++){                                          // 刹链
+  var ca2=(k2*45+22.5)*D2R;
+  bGold.rod(Math.cos(ca2)*5.6,TOP_Y+0.55,Math.sin(ca2)*5.6,
+           Math.cos(ca2)*0.3,TOP_Y+2.9,Math.sin(ca2)*0.3, 0.035);
+}
+
+/* ---------- 首层佛像 ---------- */
+var bY=BASE_Y+0.9;
+bWoodDk.box(2.5,0.5,2.5, 0,BASE_Y+0.25,0);
+bWoodDk.box(1.9,0.42,1.9, 0,BASE_Y+0.71,0);
+bGold.cyl(1.05,1.2,0.28,10, 0,BASE_Y+1.06,0);
+var profile=[[0.02,0],[0.6,0],[0.64,0.1],[0.48,0.4],[0.54,0.6],[0.4,0.88],[0.33,1.04],[0.3,1.16],[0.15,1.27],[0.02,1.3]]
+  .map(function(p){ return new THREE.Vector2(p[0],p[1]); });
+var buddha=new THREE.Mesh(new THREE.LatheGeometry(profile,14),matGold);
+buddha.scale.set(1.15,1.15,1.15);
+buddha.position.set(0,bY,0);
+buddha.castShadow=true;
+scene.add(buddha);
+bGold.sphere(0.24, 0,bY+1.62,0);
+bGold.sphere(0.11, 0,bY+1.88,0);
+[-2.1,2.1].forEach(function(ax){                                   // 胁侍
+  bGold.cyl(0.14,0.18,0.55,8, ax,BASE_Y+0.32,0.8);
+  bGold.sphere(0.16, ax,BASE_Y+0.72,0.8);
+  bGold.sphere(0.2, ax,BASE_Y+0.1,0.8);
+});
+
+/* ---------- 合并入场景 ---------- */
+function addMerged(bucket,mat){
+  var m=bucket.build(mat);
+  m.castShadow=true; m.receiveShadow=true;
+  scene.add(m);
+}
+addMerged(bWood,matWood); addMerged(bWoodDk,matWoodDk); addMerged(bWall,matWall);
+addMerged(bIn,matInDk); addMerged(bStone,matStone); addMerged(bGold,matGold);
+addMerged(bTrunk,matTrunk); addMerged(bLeaf,matLeaf); addMerged(bRidge,matRidge);
+if(roofGeos.length){
+  var rm=new THREE.Mesh(mergeGeoms(roofGeos),matRoof);
+  rm.castShadow=true; rm.receiveShadow=true; scene.add(rm);
+}
+if(slabGeos.length){
+  var sm=new THREE.Mesh(mergeGeoms(slabGeos),matWoodDk);
+  sm.castShadow=true; sm.receiveShadow=true; scene.add(sm);
+}
+
+/* ---------- 交互：视角切换 / 双击 / 按钮 ---------- */
+function setView(v){
+  if(v==='in'){
+    camera.position.set(2.6,3.9,2.6);
+    controls.target.set(0,13.5,0);
+  }else{
+    camera.position.set(36,22,42);
+    controls.target.set(0,13,0);
+  }
+  controls.autoRotate=false;
+}
+window.__view=setView;
+function toggleView(){
+  var inside=Math.hypot(camera.position.x,camera.position.z)<9 && camera.position.y<TOP_Y+1;
+  setView(inside?'out':'in');
+}
+renderer.domElement.addEventListener('dblclick',function(e){ e.preventDefault(); toggleView(); });
+document.getElementById('btnIn').addEventListener('click',function(){ setView('in'); });
+document.getElementById('btnOut').addEventListener('click',function(){ setView('out'); });
+
+window.addEventListener('resize',function(){
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+/* ---------- 主循环 ---------- */
+var ready=false;
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene,camera);
+  if(!ready){
+    ready=true;
+    window.__ready=true;
+    var lw=document.getElementById('loadingWrap');
+    if(lw) lw.style.display='none';
+  }
+}
+animate();
+};
+</script>
+</body>
+</html>
