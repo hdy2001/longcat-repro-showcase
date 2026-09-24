@@ -1,987 +1,622 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>祈年殿 · 太和殿 — 粒子点云</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粒子古建 · 祈年殿 / 太和殿</title>
 <style>
-  :root { --ink: #f4f6fa; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-  body {
-    font-family: "Songti SC", "STSong", "STZhongsong", "SimSun", "Noto Serif SC", serif;
-    color: var(--ink);
-    user-select: none; -webkit-user-select: none;
+  html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  #label {
+    position:fixed; left:46px; top:50%; transform:translateY(-50%);
+    display:flex; gap:28px; align-items:flex-start;
+    pointer-events:none; transition:opacity .38s ease;
   }
-  #scene { position: fixed; inset: 0; display: block; cursor: grab; touch-action: none; }
-  #scene:active { cursor: grabbing; }
-  body::after {
-    content: ""; position: fixed; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 55%, rgba(0,0,0,.6) 100%);
+  #label.hide { opacity:0; }
+  #name {
+    writing-mode:vertical-rl;
+    font-family:"Songti SC","STSong","Noto Serif SC",serif;
+    color:#f5f5f5; font-size:58px; font-weight:600; letter-spacing:16px;
+    text-shadow:0 0 22px rgba(255,255,255,.22);
   }
-
-  /* ===== 左侧竖排标题: writing-mode 竖排单列, 不换行 ===== */
-  #title {
-    position: fixed; left: clamp(20px, 4.5vw, 48px); top: 50%;
-    transform: translateY(-50%);
-    writing-mode: vertical-rl; text-orientation: upright;
-    transition: opacity .22s ease, transform .22s ease;
-    z-index: 4;
+  #sub {
+    writing-mode:vertical-rl;
+    font-family:"Songti SC",serif; color:rgba(255,255,255,.48);
+    font-size:13px; letter-spacing:5px; padding-top:8px;
   }
-  #title.swap { opacity: 0; transform: translateY(-50%) translateX(12px); }
-  #title .main {
-    writing-mode: vertical-rl; white-space: nowrap;
-    font-size: clamp(24px, 4.4vh, 38px); letter-spacing: .34em; font-weight: 600;
-    text-shadow: 0 0 16px rgba(255,255,255,.30);
+  #hint {
+    position:fixed; top:26px; right:32px; pointer-events:none;
+    color:rgba(255,255,255,.40); font-family:"Songti SC",serif;
+    font-size:12px; letter-spacing:3px;
   }
-  #title .seal {
-    display: inline-block; border: 1px solid rgba(255,255,255,.85);
-    padding: .22em .10em; font-size: .52em; line-height: 1; letter-spacing: 0;
-    margin-bottom: .85em; font-weight: 400;
-  }
-  #title .sub {
-    writing-mode: vertical-rl; white-space: nowrap;
-    font-family: "Helvetica Neue", Arial, sans-serif;
-    font-size: 10px; letter-spacing: .52em; color: rgba(244,246,250,.5);
-    margin-left: 1.2em;
-  }
-
-  #brand {
-    position: fixed; right: clamp(16px, 3.5vw, 36px); top: 50%; transform: translateY(-50%);
-    writing-mode: vertical-rl; font-family: "Helvetica Neue", Arial, sans-serif;
-    font-size: 10px; letter-spacing: .5em; color: rgba(244,246,250,.38); z-index: 4;
-  }
-
   #nav {
-    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
-    transform: translateX(-50%); display: flex; gap: 14px; z-index: 5;
+    position:fixed; left:50%; bottom:36px; transform:translateX(-50%);
+    display:flex; gap:14px;
   }
   #nav button {
-    font-family: inherit; font-size: 14px; letter-spacing: .3em; text-indent: .3em;
-    padding: 11px 26px; color: rgba(244,246,250,.85);
-    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.22);
-    border-radius: 999px; cursor: pointer;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    transition: background .25s, color .25s, box-shadow .25s, border-color .25s;
+    appearance:none; border:1px solid rgba(255,255,255,.32);
+    background:transparent; color:rgba(255,255,255,.85);
+    font-family:"Songti SC",serif; font-size:14px; letter-spacing:4px;
+    padding:9px 24px 9px 28px; border-radius:999px; cursor:pointer;
+    transition:all .3s ease;
   }
-  #nav button::after { content: attr(data-key); font-size: 9px; vertical-align: 2px; opacity: .45; margin-left: .9em; letter-spacing: 0; }
-  #nav button:hover { background: rgba(255,255,255,.13); }
-  #nav button.active {
-    background: var(--ink); color: #060608; border-color: var(--ink);
-    box-shadow: 0 0 26px rgba(255,255,255,.28);
-  }
-
-  #hint {
-    position: fixed; right: clamp(18px, 3.5vw, 34px); bottom: max(26px, env(safe-area-inset-bottom));
-    font-family: "Helvetica Neue", Arial, sans-serif;
-    font-size: 11px; letter-spacing: .32em; color: rgba(244,246,250,.35); z-index: 4;
-  }
-
-  #loading {
-    position: fixed; inset: 0; background: #000; z-index: 10;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; letter-spacing: .7em; text-indent: .7em; color: rgba(244,246,250,.75);
-    transition: opacity .7s ease;
-  }
-  #loading.done { opacity: 0; pointer-events: none; }
-
-  @media (max-width: 640px) {
-    #title .main { font-size: 22px; }
-    #hint { display: none; }
-  }
+  #nav button:hover { border-color:rgba(255,255,255,.8); }
+  #nav button.active { background:rgba(255,255,255,.92); color:#000; border-color:transparent; }
 </style>
 </head>
 <body>
-<canvas id="scene"></canvas>
-
-<div id="title">
-  <div class="main"><span class="seal" id="tSeal">祈</span><span class="txt" id="tMain">天坛 · 祈年殿</span></div>
-  <div class="sub" id="tSub">HALL OF PRAYER FOR GOOD HARVESTS</div>
-</div>
-<div id="brand">POINT CLOUD · 粒子点云</div>
-<div id="nav">
-  <button id="btn0" data-key="1" class="active">祈年殿</button>
-  <button id="btn1" data-key="2">太和殿</button>
-</div>
+<div id="app"></div>
+<div id="label"><div id="name">祈年殿</div><div id="sub">天坛 · TEMPLE OF HEAVEN</div></div>
 <div id="hint">拖拽旋转 · 滚轮缩放</div>
-<div id="loading">正在凝聚粒子</div>
+<div id="nav"><button id="btn0" class="active">祈 年 殿</button><button id="btn1">太 和 殿</button></div>
 
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
 <script>
-'use strict';
-/* ============================================================
- * 祈年殿 · 太和殿 — 粒子点云
- * 零依赖 Canvas 渲染器: 加色混合粒子 + 透视投影 + 轨道交互
- * ============================================================ */
+(function () {
+  'use strict';
 
-/* ---------------- 基础工具(全部显式声明) ---------------- */
-const TAU = Math.PI * 2;
-const FOV = 38 * Math.PI / 180;
-const clamp = (v, a, b) => (v < a ? a : (v > b ? b : v));
-const lerp = (a, b, t) => a + (b - a) * t;
-const rnd = (a, b) => { if (b === undefined) { b = a; a = 0; } return a + Math.random() * (b - a); };
-const jit = (c, amt) => [clamp(c[0] + rnd(-amt, amt), 0, 255), clamp(c[1] + rnd(-amt, amt), 0, 255), clamp(c[2] + rnd(-amt, amt), 0, 255)];
-const mix3 = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
-const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  /* ============ renderer / scene / camera ============ */
+  var container = document.getElementById('app');
+  var renderer = new THREE.WebGLRenderer({ antialias:false, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 1);
+  container.appendChild(renderer.domElement);
 
-/* ---------------- 调色板 ---------------- */
-const COL = {
-  marble:   [226, 232, 240],
-  marbleHi: [240, 244, 250],
-  blueTile: [122, 162, 224],
-  blueDeep: [84, 122, 200],
-  gold:     [255, 199, 105],
-  goldHot:  [255, 226, 150],
-  green:    [96, 204, 152],
-  warm:     [255, 208, 152],
-  silver:   [232, 238, 246],
-  white:    [255, 255, 255]
-};
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(62, 34, 84);
 
-/* ---------------- 点云容器 ---------------- */
-class Cloud {
-  constructor() { this.p = []; this.c = []; this.s = []; this.ph = []; this.am = []; }
-  push(x, y, z, r, g, b, size, amp) {
-    this.p.push(x, y, z);
-    this.c.push(r, g, b);
-    this.s.push(size === undefined ? 0.016 : size);
-    this.ph.push(Math.random() * TAU);
-    this.am.push(amp === undefined ? 0.014 : amp);
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 15, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.enablePan = false;
+  controls.minDistance = 30;
+  controls.maxDistance = 230;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.45;
+
+  /* ============ shaders ============ */
+  var VERT = [
+    'attribute vec3 aOut;',
+    'attribute vec3 aColor;',
+    'attribute vec4 aMisc;', // phase, delay, floatAmp, sizeJitter
+    'uniform float uTime;',
+    'uniform float uMorph;',
+    'uniform float uPixelFactor;',
+    'uniform float uSize;',
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'void main(){',
+    '  float t = clamp(uMorph * (1.0 + aMisc.y) - aMisc.y, 0.0, 1.0);',
+    '  t = t * t * (3.0 - 2.0 * t);',
+    '  vec3 p = mix(position, aOut, t);',
+    '  float ph = aMisc.x;',
+    '  float amp = aMisc.z;',
+    '  p.x += sin(uTime * 0.55 + ph * 1.7) * amp * 0.7;',
+    '  p.y += sin(uTime * 0.75 + ph) * amp;',
+    '  p.z += cos(uTime * 0.62 + ph * 2.3) * amp * 0.7;',
+    '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+    '  gl_Position = projectionMatrix * mv;',
+    '  float size = uSize * aMisc.w * (1.0 - 0.45 * t);',
+    '  gl_PointSize = clamp(size * uPixelFactor / -mv.z, 1.0, 5.0);',
+    '  vColor = aColor;',
+    '  vAlpha = 1.0 - 0.35 * t;',
+    '}'
+  ].join('\n');
+
+  var FRAG = [
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'void main(){',
+    '  vec2 uv = gl_PointCoord - 0.5;',
+    '  float d = length(uv);',
+    '  float a = smoothstep(0.5, 0.10, d);',
+    '  gl_FragColor = vec4(vColor, a * vAlpha);',
+    '}'
+  ].join('\n');
+
+  var pixelFactor = 1000;
+  function updatePixelFactor() {
+    pixelFactor = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)));
   }
-  build() {
-    const n = this.p.length / 3;
-    const pos = new Float32Array(this.p);
-    const col = new Float32Array(this.c);
-    const size = new Float32Array(this.s);
-    const ph = new Float32Array(this.ph);
-    const am = new Float32Array(this.am);
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (let i = 0; i < n; i++) {
-      const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-    }
-    /* 以包围盒中心为原点, 保证建筑位于画面中央 */
-    const ox = (minX + maxX) / 2, oy = (minY + maxY) / 2, oz = (minZ + maxZ) / 2;
-    for (let i = 0; i < n; i++) { pos[i * 3] -= ox; pos[i * 3 + 1] -= oy; pos[i * 3 + 2] -= oz; }
-    return { n: n, pos: pos, col: col, size: size, ph: ph, am: am,
-             w: maxX - minX, h: maxY - minY, d: maxZ - minZ };
+  updatePixelFactor();
+
+  function makeMaterial(size) {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uMorph: { value: 0 },
+        uPixelFactor: { value: pixelFactor },
+        uSize: { value: size }
+      },
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
   }
-}
 
-/* ============================================================
- * 几何采样工具
- * ============================================================ */
-
-/* 圆环 */
-function ring(c, R, y, n, col, size, amp) {
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU + rnd(-0.012, 0.012);
-    const r = R + rnd(-0.015, 0.015);
-    c.push(Math.cos(a) * r, y + rnd(-0.015, 0.015), Math.sin(a) * r, col[0], col[1], col[2], size, amp);
+  /* ============ cloud builder ============ */
+  function CloudBuilder() { return { home: [], color: [], misc: [] }; }
+  function put(b, x, y, z, r, g, bl, boost) {
+    var j = (0.66 + Math.random() * 0.40) * (boost || 1);
+    b.home.push(x, y, z);
+    b.color.push(r * j, g * j, bl * j);
+    b.misc.push(
+      Math.random() * Math.PI * 2,
+      Math.random() * 0.40,
+      0.08 + Math.random() * 0.08,
+      0.75 + Math.random() * 0.50
+    );
   }
-}
+  function pick(p, a, b) { return Math.random() < p ? a : b; }
 
-/* 环形面(台面可见环带) */
-function annulus(c, rIn, rOut, y, n, col, size) {
-  for (let i = 0; i < n; i++) {
-    const u = Math.random();
-    const r = Math.sqrt(lerp(rIn * rIn, rOut * rOut, u));
-    const a = Math.random() * TAU;
-    c.push(Math.cos(a) * r, y + rnd(-0.006, 0.006), Math.sin(a) * r, col[0], col[1], col[2], size);
-  }
-}
-
-/* 圆形台基层 */
-function roundTier(c, R, y0, h, o) {
-  const nSide = o.nSide, nTop = o.nTop;
-  for (let i = 0; i < nSide; i++) {
-    const a = Math.random() * TAU;
-    const y = y0 + Math.random() * h;
-    c.push(Math.cos(a) * (R + rnd(-0.02, 0.02)), y, Math.sin(a) * (R + rnd(-0.02, 0.02)),
-           o.col[0], o.col[1], o.col[2], 0.016);
-  }
-  annulus(c, o.rIn || 0, R, y0 + h, nTop, mix3(o.col, COL.white, 0.22), 0.014);
-  ring(c, R, y0 + h, o.nRim, o.rimCol || COL.marbleHi, 0.02, 0.008);
-  ring(c, R, y0 + 0.02, Math.round(o.nRim * 0.6), o.col, 0.016, 0.008);
-}
-
-/* 圆形栏杆 */
-function balustradeRound(c, R, y, o) {
-  const posts = o.posts, railN = o.railN;
-  const pr = R + 0.03;
-  for (let k = 0; k < posts; k++) {
-    const a = (k / posts) * TAU;
-    const x = Math.cos(a) * pr, z = Math.sin(a) * pr;
-    for (let j = 0; j < 4; j++) {
-      c.push(x + rnd(-0.008, 0.008), y + (j / 3) * 0.26, z + rnd(-0.008, 0.008),
-             o.col[0], o.col[1], o.col[2], 0.015, 0.006);
-    }
-    c.push(x, y + 0.30, z, COL.white[0], COL.white[1], COL.white[2], 0.02, 0.006);
-  }
-  ring(c, pr, y + 0.10, railN, mix3(o.col, COL.white, 0.15), 0.012, 0.005);
-  ring(c, pr, y + 0.26, railN, o.col, 0.012, 0.005);
-}
-
-/* 矩形周长取点: hw/hd 为半宽半深, t∈[0,1) */
-function rectPerim(hw, hd, t) {
-  const lw = 2 * hw, ld = 2 * hd, per = 2 * (lw + ld);
-  let s = (((t % 1) + 1) % 1) * per;
-  if (s < lw) return [-hw + s, hd];
-  s -= lw;
-  if (s < ld) return [hw, hd - s];
-  s -= ld;
-  if (s < lw) return [hw - s, -hd];
-  s -= lw;
-  return [-hw, -hd + s];
-}
-
-function rectRing(c, hw, hd, y, n, col, size, amp) {
-  for (let i = 0; i < n; i++) {
-    const p = rectPerim(hw, hd, i / n + rnd(-0.002, 0.002));
-    c.push(p[0] + rnd(-0.008, 0.008), y + rnd(-0.008, 0.008), p[1] + rnd(-0.008, 0.008),
-           col[0], col[1], col[2], size, amp);
-  }
-}
-
-/* 矩形周长竖带(彩画/额枋), colFn(x, z, y) */
-function rectBand(c, hw, hd, y0, y1, n, colFn, size) {
-  for (let i = 0; i < n; i++) {
-    const p = rectPerim(hw, hd, Math.random());
-    const y = lerp(y0, y1, Math.random());
-    const col = colFn(p[0], p[1], y);
-    c.push(p[0], y, p[1], col[0], col[1], col[2], size);
-  }
-}
-
-/* 矩形台基 */
-function rectTier(c, hw, hd, y0, h, o) {
-  const nSide = o.nSide, nTop = o.nTop;
-  for (let i = 0; i < nSide; i++) {
-    const p = rectPerim(hw, hd, Math.random());
-    const y = y0 + Math.random() * h;
-    c.push(p[0] + rnd(-0.015, 0.015), y, p[1] + rnd(-0.015, 0.015), o.col[0], o.col[1], o.col[2], 0.016);
-  }
-  for (let i = 0; i < nTop; i++) {
-    c.push(rnd(-hw, hw), y0 + h + rnd(-0.006, 0.006), rnd(-hd, hd),
-           o.col[0], o.col[1], o.col[2], 0.014);
-  }
-  rectRing(c, hw, hd, y0 + h, o.nRim, o.rimCol || COL.marbleHi, 0.02, 0.008);
-  rectRing(c, hw, hd, y0 + 0.02, Math.round(o.nRim * 0.55), o.col, 0.016, 0.008);
-}
-
-/* 矩形栏杆(正面可留楼梯口) */
-function balustradeRect(c, hw, hd, y, o) {
-  const per = 4 * (hw + hd);
-  const nPosts = o.posts, spacing = per / nPosts;
-  for (let k = 0; k < nPosts; k++) {
-    const p = rectPerim(hw, hd, (k * spacing) / per);
-    if (o.gap && Math.abs(p[0]) < o.gapW && p[1] > hd - 0.01) continue;
-    const x = p[0] + 0.03, z = p[1] + 0.03;
-    for (let j = 0; j < 4; j++) {
-      c.push(x + rnd(-0.008, 0.008), y + (j / 3) * 0.26, z + rnd(-0.008, 0.008),
-             o.col[0], o.col[1], o.col[2], 0.015, 0.006);
-    }
-    c.push(x, y + 0.30, z, COL.white[0], COL.white[1], COL.white[2], 0.02, 0.006);
-  }
-  rectRing(c, hw + 0.03, hd + 0.03, y + 0.10, o.railN, mix3(o.col, COL.white, 0.15), 0.012, 0.005);
-  rectRing(c, hw + 0.03, hd + 0.03, y + 0.26, o.railN, o.col, 0.012, 0.005);
-}
-
-/* 柱子 */
-function column(c, x, z, y0, y1, r, col, n, size) {
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    const a = Math.random() * TAU;
-    const rr = r * Math.sqrt(Math.random());
-    c.push(x + Math.cos(a) * rr, y0 + (y1 - y0) * t, z + Math.sin(a) * rr,
-           col[0], col[1], col[2], size);
-  }
-}
-
-/* 圆形竖带(额枋/斗拱带), colFn(a, y) */
-function band(c, R, y0, y1, n, colFn, size) {
-  for (let i = 0; i < n; i++) {
-    const a = Math.random() * TAU;
-    const y = lerp(y0, y1, Math.random());
-    const col = colFn(a, y);
-    c.push(Math.cos(a) * (R + rnd(-0.012, 0.012)), y, Math.sin(a) * (R + rnd(-0.012, 0.012)),
-           col[0], col[1], col[2], size);
-  }
-}
-
-/* 台阶: 沿方向 ang 从外侧低点 (z0, y0) 升到内侧高点 (z1, y1) */
-function stairFlight(c, ang, z0, z1, y0, y1, w, o) {
-  const dx = Math.cos(ang), dz = Math.sin(ang);
-  const px = -dz, pz = dx;
-  const off = o.off || 0;
-  const steps = o.steps || 5;
-  const treadN = o.tread || 7;
-  const run = (z0 - z1) / steps;
-  for (let i = 0; i < steps; i++) {
-    const t0 = i / steps, t1 = (i + 1) / steps;
-    const za = lerp(z0, z1, t0), zb = lerp(z0, z1, t1);
-    const ya = lerp(y0, y1, t0), yb = lerp(y0, y1, t1);
-    for (let k = 0; k < treadN; k++) {
-      const oo = -w / 2 + w * (k / (treadN - 1)) + rnd(-0.02, 0.02) + off;
-      c.push(px * oo + dx * (zb - run * 0.5), yb + 0.014, pz * oo + dz * (zb - run * 0.5),
-             o.col[0], o.col[1], o.col[2], 0.015, 0.006);
-    }
-    for (let k = 0; k < 3; k++) {
-      const oo = -w / 2 + w * (k / 2) + off;
-      c.push(px * oo + dx * za, lerp(ya, yb, k / 2), pz * oo + dz * za,
-             o.col[0], o.col[1], o.col[2], 0.015, 0.006);
+  function spherePt(b, cx, cy, cz, rad, n, rgb, shell) {
+    for (var i = 0; i < n; i++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2;
+      var s = Math.sqrt(1 - u * u);
+      var rr = shell ? rad * (0.68 + 0.32 * Math.random()) : rad * Math.cbrt(Math.random());
+      put(b, cx + s * Math.cos(th) * rr, cy + u * rr, cz + s * Math.sin(th) * rr, rgb[0], rgb[1], rgb[2]);
     }
   }
-  for (let s = -1; s <= 1; s += 2) {
-    for (let k = 0; k <= 12; k++) {
-      const t = k / 12;
-      c.push(px * (s * w / 2 + off) + dx * lerp(z0, z1, t), lerp(y0, y1, t) + 0.045,
-             pz * (s * w / 2 + off) + dz * lerp(z0, z1, t), o.edgeCol[0], o.edgeCol[1], o.edgeCol[2], 0.014, 0.005);
+  function linePt(b, x0, y0, z0, x1, y1, z1, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var t = Math.random();
+      put(b,
+        x0 + (x1 - x0) * t + (Math.random() - 0.5) * 0.08,
+        y0 + (y1 - y0) * t + (Math.random() - 0.5) * 0.08,
+        z0 + (z1 - z0) * t + (Math.random() - 0.5) * 0.08,
+        rgb[0], rgb[1], rgb[2]);
     }
   }
-}
-
-/* 攒尖圆顶(祈年殿三重檐之一): 檐口圆 (R1,y1) → 顶圆 (R2,y2), 带凹曲与檐口起翘 */
-function coneRoof(c, R1, y1, R2, y2, o) {
-  const n = o.n, up = o.up, sag = o.sag;
-  for (let i = 0; i < n; i++) {
-    const t = Math.pow(Math.random(), 0.92);
-    const a = Math.random() * TAU;
-    const r = lerp(R1, R2, Math.pow(t, 1.25)) + rnd(-0.014, 0.014);
-    const y = lerp(y1, y2, t) + up * Math.pow(1 - t, 6) - sag * Math.sin(Math.PI * t);
-    let col = o.colFn(t);
-    if (Math.random() < 0.05) col = mix3(col, COL.white, 0.65);
-    c.push(Math.cos(a) * r, y + rnd(-0.01, 0.01), Math.sin(a) * r, col[0], col[1], col[2], o.size, 0.010);
-  }
-  /* 檐口双线(厚度) */
-  ring(c, R1, y1 + up, o.rimN, o.rimCol, 0.021, 0.006);
-  ring(c, R1 - 0.02, y1 + up - 0.07, Math.round(o.rimN * 0.6), mix3(o.rimCol, COL.blueDeep, 0.3), 0.015, 0.006);
-  /* 放射脊线 */
-  for (let k = 0; k < o.ridges; k++) {
-    const a = (k / o.ridges) * TAU + (o.ridgeOffset || 0);
-    for (let i = 0; i < o.ridgeN; i++) {
-      const t = i / (o.ridgeN - 1);
-      const r = lerp(R1, R2, Math.pow(t, 1.25));
-      const y = lerp(y1, y2, t) + up * Math.pow(1 - t, 6) - sag * Math.sin(Math.PI * t) + 0.03;
-      const rc = Math.random() < 0.06 ? COL.white : o.ridgeCol;
-      c.push(Math.cos(a) * r, y, Math.sin(a) * r, rc[0], rc[1], rc[2], 0.018, 0.006);
+  // curved Chinese roof cone: steep at ridge, flattening + upturned at eave
+  function roofCone(b, N, rT, zT, rB, zB, curl, colorFn) {
+    for (var i = 0; i < N; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var t = Math.pow(Math.random(), 0.85);
+      var r = rT + (rB - rT) * t;
+      var z = zT + (zB - zT) * Math.pow(t, 0.55);
+      if (t > 0.88) { var u = (t - 0.88) / 0.12; z += curl * u * u; }
+      var rr = r + (Math.random() - 0.5) * 0.1;
+      var zz = z + (Math.random() - 0.5) * 0.1;
+      var c = colorFn(th, t);
+      put(b, rr * Math.cos(th), zz, rr * Math.sin(th), c[0], c[1], c[2]);
     }
   }
-  /* 顶部收环 */
-  ring(c, Math.max(R2, 0.05), y2, 90, o.rimCol, 0.018, 0.005);
-}
-
-/* 脊线 */
-function hipLine(c, p0, p1, n, col) {
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    c.push(lerp(p0[0], p1[0], t), lerp(p0[1], p1[1], t) + Math.sin(t * Math.PI) * 0.02,
-           lerp(p0[2], p1[2], t), col[0], col[1], col[2], 0.017, 0.005);
-  }
-}
-
-/* 吻兽 */
-function beast(c, x, y, col) {
-  for (let j = 0; j < 26; j++) {
-    const t = Math.random();
-    const a = Math.random() * TAU;
-    const rr = 0.10 * Math.sqrt(Math.random()) * (1 - t * 0.4);
-    c.push(x + Math.cos(a) * rr, y + t * 0.34, Math.sin(a) * rr, col[0], col[1], col[2], 0.02, 0.005);
-  }
-}
-
-/* 四坡顶(上层庑殿 / 下层副阶檐通用):
-   檐口矩形 (ex,ez)@ey → 顶部 (tx,tz)@ty (tz=0 时即庑殿正脊) */
-function hipRoof(c, ex, ez, ey, tx, ty, tz, o) {
-  const wf = o.wf, ws = o.ws, up = o.up, sag = o.sag;
-  for (let i = 0; i < o.n; i++) {
-    const pick = Math.random();
-    let x, y, z, tt;
-    if (pick < wf) {                       /* 前坡 */
-      const u = Math.random(), v = Math.random();
-      x = lerp(lerp(-ex, ex, u), lerp(-tx, tx, u), v);
-      z = lerp(ez, tz, v);
-      y = lerp(ey, ty, v) - sag * Math.sin(Math.PI * v) + up * Math.pow(1 - v, 6);
-      tt = v;
-    } else if (pick < wf * 2) {           /* 后坡 */
-      const u = Math.random(), v = Math.random();
-      x = lerp(lerp(ex, -ex, u), lerp(tx, -tx, u), v);
-      z = lerp(-ez, -tz, v);
-      y = lerp(ey, ty, v) - sag * Math.sin(Math.PI * v) + up * Math.pow(1 - v, 6);
-      tt = v;
-    } else if (pick < wf * 2 + ws) {      /* 右山(三角坡) */
-      const a2 = Math.random(), b2 = Math.random();
-      let u = a2, v = b2;
-      if (u + v > 1) { u = 1 - u; v = 1 - v; }
-      const s = u + v;
-      x = tx + s * (ex - tx);
-      z = tz + (u - v) * (ez - tz);
-      y = ty + s * (ey - ty) - sag * Math.sin(Math.PI * s) * 0.7 + up * Math.pow(1 - s, 6) * 0.8;
-      tt = s;
-    } else {                               /* 左山(三角坡) */
-      const a2 = Math.random(), b2 = Math.random();
-      let u = a2, v = b2;
-      if (u + v > 1) { u = 1 - u; v = 1 - v; }
-      const s = u + v;
-      x = -tx + s * (-ex + tx);
-      z = -tz + (u - v) * (ez - tz);
-      y = ty + s * (ey - ty) - sag * Math.sin(Math.PI * s) * 0.7 + up * Math.pow(1 - s, 6) * 0.8;
-      tt = s;
-    }
-    let col = o.colFn(tt);
-    if (Math.random() < 0.05) col = mix3(col, COL.white, 0.6);
-    c.push(x, y + rnd(-0.008, 0.008), z, col[0], col[1], col[2], o.size, 0.010);
-  }
-  /* 檐口双线 */
-  rectRing(c, ex, ez, ey + 0.012, o.rimN, o.rimCol, 0.021, 0.006);
-  rectRing(c, ex, ez, ey - 0.07, Math.round(o.rimN * 0.55), mix3(o.rimCol, COL.blueDeep, 0.25), 0.014, 0.006);
-  /* 四角起翘 */
-  const corners = [[ex, ez], [ex, -ez], [-ex, -ez], [-ex, ez]];
-  for (let k = 0; k < corners.length; k++) {
-    const cx = corners[k][0], cz = corners[k][1];
-    for (let j = 0; j < 14; j++) {
-      const along = (j / 14) * 0.3;
-      const sx = cx > 0 ? -1 : 1, sz = cz > 0 ? -1 : 1;
-      const lift = 0.05 * (1 - along / 0.3) + 0.01;
-      if (k % 2 === 0) c.push(cx + sx * along, ey + lift, cz, o.rimCol[0], o.rimCol[1], o.rimCol[2], 0.018, 0.006);
-      else c.push(cx, ey + lift, cz + sz * along, o.rimCol[0], o.rimCol[1], o.rimCol[2], 0.018, 0.006);
+  // hip roof (庑殿顶) heightfield over a rect plan, ridge along x
+  function roofHip(b, N, eX, eZ, eY, rY, rHalf, colorFn, curl) {
+    for (var i = 0; i < N; i++) {
+      var x = (Math.random() * 2 - 1) * eX;
+      var z = (Math.random() * 2 - 1) * eZ;
+      var hf = Math.max(0, Math.abs(x) - rHalf) / (eX - rHalf);
+      var ef = Math.abs(z) / eZ;
+      var m = Math.max(hf, ef);
+      var y = rY - (rY - eY) * Math.pow(m, 0.85);
+      y += curl * Math.pow(hf * ef, 2.0); // upturned corners
+      y += (Math.random() - 0.5) * 0.1;
+      var c = colorFn(x, z, m);
+      put(b, x + (Math.random() - 0.5) * 0.1, y, z + (Math.random() - 0.5) * 0.1, c[0], c[1], c[2]);
     }
   }
-  /* 垂脊(四) */
-  hipLine(c, [tx, ty + 0.02, tz], [ex, ey + 0.03, ez], o.hipN, o.hipCol);
-  hipLine(c, [tx, ty + 0.02, tz], [ex, ey + 0.03, -ez], o.hipN, o.hipCol);
-  hipLine(c, [-tx, ty + 0.02, tz], [-ex, ey + 0.03, -ez], o.hipN, o.hipCol);
-  hipLine(c, [-tx, ty + 0.02, tz], [-ex, ey + 0.03, ez], o.hipN, o.hipCol);
-  if (o.ridge) {
-    /* 正脊(带微拱) */
-    const rxx = tx + (o.ridgeOver || 0.22);
-    for (let i = 0; i < o.ridgeN; i++) {
-      const t = i / (o.ridgeN - 1);
-      const x = lerp(-rxx, rxx, t);
-      const y = ty + 0.05 + 0.06 * (1 - Math.pow(x / rxx, 2));
-      const rc = Math.random() < 0.08 ? COL.white : o.hipCol;
-      c.push(x, y, rnd(-0.03, 0.03), rc[0], rc[1], rc[2], 0.02, 0.005);
-      c.push(x, y - 0.06, rnd(-0.02, 0.02), rc[0], rc[1], rc[2], 0.015, 0.005);
+  function rimRingCone(b, r, z, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var rr = r + (Math.random() - 0.5) * 0.12;
+      put(b, rr * Math.cos(th), z + (Math.random() - 0.5) * 0.12, rr * Math.sin(th), rgb[0], rgb[1], rgb[2]);
     }
-    /* 吻兽 + 垂脊兽 */
-    beast(c, -rxx + 0.05, ty + 0.04, o.hipCol);
-    beast(c, rxx - 0.05, ty + 0.04, o.hipCol);
-    for (let k = 0; k < 4; k++) {
-      const sx = k < 2 ? 1 : -1, sz = k % 2 === 0 ? 1 : -1;
-      for (let j = 0; j < 4; j++) {
-        const t = 0.90 + j * 0.028;
-        c.push(lerp(sx * tx, sx * ex, t), lerp(ty, ey, t) + 0.04,
-               lerp(sz * tz, sz * ez, t), o.hipCol[0], o.hipCol[1], o.hipCol[2], 0.018, 0.004);
+  }
+  function rectPerimeter(w, d, t) { // t in [0,1) along rect outline
+    var p = t * 2 * (w + d);
+    if (p < w) return [-w / 2 + p, -d / 2];
+    p -= w;
+    if (p < d) return [w / 2, -d / 2 + p];
+    p -= d;
+    if (p < w) return [w / 2 - p, d / 2];
+    p -= w;
+    return [-w / 2, d / 2 - p];
+  }
+  function rimRect(b, w, d, y, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w, d, Math.random());
+      put(b, xz[0] + (Math.random() - 0.5) * 0.12, y + (Math.random() - 0.5) * 0.12, xz[1], rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function wallRing(b, r, y0, y1, segs, per, colorFn) {
+    for (var i = 0; i < segs; i++) {
+      var th = (i / segs) * Math.PI * 2;
+      for (var k = 0; k < per; k++) {
+        var t = k / per;
+        var c = colorFn(th, t);
+        put(b,
+          (r + (Math.random() - 0.5) * 0.08) * Math.cos(th),
+          y0 + (y1 - y0) * t + (Math.random() - 0.5) * 0.1,
+          (r + (Math.random() - 0.5) * 0.08) * Math.sin(th),
+          c[0], c[1], c[2]);
       }
     }
   }
-}
-
-/* 宝顶小球 */
-function finialBall(c, cy, r, col, n) {
-  for (let i = 0; i < n; i++) {
-    const u = rnd(-1, 1), a = Math.random() * TAU, s = Math.sqrt(1 - u * u);
-    c.push(r * s * Math.cos(a), cy + r * u, r * s * Math.sin(a), col[0], col[1], col[2], 0.02, 0.008);
+  function bracketBand(b, r, y, n, cA, cB) {
+    for (var i = 0; i < n; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var seg = Math.floor(th / (Math.PI * 2) * 40);
+      var c = seg % 2 === 0 ? cA : cB;
+      var rr = r + (Math.random() - 0.5) * 0.35;
+      put(b, rr * Math.cos(th), y + (Math.random() - 0.5) * 0.4, rr * Math.sin(th), c[0], c[1], c[2]);
+    }
   }
-}
+  function bracketBandRect(b, w, d, y, n, cA, cB) {
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w, d, Math.random());
+      var seg = Math.floor(Math.random() * 48);
+      var c = seg % 2 === 0 ? cA : cB;
+      put(b,
+        xz[0] + (Math.random() - 0.5) * 0.35,
+        y + (Math.random() - 0.5) * 0.4,
+        xz[1] + (Math.random() - 0.5) * 0.35,
+        c[0], c[1], c[2]);
+    }
+  }
+  function column(b, x, z, y0, y1, per, rgb) {
+    for (var k = 0; k < per; k++) {
+      var t = k / (per - 1);
+      put(b, x + (Math.random() - 0.5) * 0.09, y0 + (y1 - y0) * t, z + (Math.random() - 0.5) * 0.09, rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function terrace(b, w, d, y0, y1, cTop, cSide, cEdge) {
+    var i, x, z;
+    for (i = 0; i < 2400; i++) { // top face
+      x = (Math.random() * 2 - 1) * w / 2; z = (Math.random() * 2 - 1) * d / 2;
+      put(b, x, y1 + 0.03, z, cTop[0], cTop[1], cTop[2]);
+    }
+    for (i = 0; i < 2400; i++) { // side faces, denser toward edges
+      var face = Math.floor(Math.random() * 4);
+      var v = Math.pow(Math.random(), 0.65), u = Math.random();
+      var y = y0 + (y1 - y0) * v;
+      if (face === 0) { x = (u * 2 - 1) * w / 2; z = d / 2 + 0.02; }
+      else if (face === 1) { x = (u * 2 - 1) * w / 2; z = -d / 2 - 0.02; }
+      else if (face === 2) { x = w / 2 + 0.02; z = (u * 2 - 1) * d / 2; }
+      else { x = -w / 2 - 0.02; z = (u * 2 - 1) * d / 2; }
+      put(b, x, y, z, cSide[0], cSide[1], cSide[2]);
+    }
+    for (i = 0; i < 700; i++) { // top edge line
+      var xz = rectPerimeter(w, d, Math.random());
+      put(b, xz[0], y1 + 0.03, xz[1], cEdge[0], cEdge[1], cEdge[2]);
+    }
+    for (i = 0; i < 350; i++) { // waist line
+      var xz2 = rectPerimeter(w, d, Math.random());
+      put(b, xz2[0], (y0 + y1) / 2, xz2[1], cSide[0] * 0.8, cSide[1] * 0.8, cSide[2] * 0.8);
+    }
+  }
+  function balustrade(b, w, d, y, spacing, rgbPost, rgbTip) {
+    var per = 2 * (w + d), n = Math.floor(per / spacing);
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w - 0.6, d - 0.6, i / n);
+      for (var k = 0; k < 4; k++) put(b, xz[0], y + 0.06 + k * 0.14, xz[1], rgbPost[0], rgbPost[1], rgbPost[2]);
+      put(b, xz[0], y + 0.62, xz[1], rgbTip[0], rgbTip[1], rgbTip[2]);
+    }
+  }
+  function stairs(b, x0, x1, zTop, zBot, yTop, yBot, cStep, cEdge) {
+    var steps = 12, dz = (zBot - zTop) / steps, s, k, x;
+    for (s = 0; s < steps; s++) {
+      var yA = yTop + (yBot - yTop) * s / steps;
+      var yB = yTop + (yBot - yTop) * (s + 1) / steps;
+      var zB = zTop + dz * (s + 1);
+      for (k = 0; k < 14; k++) { x = x0 + (x1 - x0) * k / 13; put(b, x, yB + 0.03, zB - dz * 0.45, cStep[0], cStep[1], cStep[2]); }
+      for (k = 0; k < 6; k++) { x = x0 + (x1 - x0) * k / 5; put(b, x, yB + (yA - yB) * k / 5 + 0.02, zB, cStep[0] * 0.85, cStep[1] * 0.85, cStep[2] * 0.85); }
+    }
+    for (k = 0; k < 70; k++) {
+      var t = k / 69;
+      put(b, x0 - 0.4, yTop + (yBot - yTop) * t, zTop + (zBot - zTop) * t, cEdge[0], cEdge[1], cEdge[2]);
+      put(b, x1 + 0.4, yTop + (yBot - yTop) * t, zTop + (zBot - zTop) * t, cEdge[0], cEdge[1], cEdge[2]);
+    }
+  }
 
-/* ============================================================
- * 祈年殿: 三重檐圆形攒尖顶 + 三层圆坛
- * ============================================================ */
-function buildQini() {
-  const c = new Cloud();
+  /* ============ palettes (kept below 1.0 to avoid additive blowout) ============ */
+  var SILVER   = [0.58, 0.60, 0.64];
+  var SILVER_HI= [0.78, 0.80, 0.84];
+  var MARBLE  = [0.56, 0.58, 0.62];
+  var BLUE     = [0.10, 0.25, 0.62];
+  var BLUE_SL  = [0.40, 0.48, 0.70];
+  var GOLD     = [0.80, 0.58, 0.22];
+  var RED      = [0.52, 0.10, 0.10];
+  var DARKRED  = [0.30, 0.08, 0.08];
+  var GREEN    = [0.15, 0.45, 0.28];
+  var RIM_Q    = [0.52, 0.70, 0.90];
 
-  /* ---- 三层汉白玉圆坛 ---- */
-  const tiers = [
-    { R: 3.62, y: 0.00, h: 0.34 },
-    { R: 3.16, y: 0.40, h: 0.34 },
-    { R: 2.72, y: 0.80, h: 0.34 }
-  ];
-  tiers.forEach(function (t, idx) {
-    roundTier(c, t.R, t.y, t.h, {
-      nSide: 1500, nTop: 750, nRim: 520,
-      col: COL.marble, rimCol: COL.marbleHi,
-      rIn: idx === 2 ? 0 : tiers[idx + 1].R
+  /* ============ 祈年殿 ============ */
+  function buildQinian() {
+    var b = CloudBuilder(), i;
+    // three circular terraces + balustrades
+    var tiers = [ { r: 14.6, y0: 0, y1: 1.3 }, { r: 13.6, y0: 1.3, y1: 2.6 }, { r: 12.6, y0: 2.6, y1: 3.9 } ];
+    for (i = 0; i < 3; i++) {
+      var tr = tiers[i];
+      for (var k = 0; k < 2400; k++) {
+        var rr = tr.r * Math.sqrt(Math.random()), th = Math.random() * Math.PI * 2;
+        put(b, rr * Math.cos(th), tr.y1 + 0.03, rr * Math.sin(th), MARBLE[0], MARBLE[1], MARBLE[2]);
+      }
+      for (k = 0; k < 2400; k++) {
+        th = Math.random() * Math.PI * 2;
+        var y = tr.y0 + (tr.y1 - tr.y0) * Math.pow(Math.random(), 0.65);
+        var rad = tr.r + 0.02;
+        put(b, rad * Math.cos(th), y, rad * Math.sin(th), SILVER[0] * 0.85, SILVER[1] * 0.85, SILVER[2] * 0.85);
+      }
+      for (k = 0; k < 700; k++) {
+        th = Math.random() * Math.PI * 2;
+        put(b, tr.r * Math.cos(th), tr.y1 + 0.03, tr.r * Math.sin(th), SILVER_HI[0], SILVER_HI[1], SILVER_HI[2]);
+      }
+      var posts = Math.floor(2 * Math.PI * tr.r / 2.4);
+      for (k = 0; k < posts; k++) {
+        th = k / posts * Math.PI * 2;
+        for (var m = 0; m < 4; m++) put(b, tr.r * Math.cos(th), tr.y1 + 0.06 + m * 0.14, tr.r * Math.sin(th), SILVER_HI[0], SILVER_HI[1], SILVER_HI[2]);
+        put(b, tr.r * Math.cos(th), tr.y1 + 0.62, tr.r * Math.sin(th), MARBLE[0] * 1.3, MARBLE[1] * 1.3, MARBLE[2] * 1.3);
+      }
+    }
+    // lower colonnade: red columns + dark red wall panels
+    for (i = 0; i < 48; i++) {
+      var cth = i / 48 * Math.PI * 2;
+      column(b, 10.8 * Math.cos(cth), 10.8 * Math.sin(cth), 3.9, 12.0, 62, RED);
+    }
+    wallRing(b, 9.9, 4.2, 11.4, 48, 80, function () { return DARKRED; });
+    bracketBand(b, 11.3, 12.3, 2200, GOLD, GREEN);
+    // roof 1 (lower eave)
+    roofCone(b, 12000, 8.6, 13.6, 14.2, 10.9, 0.5, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 14.2, 11.05, 1400, RIM_Q);
+    // drum wall
+    wallRing(b, 8.4, 13.6, 18.4, 48, 95, function (th, t) {
+      var seg = Math.floor(th / (Math.PI * 2) * 24);
+      if (seg % 2 === 0 && Math.random() < 0.10) return GOLD;
+      return pick(0.7, BLUE, BLUE_SL);
     });
-    balustradeRound(c, t.R, t.y + t.h, { posts: 80, railN: 300, col: COL.marbleHi });
-  });
-
-  /* ---- 四向台阶 ---- */
-  for (let k = 0; k < 4; k++) {
-    const a = k * Math.PI / 2;
-    stairFlight(c, a, 4.95, 3.56, 0.00, 0.34, 1.15, { steps: 6, col: COL.marbleHi, edgeCol: COL.white });
-    stairFlight(c, a, 3.13, 2.66, 0.36, 0.74, 1.15, { steps: 4, col: COL.marbleHi, edgeCol: COL.white });
-    stairFlight(c, a, 2.68, 2.30, 0.76, 1.14, 1.15, { steps: 4, col: COL.marbleHi, edgeCol: COL.white });
+    bracketBand(b, 8.9, 18.7, 1700, GOLD, GREEN);
+    // roof 2 (middle eave)
+    roofCone(b, 9500, 5.6, 19.6, 11.8, 17.2, 0.5, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 11.8, 17.35, 1100, RIM_Q);
+    // upper wall
+    wallRing(b, 5.4, 19.6, 23.8, 42, 85, function (th, t) {
+      var seg = Math.floor(th / (Math.PI * 2) * 24);
+      if (seg % 2 === 0 && Math.random() < 0.12) return GOLD;
+      return pick(0.7, BLUE, BLUE_SL);
+    });
+    bracketBand(b, 6.2, 24.1, 1300, GOLD, GREEN);
+    // roof 3 (top cone)
+    roofCone(b, 10500, 0.8, 31.0, 8.6, 23.4, 0.7, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 8.6, 23.55, 900, RIM_Q);
+    // gilded finial 宝顶
+    linePt(b, 0, 31.0, 0, 0, 31.9, 0, 200, GOLD);
+    spherePt(b, 0, 32.3, 0, 1.15, 1400, GOLD, true);
+    for (i = 0; i < 300; i++) { // lotus ring
+      var lth = Math.random() * Math.PI * 2;
+      put(b, 0.85 * Math.cos(lth), 31.7 + (Math.random() - 0.5) * 0.25, 0.85 * Math.sin(lth), GOLD[0], GOLD[1], GOLD[2]);
+    }
+    linePt(b, 0, 33.1, 0, 0, 34.4, 0, 220, GOLD);
+    spherePt(b, 0, 34.5, 0, 0.22, 120, GOLD, false);
+    return b;
   }
 
-  /* ---- 殿身(檐柱/龙井柱/墙/门窗/额枋) ---- */
-  const yB = 1.16, yT = 2.44, R = 1.80;
-  for (let k = 0; k < 24; k++) {
-    const a = (k / 24) * TAU;
-    column(c, Math.cos(a) * R, Math.sin(a) * R, yB, yT, 0.07, mix3(COL.warm, COL.silver, 0.30), 30, 0.017);
+  /* ============ 太和殿 ============ */
+  var YELLOW = [0.70, 0.54, 0.18];
+  var WARM_SL= [0.50, 0.48, 0.42];
+  var GOLD_R = [0.80, 0.60, 0.22];
+  var EAVE_RM= [0.70, 0.66, 0.50];
+
+  function buildTaihe() {
+    var b = CloudBuilder(), i;
+    // three-tier marble terrace 三层台基
+    terrace(b, 64, 38, 0, 2.2, MARBLE, SILVER, SILVER_HI);
+    terrace(b, 60, 34, 2.2, 4.4, MARBLE, SILVER, SILVER_HI);
+    terrace(b, 56, 30, 4.4, 6.6, MARBLE, SILVER, SILVER_HI);
+    balustrade(b, 64, 38, 2.2, 2.3, SILVER, SILVER_HI);
+    balustrade(b, 60, 34, 4.4, 2.3, SILVER, SILVER_HI);
+    balustrade(b, 56, 30, 6.6, 2.3, SILVER, SILVER_HI);
+    // front stairways: central ramp + two side ramps
+    stairs(b, -4.5, 4.5, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    stairs(b, -15, -11, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    stairs(b, 11, 15, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    // red columns ring
+    var x, z;
+    for (x = -27; x <= 27.01; x += 5.4) { column(b, x, 14, 6.8, 15.6, 70, RED); column(b, x, -14, 6.8, 15.6, 70, RED); }
+    for (z = -9.8; z <= 9.81; z += 4.9) { column(b, 27, z, 6.8, 15.6, 70, RED); column(b, -27, z, 6.8, 15.6, 70, RED); }
+    // wall panels between columns
+    for (i = 0; i < 2800; i++) {
+      x = (Math.random() * 2 - 1) * 26.2; put(b, x, 6.8 + Math.random() * 8.0, 13.2, DARKRED[0], DARKRED[1], DARKRED[2]);
+      put(b, x, 6.8 + Math.random() * 8.0, -13.2, DARKRED[0], DARKRED[1], DARKRED[2]);
+    }
+    for (i = 0; i < 1600; i++) {
+      z = (Math.random() * 2 - 1) * 13.2; put(b, 26.2, 6.8 + Math.random() * 8.0, z, DARKRED[0], DARKRED[1], DARKRED[2]);
+      put(b, -26.2, 6.8 + Math.random() * 8.0, z, DARKRED[0], DARKRED[1], DARKRED[2]);
+    }
+    // bracket band 斗拱
+    bracketBandRect(b, 55, 29, 15.9, 3600, GREEN, GOLD);
+    // lower eave roof
+    roofHip(b, 15000, 33, 19, 16.8, 20.6, 19, function () { return pick(0.55, YELLOW, WARM_SL); }, 0.35);
+    rimRect(b, 66, 38, 16.75, 2200, EAVE_RM);
+    linePt(b, -19, 20.75, 0, 19, 20.75, 0, 800, GOLD_R);
+    ridgesOrnaments(b, 33, 19, 16.8, 20.6, 19);
+    // upper wall band with painted decor
+    for (i = 0; i < 3600; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var rx = 24, rz = 11;
+      var px = rx * Math.cos(th), pz = rz * Math.sin(th);
+      var seg = Math.floor(th / (Math.PI * 2) * 48);
+      var c = seg % 3 === 0 ? GOLD : (seg % 3 === 1 ? GREEN : [0.12, 0.22, 0.55]);
+      put(b, px, 20.6 + Math.random() * 2.0, pz, c[0], c[1], c[2]);
+    }
+    // upper main roof
+    roofHip(b, 20000, 36, 21, 22.8, 26.6, 20, function () { return pick(0.55, YELLOW, WARM_SL); }, 0.4);
+    rimRect(b, 72, 42, 22.75, 2400, EAVE_RM);
+    linePt(b, -20.8, 26.75, 0, 20.8, 26.75, 0, 900, GOLD_R);
+    ridgesOrnaments(b, 36, 21, 22.8, 26.6, 20);
+    spherePt(b, 21.6, 27.1, 0, 0.6, 220, GOLD_R, true);
+    spherePt(b, -21.6, 27.1, 0, 0.6, 220, GOLD_R, true);
+    return b;
   }
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * TAU + 0.4;
-    column(c, Math.cos(a) * 0.95, Math.sin(a) * 0.95, yB, 4.34, 0.075, mix3(COL.warm, COL.gold, 0.25), 42, 0.017);
-  }
-  for (let i = 0; i < 1500; i++) {
-    const a = Math.random() * TAU;
-    const y = lerp(1.24, 2.42, Math.random());
-    const cc = jit(mix3(COL.marble, COL.warm, 0.35), 10);
-    c.push(Math.cos(a) * (R - 0.08), y, Math.sin(a) * (R - 0.08), cc[0], cc[1], cc[2], 0.014, 0.008);
-  }
-  for (let k = 0; k < 4; k++) {
-    const da = (k / 4) * TAU + Math.PI / 4;
-    for (let i = 0; i < 110; i++) {
-      const aa = da + rnd(-0.10, 0.10);
-      const y = lerp(1.38, 2.26, Math.random());
-      const cc = jit(mix3(COL.blueDeep, COL.marble, 0.30), 10);
-      c.push(Math.cos(aa) * (R - 0.10), y, Math.sin(aa) * (R - 0.10), cc[0], cc[1], cc[2], 0.015, 0.006);
+  function ridgesOrnaments(b, eX, eZ, eY, rY, rHalf) {
+    var sx, sz;
+    for (sx = -1; sx <= 1; sx += 2) for (sz = -1; sz <= 1; sz += 2) {
+      // 垂脊: ridge end -> corner
+      linePt(b, sx * rHalf, rY, 0, sx * eX, eY + 0.1, sz * eZ, 260, GOLD_R);
+      // 脊兽 clusters along the ridge
+      for (var k = 0; k < 8; k++) {
+        var t = 0.2 + 0.7 * k / 7;
+        var px = sx * rHalf + (sx * eX - sx * rHalf) * t;
+        var py = rY + (eY + 0.1 - rY) * t;
+        var pz = sz * eZ * t;
+        spherePt(b, px, py + 0.25, pz, 0.22, 12, GOLD_R, false);
+      }
     }
   }
-  band(c, R + 0.03, yT - 0.05, yT + 0.08, 620, function () { return jit(COL.gold, 12); }, 0.017);
 
-  /* ---- 三重檐(圆形攒尖) ---- */
-  const roofBase = mix3(COL.blueTile, COL.silver, 0.35);
-  const mkColFn = function (base, hot) {
-    return function (t) {
-      const cc = mix3(base, hot, clamp((t - 0.72) / 0.28, 0, 1) * 0.55);
-      return jit(cc, 12);
-    };
-  };
-  coneRoof(c, 2.62, 2.42, 1.12, 3.44, {
-    n: 15000, up: 0.10, sag: 0.05, ridges: 8, ridgeN: 100, rimN: 560,
-    colFn: mkColFn(roofBase, COL.gold), rimCol: mix3(COL.blueTile, COL.white, 0.5),
-    ridgeCol: COL.goldHot, size: 0.016
-  });
-  coneRoof(c, 2.10, 3.62, 0.72, 4.36, {
-    n: 12500, up: 0.10, sag: 0.045, ridges: 8, ridgeN: 90, rimN: 480,
-    colFn: mkColFn(roofBase, COL.gold), rimCol: mix3(COL.blueTile, COL.white, 0.5),
-    ridgeCol: COL.goldHot, size: 0.016
-  });
-  coneRoof(c, 1.58, 4.54, 0.10, 5.44, {
-    n: 10000, up: 0.09, sag: 0.04, ridges: 8, ridgeN: 80, rimN: 400,
-    colFn: mkColFn(roofBase, COL.gold), rimCol: mix3(COL.blueTile, COL.white, 0.5),
-    ridgeCol: COL.goldHot, size: 0.016
-  });
+  /* ============ assemble point clouds ============ */
+  function finalize(builder, cx, cy, cz, ampScale) {
+    var n = builder.home.length / 3;
+    var pos = new Float32Array(builder.home);
+    var col = new Float32Array(builder.color);
+    var misc = new Float32Array(builder.misc);
+    var out = new Float32Array(n * 3);
+    var amp = ampScale || 1;
+    for (var i = 0; i < n; i++) {
+      var ix = i * 3;
+      var dx = pos[ix] - cx, dy = pos[ix + 1] - cy, dz = pos[ix + 2] - cz;
+      var len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      dx /= len; dy /= len; dz /= len;
+      dx += (Math.random() - 0.5) * 1.3;
+      dy += (Math.random() - 0.5) * 1.3;
+      dz += (Math.random() - 0.5) * 1.3;
+      var l2 = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      var spread = 26 + Math.random() * 38;
+      out[ix] = pos[ix] + dx / l2 * spread;
+      out[ix + 1] = pos[ix + 1] + dy / l2 * spread;
+      out[ix + 2] = pos[ix + 2] + dz / l2 * spread;
+      misc[ix / 3 * 4 + 2] *= amp;
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aOut', new THREE.BufferAttribute(out, 3));
+    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aMisc', new THREE.BufferAttribute(misc, 4));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), 150);
+    return g;
+  }
 
-  /* ---- 檐下斗拱带(青绿彩绘) ---- */
-  const segCols = [COL.green, COL.blueDeep, COL.gold];
-  const bandColFn = function (a) {
-    const seg = Math.floor((a / TAU) * 12) % 3;
-    return jit(mix3(segCols[seg], COL.marble, 0.30), 10);
-  };
-  band(c, 1.16, 3.44, 3.66, 420, bandColFn, 0.015);
-  band(c, 0.76, 4.36, 4.58, 320, bandColFn, 0.015);
+  var qinian = new THREE.Points(finalize(buildQinian(), 0, 15, 0), makeMaterial(0.20));
+  var taihe  = new THREE.Points(finalize(buildTaihe(), 0, 15, 0), makeMaterial(0.20));
+  taihe.visible = false;
+  scene.add(qinian); scene.add(taihe);
 
-  /* ---- 鎏金宝顶 ---- */
-  ring(c, 0.10, 5.50, 130, COL.gold, 0.018, 0.005);
-  finialBall(c, 5.72, 0.15, jit(COL.goldHot, 8), 420);
-  column(c, 0, 0, 5.56, 5.98, 0.035, COL.goldHot, 16, 0.016);
+  /* ============ background stars ============ */
+  (function stars() {
+    var b = CloudBuilder();
+    for (var i = 0; i < 700; i++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2;
+      var s = Math.sqrt(1 - u * u), r = 380 + Math.random() * 150;
+      var base = pick(0.12, [0.40, 0.55, 0.90], pick(0.10, [0.80, 0.65, 0.30], [0.30, 0.31, 0.36]));
+      b.home.push(s * Math.cos(th) * r, u * r, s * Math.sin(th) * r);
+      b.color.push(base[0], base[1], base[2]);
+      b.misc.push(Math.random() * Math.PI * 2, 0, 0.5, 0.7 + Math.random() * 0.7);
+    }
+    var n = b.home.length / 3;
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(b.home), 3));
+    g.setAttribute('aOut', new THREE.BufferAttribute(new Float32Array(b.home), 3));
+    g.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(b.color), 3));
+    g.setAttribute('aMisc', new THREE.BufferAttribute(new Float32Array(b.misc), 4));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 600);
+    var m = makeMaterial(1.1);
+    m.uniforms.uSize.value = 1.1;
+    var p = new THREE.Points(g, m);
+    p.frustumCulled = false;
+    scene.add(p);
+  })();
 
-  return c.build();
-}
+  /* ============ transition (disperse -> converge) ============ */
+  var points = [qinian, taihe];
+  var mats = [qinian.material, taihe.material];
+  var clock = new THREE.Clock();
+  var anim = null, current = 0;
 
-/* ============================================================
- * 太和殿: 重檐庑殿顶 + 三层台基
- * ============================================================ */
-function buildTaihe() {
-  const c = new Cloud();
-
-  /* ---- 三层台基 ---- */
-  const tiers = [
-    { hw: 5.00, hd: 3.40, y: 0.00, h: 0.50 },
-    { hw: 4.60, hd: 3.00, y: 0.56, h: 0.50 },
-    { hw: 4.20, hd: 2.60, y: 1.12, h: 0.50 }
+  var nameEl = document.getElementById('name');
+  var subEl = document.getElementById('sub');
+  var labelEl = document.getElementById('label');
+  var DATA = [
+    { name: '祈年殿', sub: '天坛 · TEMPLE OF HEAVEN' },
+    { name: '太和殿', sub: '故宫 · HALL OF SUPREME HARMONY' }
   ];
-  tiers.forEach(function (t) {
-    rectTier(c, t.hw, t.hd, t.y, t.h, { nSide: 1700, nTop: 800, nRim: 560, col: COL.marble, rimCol: COL.marbleHi });
-    balustradeRect(c, t.hw, t.hd, t.y + t.h, { posts: 92, railN: 340, col: COL.marbleHi, gap: true, gapW: 2.4 });
-  });
+  var labelTimer = null;
 
-  /* ---- 正面三台阶梯(御路居中, 两侧踏跺) ---- */
-  for (let i = 0; i < 3; i++) {
-    const t = tiers[i];
-    const zE = t.hd;
-    const zStart = (i === 0) ? zE + 1.05 : Math.min(zE + 0.62, tiers[i - 1].hd + 0.02);
-    const yStart = (i === 0) ? 0 : tiers[i - 1].y + tiers[i - 1].h;
-    const nSteps = (i === 0) ? 6 : 4;
-    stairFlight(c, Math.PI / 2, zStart, zE - 0.08, yStart, t.y + t.h, 1.5,
-      { steps: nSteps, tread: 8, col: COL.marbleHi, edgeCol: COL.white });
-    stairFlight(c, Math.PI / 2, zStart, zE - 0.06, yStart, t.y + t.h, 0.8,
-      { steps: nSteps, tread: 6, off: 1.35, col: COL.marble, edgeCol: COL.marbleHi });
-    stairFlight(c, Math.PI / 2, zStart, zE - 0.06, yStart, t.y + t.h, 0.8,
-      { steps: nSteps, tread: 6, off: -1.35, col: COL.marble, edgeCol: COL.marbleHi });
+  function updateNav(i) {
+    document.getElementById('btn0').classList.toggle('active', i === 0);
+    document.getElementById('btn1').classList.toggle('active', i === 1);
   }
-
-  /* ---- 副檐廊柱(下层檐柱) ---- */
-  const colY0 = 1.66, colY1 = 3.32;
-  for (let ix = -7; ix <= 7; ix++) {
-    column(c, ix * 0.52, 2.52, colY0, colY1, 0.075, mix3(COL.warm, COL.silver, 0.30), 30, 0.016);
-    column(c, ix * 0.52, -2.52, colY0, colY1, 0.075, mix3(COL.warm, COL.silver, 0.30), 30, 0.016);
+  function fadeLabel(i) {
+    labelEl.classList.add('hide');
+    clearTimeout(labelTimer);
+    labelTimer = setTimeout(function () {
+      nameEl.textContent = DATA[i].name;
+      subEl.textContent = DATA[i].sub;
+      labelEl.classList.remove('hide');
+    }, 400);
   }
-  for (let iz = -2; iz <= 2; iz++) {
-    if (iz === 0) continue;
-    column(c, 3.82, iz * 0.52, colY0, colY1, 0.075, mix3(COL.warm, COL.silver, 0.30), 26, 0.016);
-    column(c, -3.82, iz * 0.52, colY0, colY1, 0.075, mix3(COL.warm, COL.silver, 0.30), 26, 0.016);
+  function switchTo(i) {
+    if (i === current || anim) return;
+    anim = { phase: 'out', from: current, to: i, t0: clock.getElapsedTime() };
+    updateNav(i);
+    fadeLabel(i);
   }
-  rectRing(c, 3.86, 2.56, 3.06, 420, COL.gold, 0.016, 0.006);
-  rectRing(c, 3.86, 2.56, 3.30, 420, COL.gold, 0.017, 0.006);
-
-  /* ---- 上层墙体 / 隔扇 / 彩画 ---- */
-  const whw = 3.52, whd = 2.22;
-  for (let i = 0; i < 1500; i++) {
-    const x = rnd(-whw, whw), y = lerp(1.76, 2.86, Math.random());
-    const z = (Math.random() < 0.5 ? 1 : -1) * whd;
-    const cc = jit(mix3(COL.marble, COL.warm, 0.4), 10);
-    c.push(x, y, z, cc[0], cc[1], cc[2], 0.014, 0.008);
-  }
-  for (let i = 0; i < 700; i++) {
-    const z = rnd(-whd, whd), y = lerp(1.76, 2.86, Math.random());
-    const x = (Math.random() < 0.5 ? 1 : -1) * whw;
-    const cc = jit(mix3(COL.marble, COL.warm, 0.4), 10);
-    c.push(x, y, z, cc[0], cc[1], cc[2], 0.014, 0.008);
-  }
-  for (let ix = -6; ix <= 6; ix++) {
-    for (let j = 0; j < 8; j++) {
-      const cc = jit(mix3(COL.blueDeep, COL.marble, 0.2), 8);
-      c.push(ix * 0.5, lerp(1.85, 2.90, j / 7), whd - 0.04, cc[0], cc[1], cc[2], 0.013, 0.005);
-    }
-  }
-  const caiCols = [COL.green, COL.gold, COL.blueDeep, COL.gold];
-  rectBand(c, whw + 0.10, whd + 0.10, 3.84, 4.06, 900, function (x) {
-    const seg = Math.abs(Math.floor((x + 4.5) / 0.6)) % 4;
-    return jit(mix3(caiCols[seg], COL.white, 0.15), 10);
-  }, 0.015);
-  rectBand(c, 3.92, 2.62, 2.98, 3.30, 700, function (x) {
-    const seg = Math.abs(Math.floor((x + 4.5) / 0.6)) % 4;
-    return jit(mix3(caiCols[(seg + 1) % 4], COL.white, 0.15), 10);
-  }, 0.014);
-
-  /* ---- 下层檐(副阶檐, 四坡裙顶) ---- */
-  const tileBase = mix3(COL.gold, COL.silver, 0.30);
-  const tileColFn = function (t) {
-    const cc = mix3(tileBase, COL.goldHot, clamp((t - 0.65) / 0.35, 0, 1) * 0.5);
-    return jit(cc, 12);
-  };
-  hipRoof(c, 5.10, 3.62, 3.34, 3.86, 3.80, 2.56, {
-    n: 9000, wf: 0.32, ws: 0.18, up: 0.05, sag: 0.03, rimN: 600, hipN: 70,
-    colFn: tileColFn, rimCol: mix3(COL.gold, COL.white, 0.35),
-    hipCol: COL.gold, size: 0.016
-  });
-
-  /* ---- 上层檐(重檐庑殿顶: 正脊 + 四垂脊 + 山花) ---- */
-  hipRoof(c, 4.42, 2.86, 4.06, 2.62, 5.52, 0, {
-    n: 15000, wf: 0.32, ws: 0.18, up: 0.06, sag: 0.035, rimN: 640, hipN: 90,
-    colFn: tileColFn, rimCol: mix3(COL.gold, COL.white, 0.4),
-    hipCol: COL.goldHot, ridge: true, ridgeN: 110, ridgeOver: 0.26, size: 0.016
-  });
-
-  return c.build();
-}
-
-/* ============================================================
- * 渲染器
- * ============================================================ */
-const canvas = document.getElementById('scene');
-const ctx = canvas.getContext('2d');
-const off = document.createElement('canvas');
-const offCtx = off.getContext('2d');
-const glowSpr = (function makeGlow() {
-  const s = 256, cv = document.createElement('canvas');
-  cv.width = s; cv.height = s;
-  const g = cv.getContext('2d');
-  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  grad.addColorStop(0, 'rgba(160,190,235,0.55)');
-  grad.addColorStop(0.5, 'rgba(120,150,210,0.18)');
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, s, s);
-  return cv;
-})();
-
-let offW = 0, offH = 0;
-let img = null, buf = null;
-const buildings = [];
-const state = {
-  yaw: 0.65, pitch: 0.15, dist: 12, distT: 12,
-  cur: 0, prev: -1, animT: 1, animDur: 0.85, animating: false,
-  lastTouch: 0
-};
-
-/* 依据建筑包围盒计算取景距离, 保证完整居中 */
-function fitDist() {
-  const b = buildings[state.cur];
-  if (!b) return;
-  const halfW = Math.max(b.w, b.d) / 2 * 1.10;
-  const halfH = b.h / 2 * 1.10;
-  const tanV = Math.tan(FOV / 2);
-  const tanH = tanV * (offW / offH);
-  state.distT = Math.max(halfH / tanV, halfW / tanH) * 1.06;
-}
-
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const scale = dpr * 0.8;
-  offW = Math.max(2, Math.floor(window.innerWidth * scale));
-  offH = Math.max(2, Math.floor(window.innerHeight * scale));
-  canvas.width = Math.floor(window.innerWidth * dpr);
-  canvas.height = Math.floor(window.innerHeight * dpr);
-  off.width = offW;
-  off.height = offH;
-  img = offCtx.createImageData(offW, offH);
-  buf = img.data;
-  fitDist();
-}
-window.addEventListener('resize', resize);
-
-/* 背景星尘 */
-const stars = { n: 380, pos: new Float32Array(380 * 3), col: new Float32Array(380 * 3) };
-(function initStars() {
-  for (let i = 0; i < stars.n; i++) {
-    const u = rnd(-1, 1), a = Math.random() * TAU, s = Math.sqrt(1 - u * u);
-    const r = rnd(26, 60);
-    stars.pos[i * 3] = Math.cos(a) * s * r;
-    stars.pos[i * 3 + 1] = u * r * 0.6;
-    stars.pos[i * 3 + 2] = Math.sin(a) * s * r;
-    const pick = Math.random();
-    const base = pick < 0.7 ? [200, 210, 225] : (pick < 0.85 ? [160, 180, 230] : [220, 200, 160]);
-    const b = rnd(0.10, 0.42);
-    stars.col[i * 3] = base[0] * b;
-    stars.col[i * 3 + 1] = base[1] * b;
-    stars.col[i * 3 + 2] = base[2] * b;
-  }
-})();
-
-/* 将一点写入加色缓冲 */
-function plot(idx, r, g, b) {
-  buf[idx] += r; buf[idx + 1] += g; buf[idx + 2] += b;
-}
-
-/* 绘制单个点云(带浮动感与深度雾) */
-function drawCloud(b, wgt, t) {
-  const n = b.n, pos = b.pos, col = b.col, size = b.size, ph = b.ph, am = b.am;
-  const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
-  const cxp = Math.cos(state.pitch), sxp = Math.sin(state.pitch);
-  const f = (offH / 2) / Math.tan(FOV / 2);
-  const cx0 = offW / 2, cy0 = offH / 2;
-  const dist = state.dist;
-  const invD = 1 / (dist * 1.8);
-  for (let i = 0; i < n; i++) {
-    const i3 = i * 3;
-    let x = pos[i3], y = pos[i3 + 1], z = pos[i3 + 2];
-    /* 轻微浮动 */
-    y += Math.sin(t * 0.9 + ph[i]) * am[i];
-    x += Math.sin(t * 0.7 + ph[i] * 1.7) * am[i] * 0.6;
-    z += Math.cos(t * 0.8 + ph[i] * 2.3) * am[i] * 0.6;
-    /* 轨道旋转 */
-    const x1 = x * cy + z * sy;
-    const z1 = -x * sy + z * cy;
-    const y2 = y * cxp - z1 * sxp;
-    const z2 = y * sxp + z1 * cxp;
-    const depth = dist - z2;
-    if (depth < 0.6) continue;
-    const s = f / depth;
-    const px = cx0 + x1 * s;
-    const py = cy0 - y2 * s;
-    if (px < 0 || px >= offW || py < 0 || py >= offH) continue;
-    const fog = clamp(1.25 - depth * invD, 0.35, 1) * wgt;
-    const r = col[i3] * fog, g = col[i3 + 1] * fog, bb = col[i3 + 2] * fog;
-    const xpi = px | 0, ypi = py | 0;
-    const ps = size[i] * s;
-    if (ps > 1.5 && xpi + 1 < offW && ypi + 1 < offH) {
-      const kk = 0.5;
-      const base = (ypi * offW + xpi) * 4;
-      const bw4 = offW * 4;
-      plot(base, r * kk, g * kk, bb * kk);
-      plot(base + 4, r * kk, g * kk, bb * kk);
-      plot(base + bw4, r * kk, g * kk, bb * kk);
-      plot(base + bw4 + 4, r * kk, g * kk, bb * kk);
+  function stepAnim(t) {
+    if (!anim) return;
+    if (anim.phase === 'out') {
+      var p = (t - anim.t0) / 1.0;
+      if (p >= 1) {
+        mats[anim.from].uniforms.uMorph.value = 0;
+        points[anim.from].visible = false;
+        mats[anim.to].uniforms.uMorph.value = 1;
+        points[anim.to].visible = true;
+        anim = { phase: 'in', to: anim.to, t0: t };
+      } else {
+        mats[anim.from].uniforms.uMorph.value = p;
+      }
     } else {
-      plot((ypi * offW + xpi) * 4, r, g, bb);
+      var p2 = (t - anim.t0) / 1.3;
+      if (p2 >= 1) {
+        mats[anim.to].uniforms.uMorph.value = 0;
+        anim = null;
+      } else {
+        mats[anim.to].uniforms.uMorph.value = 1 - p2;
+      }
     }
   }
-}
-
-/* 星尘(远, 随场景微转) */
-function drawStars() {
-  const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
-  const cxp = Math.cos(state.pitch), sxp = Math.sin(state.pitch);
-  const f = (offH / 2) / Math.tan(FOV / 2);
-  const cx0 = offW / 2, cy0 = offH / 2;
-  const dist = state.dist;
-  for (let i = 0; i < stars.n; i++) {
-    const i3 = i * 3;
-    const x = stars.pos[i3], y = stars.pos[i3 + 1], z = stars.pos[i3 + 2];
-    const x1 = x * cy + z * sy;
-    const z1 = -x * sy + z * cy;
-    const y2 = y * cxp - z1 * sxp;
-    const z2 = y * sxp + z1 * cxp;
-    const depth = dist - z2;
-    if (depth < 1) continue;
-    const s = f / depth;
-    const px = cx0 + x1 * s, py = cy0 - y2 * s;
-    if (px < 0 || px >= offW || py < 0 || py >= offH) continue;
-    const idx = ((py | 0) * offW + (px | 0)) * 4;
-    plot(idx, stars.col[i3], stars.col[i3 + 1], stars.col[i3 + 2]);
-  }
-}
-
-/* 地面辉光 */
-function drawGlow() {
-  const b = buildings[state.cur];
-  if (!b) return;
-  const f = (offH / 2) / Math.tan(FOV / 2);
-  const pxPerUnit = f / state.dist;
-  const wpx = Math.max(120, b.w * pxPerUnit * 1.15);
-  const hpx = wpx * 0.26;
-  const x = (offW - wpx) / 2;
-  const y = offH / 2 + (b.h / 2) * pxPerUnit - hpx * 0.42;
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.16;
-  ctx.drawImage(glowSpr, x, y, wpx, hpx);
-}
-
-/* ---------------- 主循环 ---------------- */
-let lastT = 0;
-function frame(now) {
-  requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - lastT) / 1000);
-  lastT = now;
-  const t = now / 1000;
-
-  /* 空闲时缓慢自转 */
-  if (now - state.lastTouch > 2800 && !state.animating) state.yaw += dt * 0.10;
-  /* 距离平滑 */
-  state.dist += (state.distT - state.dist) * Math.min(1, dt * 5);
-  /* 切换过渡 */
-  if (state.animating) {
-    state.animT += dt / state.animDur;
-    if (state.animT >= 1) { state.animT = 1; state.animating = false; state.prev = -1; }
-  }
-
-  buf.fill(0);
-  drawStars();
-  const wA = state.animating ? 1 - easeInOut(state.animT) : 1;
-  if (state.prev >= 0) drawCloud(buildings[state.prev], wA, t);
-  const wB = state.animating ? easeInOut(state.animT) : 1;
-  drawCloud(buildings[state.cur], wB, t);
-
-  /* alpha 置为不透明后上屏 */
-  for (let i = 3; i < buf.length; i += 4) buf[i] = 255;
-  offCtx.putImageData(img, 0, 0);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
-  ctx.imageSmoothingEnabled = true;
-  drawGlow();
-  ctx.drawImage(off, 0, 0, offW, offH, 0, 0, canvas.width, canvas.height);
-}
-
-/* ============================================================
- * 交互
- * ============================================================ */
-const pointers = new Map();
-let pinchD = 0;
-
-canvas.addEventListener('pointerdown', function (e) {
-  canvas.setPointerCapture(e.pointerId);
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  state.lastTouch = performance.now();
-  if (pointers.size === 2) {
-    const ps = Array.from(pointers.values());
-    pinchD = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y);
-  }
-});
-canvas.addEventListener('pointermove', function (e) {
-  const p = pointers.get(e.pointerId);
-  if (!p) return;
-  state.lastTouch = performance.now();
-  if (pointers.size === 1) {
-    state.yaw += (e.clientX - p.x) * 0.0052;
-    state.pitch = clamp(state.pitch + (e.clientY - p.y) * 0.0052, -1.15, 1.15);
-  }
-  p.x = e.clientX; p.y = e.clientY;
-  if (pointers.size === 2) {
-    const ps = Array.from(pointers.values());
-    const d = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y);
-    if (pinchD > 0 && d > 0) state.distT = clamp(state.distT * (pinchD / d), 5, 30);
-    pinchD = d;
-  }
-});
-function endPointer(e) {
-  pointers.delete(e.pointerId);
-  pinchD = 0;
-  state.lastTouch = performance.now();
-}
-canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('wheel', function (e) {
-  e.preventDefault();
-  state.distT = clamp(state.distT * Math.exp(e.deltaY * 0.0011), 5, 30);
-  state.lastTouch = performance.now();
-}, { passive: false });
-
-/* ---------------- 建筑切换 ---------------- */
-const NAMES = [
-  { main: '天坛 · 祈年殿', sub: 'HALL OF PRAYER FOR GOOD HARVESTS', seal: '祈' },
-  { main: '故宫 · 太和殿', sub: 'HALL OF SUPREME HARMONY', seal: '和' }
-];
-
-function setBuilding(i, instant) {
-  if (i === state.cur && !instant) return;
-  state.prev = state.cur;
-  state.cur = i;
-  state.animating = !instant;
-  state.animT = instant ? 1 : 0;
-  state.lastTouch = performance.now();
-  fitDist();
-  updateTitle();
-  document.getElementById('btn0').classList.toggle('active', i === 0);
-  document.getElementById('btn1').classList.toggle('active', i === 1);
-}
-
-function updateTitle() {
-  const title = document.getElementById('title');
-  title.classList.add('swap');
-  setTimeout(function () {
-    const nm = NAMES[state.cur];
-    document.getElementById('tSeal').textContent = nm.seal;
-    document.getElementById('tMain').textContent = nm.main;
-    document.getElementById('tSub').textContent = nm.sub;
-    title.classList.remove('swap');
-  }, 200);
-}
-
-document.getElementById('btn0').addEventListener('click', function () { setBuilding(0); });
-document.getElementById('btn1').addEventListener('click', function () { setBuilding(1); });
-window.addEventListener('keydown', function (e) {
-  if (e.key === '1') setBuilding(0);
-  else if (e.key === '2') setBuilding(1);
-  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') setBuilding(1 - state.cur);
-});
-
-/* ---------------- 启动 ---------------- */
-window.__errs = [];
-window.addEventListener('error', function (e) { window.__errs.push(String(e.message)); });
-
-function boot() {
-  buildings[0] = buildQini();
-  buildings[1] = buildTaihe();
-  window.__counts = [buildings[0].n, buildings[1].n];
-  resize();
-  setBuilding(0, true);
-  requestAnimationFrame(function (now) {
-    lastT = now;
-    requestAnimationFrame(frame);
-    document.getElementById('loading').classList.add('done');
+  document.getElementById('btn0').addEventListener('click', function () { switchTo(0); });
+  document.getElementById('btn1').addEventListener('click', function () { switchTo(1); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === '1') switchTo(0);
+    if (e.key === '2') switchTo(1);
   });
-}
 
-/* 等 loading 界面先绘制一帧再生成粒子 */
-requestAnimationFrame(function () { setTimeout(boot, 30); });
+  /* ============ resize / loop ============ */
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    updatePixelFactor();
+    for (var i = 0; i < mats.length; i++) mats[i].uniforms.uPixelFactor.value = pixelFactor;
+  });
+
+  function tick() {
+    requestAnimationFrame(tick);
+    var t = clock.getElapsedTime();
+    for (var i = 0; i < mats.length; i++) mats[i].uniforms.uTime.value = t;
+    stepAnim(t);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  tick();
+  window.__dbg = { scene: scene, renderer: renderer, camera: camera, points: points, THREE: THREE };
+})();
 </script>
 </body>
 </html>
