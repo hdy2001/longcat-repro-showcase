@@ -1,531 +1,477 @@
-// ===== 沙漠行动 DUNE STRIKE — 主控制器 =====
+// 沙尘行动 —— 3D 团队竞技 FPS（主控制器）
 import * as THREE from 'three';
-import { initPhysics, addStaticColliders, world, raycastWorld, rayVsCharacter } from './physics';
-import { buildMapMeshes, buildStaticColliders, buildStaticColliders as buildColliders } from './map/mapBuilder';
-import { buildWorld } from './world';
-import { buildGraph, debugGraph } from './waypoints';
-import { AudioEngine } from './audio';
-import { Effects } from './effects';
-import { Weapon } from './weapon';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { CFG, TEAM, type TeamId } from './config';
+import { buildMap } from './map';
+import { buildNavGraph } from './map';
+import { BLUE_SPAWNS, RED_SPAWNS } from './mapdata';
 import { Player } from './player';
 import { Bot } from './bot';
+import { Effects } from './effects';
+import { GameAudio } from './audio';
 import { HUD } from './hud';
-import {
-  TEAM_ALPHA, TEAM_BRAVO, PLAYER_TEAM, WEAPON, MATCH, BOT,
-  BOT_NAMES,
-} from './config';
-import { SPAWNS } from './map/mapData';
+import { makeSkyTexture } from './textures';
 
-type GameState = 'menu' | 'countdown' | 'playing' | 'paused' | 'end';
-
-const params = new URLSearchParams(location.search);
-const DEBUG = params.has('debug');
+type GameState = 'menu' | 'playing' | 'paused' | 'ended';
 
 class Game {
-  renderer!: THREE.WebGLRenderer;
-  scene!: THREE.Scene;
-  camera!: THREE.PerspectiveCamera;
-  player!: Player;
-  bots: Bot[] = [];
-  weapon!: Weapon;
-  hud = new HUD();
-  audio = new AudioEngine();
-  effects!: Effects;
+  private renderer!: THREE.WebGLRenderer;
+  private scene!: THREE.Scene;
+  private camera!: THREE.PerspectiveCamera;
+  private world!: RAPIER.World;
+  private map!: ReturnType<typeof buildMap>;
+  private player!: Player;
+  private bots: Bot[] = [];
+  private effects!: Effects;
+  private audio = new GameAudio();
+  private hud = new HUD();
+  private nav = buildNavGraph();
 
-  state: GameState = 'menu';
-  scores = [0, 0];
-  timeLeft = MATCH.roundTime;
-  countdownT = 0;
-  respawnT = 0;
-  endWin = false;
-
-  private canvas!: HTMLCanvasElement;
+  private state: GameState = 'menu';
   private clock = new THREE.Clock();
-  private acc = 0;
-  private flyMode = false;
-  private flyVel = new THREE.Vector3();
-  private minimapTimer = 0;
+  private gameT = 0;
+  private matchT = CFG.matchTime;
+  private score = [0, 0];
+  private stats: Array<{ name: string; team: TeamId; kills: number; deaths: number; isPlayer: boolean }> = [];
+  private respawnT = 0;
+  private botRespawnQueue: Array<{ bot: Bot; t: number }> = [];
+  private botColliderMap = new Map<number, Bot>();
+  private canvas!: HTMLCanvasElement;
 
-  async init() {
-    // 渲染器
+  async init(): Promise<void> {
+    // ---- 渲染器 ----
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap; // 硬阴影
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.15;
 
+    // ---- 场景 / 天空 / 雾 ----
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.08, 900);
+    this.scene.background = makeSkyTexture();
+    this.scene.fog = new THREE.Fog(0xdcc9a0, 70, 260);
 
-    // 物理
-    await initPhysics();
-    addStaticColliders(buildColliders());
+    // ---- 相机 ----
+    this.camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 600);
+    this.camera.position.set(-38, 30, 38);
+    this.camera.lookAt(0, 0, 0);
+    this.scene.add(this.camera);
 
-    // 地图 + 世界
-    this.scene.add(buildMapMeshes());
-    buildWorld(this.scene);
+    // ---- 光照：强烈日照 ----
+    const hemi = new THREE.HemisphereLight(0x9cc0e8, 0xc8a870, 0.75);
+    this.scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff2dd, 2.6);
+    sun.position.set(45, 70, 30);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -58;
+    sun.shadow.camera.right = 58;
+    sun.shadow.camera.top = 58;
+    sun.shadow.camera.bottom = -58;
+    sun.shadow.camera.far = 220;
+    sun.shadow.bias = -0.0004;
+    this.scene.add(sun, sun.target);
 
-    // 路点图
-    const { removedEdges } = buildGraph();
-    console.log(`[NavGraph] ${debugGraph()}, removedEdges=${removedEdges}`);
+    // 太阳盘
+    const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeSunSprite(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    sunSprite.position.set(140, 190, 90);
+    sunSprite.scale.set(60, 60, 1);
+    this.scene.add(sunSprite);
 
-    // 特效
+    // ---- 物理 ----
+    await RAPIER.init();
+    this.world = new RAPIER.World({ x: 0, y: CFG.worldGravity, z: 0 });
+
+    // ---- 地图 ----
+    this.map = buildMap(this.world, this.scene);
+    this.nav = this.map.nav;
+
+    // ---- 特效 ----
     this.effects = new Effects(this.scene);
 
-    // 玩家
-    const spawn = SPAWNS[TEAM_ALPHA][0];
-    this.player = new Player(this.camera, spawn[0], spawn[1], -Math.PI / 2);
-    this.player.bind(this.canvas);
-    this.player.onFootstep = (s) => this.audio.footstep(s);
-    this.player.onJump = () => {};
-    this.player.onLand = () => this.audio.land();
-    this.player.onDeath = () => this.onPlayerDeath();
-    this.player.onLockChange = (locked) => {
-      if (!locked && this.state === 'playing' && !DEBUG) this.pause();
-    };
+    // ---- 玩家 ----
+    const spawn = BLUE_SPAWNS[0];
+    this.player = new Player(this.world, this.camera, spawn);
+    this.player.onShot = () => this.playerShoot();
+    this.player.onReload = () => this.audio.reload();
+    this.player.onStep = (s) => this.audio.step(s);
+    this.player.onAmmoChanged = () => this.hud.setAmmo(this.player.mag, this.player.reserve, this.player.reloading);
 
-    // 武器
-    this.weapon = new Weapon();
-    this.camera.add(this.weapon.group);
-    this.scene.add(this.camera);
-    this.weapon.onShot = (o, d) => this.playerShoot(o, d);
-    this.weapon.onDryFire = () => this.audio.dryFire();
-    this.weapon.onReloadStart = () => this.audio.reload();
-    this.weapon.onAmmoChanged = () => {
-      this.hud.setAmmo(this.weapon.mag, this.weapon.reserve);
-    };
+    // ---- 统计行 ----
+    this.stats.push({ name: '你', team: TEAM.BLUE, kills: 0, deaths: 0, isPlayer: true });
 
-    // 机器人
-    this.spawnBots();
-
-    // UI 事件
-    document.getElementById('btn-start')!.addEventListener('click', () => this.startMatch());
-    document.getElementById('btn-resume')!.addEventListener('click', () => this.resume());
-    document.getElementById('btn-restart-pause')!.addEventListener('click', () => this.restart());
-    document.getElementById('btn-restart-end')!.addEventListener('click', () => this.restart());
-
-    // 调试热键
-    document.addEventListener('keydown', (e) => {
-      if (!DEBUG) return;
-      if (e.code === 'KeyF') {
-        this.flyMode = !this.flyMode;
-        if (this.flyMode) {
-          this.flyVel.set(0, 0, 0);
-          document.exitPointerLock?.();
-        }
-      }
-      if (e.code === 'KeyP') this.debugTopDown();
-    });
-
-    window.addEventListener('resize', () => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // 调试接口
-    if (DEBUG) {
-      (window as any).__game = this;
-      this.startMatch();
+    // ---- 机器人（5v5，玩家蓝方；BOT_NAMES 中 0-4 红方，5-8 蓝方） ----
+    const totalBots = 9;
+    for (let i = 0; i < totalBots; i++) {
+      const bot = new Bot(this.world, i);
+      this.scene.add(bot.mesh);
+      this.bots.push(bot);
+      this.botColliderMap.set(bot.collider.handle, bot);
+      this.stats.push({ name: bot.name, team: bot.team, kills: 0, deaths: 0, isPlayer: false });
     }
+
+    // ---- 输入 ----
+    this.bindInput();
+
+    // ---- HUD ----
+    this.hud.onStart = () => { this.audio.init(); this.audio.ui(); this.startMatch(); };
+    this.hud.onResume = () => { this.audio.ui(); this.lockPointer(); };
+    this.hud.onRestart = () => location.reload();
+    this.hud.setHP(100);
+    this.hud.setAmmo(CFG.magSize, CFG.reserve, false);
+    this.hud.setScore(0, 0);
+    this.hud.setTimer(this.matchT);
+
+    // 错误捕获（便于自动化验证）
+    const errors: string[] = [];
+    window.addEventListener('error', (e) => errors.push(String(e.message)));
+    window.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+    window.__errors = errors;
+
+    window.__game = {
+      getState: () => ({
+        state: this.state,
+        hp: this.player.hp,
+        playerPos: { x: +this.player.pos.x.toFixed(2), y: +this.player.pos.y.toFixed(2), z: +this.player.pos.z.toFixed(2) },
+        bots: this.bots.map(b => ({
+          name: b.name, team: b.team, alive: b.alive, hp: b.hp, state: b.state,
+          pos: { x: +b.pos.x.toFixed(2), z: +b.pos.z.toFixed(2) },
+        })),
+        score: [...this.score],
+        timeLeft: Math.round(this.matchT),
+      }),
+      start: () => { this.audio.init(); this.startMatch(); },
+      look: (yaw: number, pitch: number) => { this.player.yaw = yaw; this.player.pitch = pitch; },
+      key: (code: string, down: boolean) => {
+        if (down) this.player.keys.add(code); else this.player.keys.delete(code);
+      },
+      setTrigger: (v: boolean) => { this.player.triggerHeld = v; },
+      teleport: (x: number, z: number) => this.player.teleport(x, z),
+      pos: () => ({ x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }),
+    };
 
     this.clock.start();
     this.loop();
   }
 
-  private spawnBots() {
-    for (const b of this.bots) this.scene.remove(b.mesh);
-    this.bots = [];
-    let id = 0;
-    // ALPHA 队友
-    for (let i = 0; i < BOT.count[TEAM_ALPHA]; i++) {
-      const sp = SPAWNS[TEAM_ALPHA][(i + 1) % SPAWNS[TEAM_ALPHA].length];
-      this.addBot(id++, TEAM_ALPHA, BOT_NAMES[TEAM_ALPHA][i], sp[0], sp[1]);
-    }
-    // BRAVO 敌人
-    for (let i = 0; i < BOT.count[TEAM_BRAVO]; i++) {
-      const sp = SPAWNS[TEAM_BRAVO][i % SPAWNS[TEAM_BRAVO].length];
-      this.addBot(id++, TEAM_BRAVO, BOT_NAMES[TEAM_BRAVO][i], sp[0], sp[1]);
-    }
+  // ================= 输入 =================
+  private bindInput(): void {
+    addEventListener('resize', () => {
+      this.camera.aspect = innerWidth / innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(innerWidth, innerHeight);
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      const locked = document.pointerLockElement === this.canvas;
+      if (!locked && this.state === 'playing') {
+        this.state = 'paused';
+        this.player.keys.clear();
+        this.player.triggerHeld = false;
+        this.hud.showPause(true);
+      }
+    });
+
+    this.canvas.addEventListener('click', () => {
+      if (this.state === 'playing' && document.pointerLockElement !== this.canvas) this.lockPointer();
+    });
+
+    addEventListener('keydown', (e) => {
+      if (e.code === 'Tab') { e.preventDefault(); this.hud.showScoreboard(this.scoreRows()); return; }
+      if (this.state !== 'playing') return;
+      this.player.keys.add(e.code);
+      if (e.code === 'KeyR') this.player.startReload();
+    });
+    addEventListener('keyup', (e) => {
+      if (e.code === 'Tab') { e.preventDefault(); this.hud.hideScoreboard(); return; }
+      this.player.keys.delete(e.code);
+    });
+
+    addEventListener('mousemove', (e) => {
+      if (this.state === 'playing' && document.pointerLockElement === this.canvas) {
+        this.player.lookDelta(e.movementX, e.movementY);
+      }
+    });
+    addEventListener('mousedown', (e) => {
+      if (this.state !== 'playing' || document.pointerLockElement !== this.canvas) return;
+      if (e.button === 0) this.player.triggerHeld = true;
+      if (e.button === 2) this.player.adsHeld = true;
+    });
+    addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.player.triggerHeld = false;
+      if (e.button === 2) this.player.adsHeld = false;
+    });
+    addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  private addBot(id: number, team: number, name: string, x: number, z: number) {
-    const bot = new Bot(id, team, name, x, z);
-    bot.onShoot = (b, o, d) => this.botShoot(b, o, d);
-    bot.onFootstep = (pos, sprint) => this.playBotFootstep(pos, sprint);
-    bot.onDeath = (b) => this.onBotDeath(b);
-    this.bots.push(bot);
-    this.scene.add(bot.mesh);
-  }
-
-  private playBotFootstep(pos: THREE.Vector3, sprint: boolean) {
-    // 简单处理：bot 脚步声直接播放（无位置声像，音量低）
-    this.audio.footstep(sprint);
-  }
-
-  // ---------- 比赛流程 ----------
-  private startMatch() {
-    this.audio.init();
-    this.audio.resume();
-    this.state = 'countdown';
-    this.countdownT = MATCH.countdown;
-    this.scores = [0, 0];
-    this.timeLeft = MATCH.roundTime;
-    this.hud.setScores(0, 0);
-    this.hud.setTimer(this.timeLeft);
-    document.getElementById('menu-overlay')!.classList.add('hidden');
-    document.getElementById('end-overlay')!.classList.add('hidden');
-    document.getElementById('pause-overlay')!.classList.add('hidden');
-    this.hud.show();
-    this.hud.flashHint();
-    this.resetPositions();
-    if (!DEBUG) this.player.requestLock(this.canvas);
-  }
-
-  private resetPositions() {
-    const sp = SPAWNS[TEAM_ALPHA][0];
-    this.player.respawn(sp[0], sp[1], -Math.PI / 2);
-    this.weapon.reset();
-    this.hud.setAmmo(this.weapon.mag, this.weapon.reserve);
-    this.hud.setHealth(this.player.hp);
-    let ai = 0, bi = 0;
-    for (const b of this.bots) {
-      const spawns = SPAWNS[b.team];
-      const s = spawns[(b.team === TEAM_ALPHA ? ai++ : bi++) % spawns.length];
-      b.respawn(s[0], s[1]);
+  private lockPointer(): void {
+    this.canvas.requestPointerLock();
+    // pointerlockchange 成功后由状态机恢复；这里直接恢复（失败时鼠标仍可操作）
+    if (this.state === 'paused') {
+      this.state = 'playing';
+      this.hud.showPause(false);
     }
   }
 
-  private pause() {
-    if (this.state !== 'playing') return;
-    this.state = 'paused';
-    document.getElementById('pause-overlay')!.classList.remove('hidden');
-  }
-
-  private resume() {
-    if (this.state !== 'paused') return;
+  // ================= 比赛流程 =================
+  private startMatch(): void {
     this.state = 'playing';
-    document.getElementById('pause-overlay')!.classList.add('hidden');
-    if (!DEBUG) this.player.requestLock(this.canvas);
+    this.hud.showMenu(false);
+    this.hud.showHUD(true);
+    this.hud.centerMsg('消灭敌方小队！率先获得 35 杀获胜', 3.5);
+    this.lockPointer();
   }
 
-  private restart() {
-    document.getElementById('pause-overlay')!.classList.add('hidden');
-    document.getElementById('end-overlay')!.classList.add('hidden');
-    this.startMatch();
+  private scoreRows() {
+    return this.stats;
   }
 
-  private endMatch() {
-    this.state = 'end';
-    this.endWin = this.scores[TEAM_ALPHA] >= MATCH.killTarget || this.scores[TEAM_ALPHA] > this.scores[TEAM_BRAVO];
-    const title = document.getElementById('end-title')!;
-    const scoreEl = document.getElementById('end-score')!;
-    if (this.scores[TEAM_ALPHA] === this.scores[TEAM_BRAVO]) {
-      title.textContent = '平局';
-      title.className = '';
-    } else {
-      title.textContent = this.endWin ? '胜利！' : '战败';
-      title.className = this.endWin ? 'win' : 'lose';
-    }
-    scoreEl.textContent = `${this.scores[TEAM_ALPHA]} : ${this.scores[TEAM_BRAVO]} — ${this.endWin ? 'ALPHA 沙暴获胜' : 'BRAVO 毒蝎获胜'}`;
-    document.getElementById('end-overlay')!.classList.remove('hidden');
-    this.audio.roundEnd(this.endWin);
-    if (!DEBUG) document.exitPointerLock?.();
+  private endMatch(): void {
+    this.state = 'ended';
+    document.exitPointerLock?.();
+    const victory = this.score[TEAM.BLUE] >= this.score[TEAM.RED];
+    this.hud.showEnd(victory, this.score[TEAM.BLUE], this.score[TEAM.RED], this.stats);
   }
 
-  // ---------- 击杀 ----------
-  private onBotDeath(bot: Bot) {
-    const killerTeam = bot.lastAttacker === 'player' ? TEAM_ALPHA : (bot.lastAttacker ? bot.lastAttacker.team : (bot.team === TEAM_ALPHA ? TEAM_BRAVO : TEAM_ALPHA));
-    this.scores[killerTeam]++;
-    this.hud.setScores(this.scores[TEAM_ALPHA], this.scores[TEAM_BRAVO]);
-    const killerName = bot.lastAttacker === 'player' ? '你' : (bot.lastAttacker ? bot.lastAttacker.name : '???');
-    this.hud.addKill({
-      killer: killerName, killerTeam,
-      victim: bot.name, victimTeam: bot.team,
-      headshot: false, isMe: bot.lastAttacker === 'player',
-    });
-    if (bot.lastAttacker === 'player') {
-      this.hud.showKillBanner(`✕ 击杀 ${bot.name}`);
-    }
-    // 重生
-    setTimeout(() => {
-      if (this.state === 'end') return;
-      const spawns = SPAWNS[bot.team];
-      const s = spawns[Math.floor(Math.random() * spawns.length)];
-      bot.respawn(s[0], s[1]);
-    }, BOT.respawnDelay * 1000);
-    this.checkWin();
-  }
+  // ================= 射击裁决 =================
+  private playerShoot(): void {
+    const origin = this.player.eyePos;
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const s = this.player.currentSpread();
+    dir.x += (Math.random() - 0.5) * 2 * s;
+    dir.y += (Math.random() - 0.5) * 2 * s;
+    dir.z += (Math.random() - 0.5) * 2 * s;
+    dir.normalize();
 
-  private onPlayerDeath() {
-    this.scores[TEAM_BRAVO]++;
-    this.hud.setScores(this.scores[TEAM_ALPHA], this.scores[TEAM_BRAVO]);
-    this.respawnT = 3.0;
-    this.audio.death();
-    const killer = this.lastPlayerKiller;
-    this.hud.addKill({
-      killer: killer ? killer.name : 'BRAVO 毒蝎', killerTeam: TEAM_BRAVO,
-      victim: '你', victimTeam: TEAM_ALPHA, headshot: false, isMe: false,
-    });
-    this.hud.showRespawn(killer ? `被 ${killer.name} 击杀` : '你被击毙', this.respawnT);
-    this.checkWin();
-  }
+    const muzzle = origin.clone().add(dir.clone().multiplyScalar(0.7));
+    muzzle.y -= 0.12;
 
-  private lastPlayerKiller: Bot | null = null;
-
-  private checkWin() {
-    if (this.scores[TEAM_ALPHA] >= MATCH.killTarget || this.scores[TEAM_BRAVO] >= MATCH.killTarget) {
-      this.endMatch();
-    }
-  }
-
-  // ---------- 射击 ----------
-  private playerShoot(origin: THREE.Vector3, dir: THREE.Vector3) {
-    // 散布
-    const spread = this.weapon.currentSpread(this.player.moveFactor, this.player.airFactor);
-    const shotDir = applySpread(dir, spread);
-    const range = WEAPON.range;
-
-    // 墙体
-    const wall = raycastWorld(origin, shotDir, range, this.player.char.collider);
-    const wallDist = wall ? wall.dist : range;
-
-    // 机器人
-    let bestBot: Bot | null = null;
-    let bestDist = wallDist;
-    let bestHead = false;
-    for (const b of this.bots) {
-      if (!b.alive || b.team === TEAM_ALPHA) continue;
-      const hit = rayVsCharacter(origin, shotDir, bestDist, b.pos, BOT.radius, BOT.height);
-      if (hit && hit.dist < bestDist) {
-        bestDist = hit.dist;
-        bestBot = b;
-        bestHead = hit.headshot;
-      }
-    }
-
-    // 曳光 + 枪口
-    const muzzle = this.weapon.getMuzzleWorld(new THREE.Vector3());
-    const end = bestBot
-      ? new THREE.Vector3(bestBot.pos.x, bestBot.pos.y + (bestHead ? 1.6 : 1.0), bestBot.pos.z)
-      : wall ? wall.point : origin.clone().addScaledVector(shotDir, range);
+    const hit = this.castWorld(origin, dir, CFG.range, this.player.collider);
+    const end = hit ? hit.point : origin.clone().add(dir.clone().multiplyScalar(CFG.range));
     this.effects.tracer(muzzle, end);
-    this.effects.muzzleFlash(muzzle, true);
-    this.audio.shot(null, this.camera, true);
+    this.effects.muzzleFlash(muzzle);
+    this.audio.shot(0, true);
 
-    if (bestBot) {
-      const falloff = damageFalloff(bestDist);
-      const dmg = WEAPON.damage * (bestHead ? WEAPON.headshotMult : 1) * falloff;
-      const died = bestBot.takeDamage(dmg, 'player', this.player.pos);
-      this.hud.setHitmarker(bestHead);
-      this.audio.hit(bestHead);
-      const hitPoint = new THREE.Vector3(bestBot.pos.x, bestBot.pos.y + 1.2, bestBot.pos.z);
-      this.effects.impact(hitPoint, new THREE.Vector3(0, 1, 0), 'flesh');
-    } else if (wall) {
-      this.effects.impact(wall.point, wall.normal, 'stone');
+    if (hit) {
+      const bot = this.botColliderMap.get(hit.colliderHandle);
+      if (bot && bot.alive && bot.team !== TEAM.BLUE) {
+        const head = hit.point.y > bot.pos.y + CFG.playerHeadY;
+        this.effects.impact(hit.point, 0xb03030, 12, 3);
+        this.damageBot(bot, CFG.playerDamage * (head ? CFG.playerHeadMul : 1), '你', TEAM.BLUE, head);
+      } else {
+        const matColor = hit.isWall ? 0xc8a870 : 0x8a6a45;
+        this.effects.impact(hit.point, matColor, 8, 2);
+      }
     }
-
-    // 后坐力
-    this.player.addRecoil(WEAPON.recoilPitchDeg, (Math.random() - 0.5) * 2 * WEAPON.recoilYawDeg);
   }
 
-  private botShoot(bot: Bot, origin: THREE.Vector3, dir: THREE.Vector3) {
-    const range = 90;
-    const wall = raycastWorld(origin, dir, range, bot.char.collider);
-    const wallDist = wall ? wall.dist : range;
+  private botShoot = (bot: Bot, from: THREE.Vector3, to: THREE.Vector3): void => {
+    const dir = to.clone().sub(from).normalize();
+    const distToPlayer = this.player.alive ? from.distanceTo(this.player.pos) : 999;
+    this.audio.shot(distToPlayer, false);
+    this.effects.muzzleFlash(bot.muzzlePos);
 
-    const muzzle = new THREE.Vector3();
-    bot.muzzleFlashT = 0.06;
+    const hit = this.castWorld(from, dir, CFG.range, bot.collider);
+    const end = hit ? hit.point : to;
+    this.effects.tracer(bot.muzzlePos, end);
 
-    // 命中玩家？
-    let end: THREE.Vector3;
-    const pHit = this.player.alive
-      ? rayVsCharacter(origin, dir, wallDist, this.player.pos, 0.4, 1.8)
-      : null;
-
-    if (pHit && pHit.dist < wallDist) {
-      end = origin.clone().addScaledVector(dir, pHit.dist);
-      // 命中玩家
-      const killed = this.player.takeDamage(BOT.damage, bot.pos);
-      this.hud.damageFlash(0.9);
-      const bearing = Math.atan2(bot.pos.x - this.player.pos.x, bot.pos.z - this.player.pos.z);
-      const fwdBearing = Math.atan2(-Math.sin(this.player.yaw), -Math.cos(this.player.yaw));
-      let rel = bearing - fwdBearing;
-      while (rel > Math.PI) rel -= Math.PI * 2;
-      while (rel < -Math.PI) rel += Math.PI * 2;
-      this.hud.damageFrom(rel);
-      this.audio.hurt();
-      if (killed) this.lastPlayerKiller = bot;
-      this.effects.impact(end, dir.clone().negate(), 'flesh');
-    } else if (wall) {
-      end = wall.point;
-      this.effects.impact(wall.point, wall.normal, 'stone');
+    if (!hit) return;
+    const botHit = this.botColliderMap.get(hit.colliderHandle);
+    if (botHit && botHit.alive) {
+      if (botHit.team === bot.team) return; // 队友挡枪
+      const head = hit.point.y > botHit.pos.y + CFG.botHeadY;
+      this.effects.impact(hit.point, 0xb03030, 10, 2.5);
+      this.damageBot(botHit, CFG.botDamage * 2, bot.name, bot.team, head);
+    } else if (hit.isPlayer) {
+      const head = hit.point.y > this.player.pos.y + CFG.botHeadY;
+      this.effects.impact(hit.point, 0xb03030, 10, 2.5);
+      this.damagePlayer(CFG.botDamage * (head ? 1.8 : 1), bot);
     } else {
-      end = origin.clone().addScaledVector(dir, range);
+      this.effects.impact(hit.point, hit.isWall ? 0xc8a870 : 0x8a6a45, 6, 1.8);
     }
+  };
 
-    this.effects.tracer(origin, end, 0xffc080);
-    this.effects.muzzleFlash(origin, false);
-    this.audio.shot(bot.pos, this.camera, false);
-    bot.lastShotTime = performance.now() / 1000;
+  private castWorld(
+    origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number, exclude: RAPIER.Collider,
+  ): { point: THREE.Vector3; colliderHandle: number; isWall: boolean; isPlayer: boolean } | null {
+    const ray = new RAPIER.Ray({ x: origin.x, y: origin.y, z: origin.z }, { x: dir.x, y: dir.y, z: dir.z });
+    const hit = this.world.castRayAndGetNormal(ray, maxDist, true, undefined, undefined, exclude, undefined);
+    if (!hit) return null;
+    const toi = hit.toi;
+    const point = origin.clone().add(dir.clone().multiplyScalar(toi));
+    const handle = hit.collider.handle;
+    return {
+      point,
+      colliderHandle: handle,
+      isWall: !this.botColliderMap.has(handle) && handle !== this.player.collider.handle,
+      isPlayer: handle === this.player.collider.handle,
+    };
   }
 
-  // ---------- 主循环 ----------
-  private loop() {
-    requestAnimationFrame(() => this.loop());
-    const dt = Math.min(this.clock.getDelta(), 0.05);
-
-    if (this.state === 'countdown') {
-      this.countdownT -= dt;
-      const n = Math.ceil(this.countdownT);
-      this.hud.showKillBanner(n > 0 ? String(n) : '开战！');
-      if (this.countdownT <= 0) {
-        this.state = 'playing';
-        this.hud.showKillBanner('开战！');
-        this.audio.roundStart();
+  // ================= 伤害与击杀 =================
+  private damageBot(bot: Bot, dmg: number, killerName: string, killerTeam: TeamId, head: boolean): void {
+    if (!bot.alive) return;
+    bot.hp -= dmg;
+    if (killerName === '你') {
+      this.hud.showHitmarker(head);
+      this.audio.hit(head);
+    }
+    if (bot.hp <= 0) {
+      bot.die();
+      this.score[killerTeam]++;
+      this.hud.setScore(this.score[0], this.score[1]);
+      this.hud.killFeedAdd({ killer: killerName, killerTeam, victim: bot.name, victimTeam: bot.team, headshot: head, weapon: '步枪', t: 0 });
+      const st = this.stats.find(s => s.name === bot.name);
+      if (st) st.deaths++;
+      if (killerName === '你') {
+        const stMe = this.stats.find(s => s.isPlayer);
+        if (stMe) stMe.kills++;
+        this.audio.kill();
+        this.hud.centerMsg(head ? '爆头击杀！' : `击杀 ${bot.name}`, 1.2);
       }
+      this.botRespawnQueue.push({ bot, t: CFG.botRespawn });
+      this.checkMatchEnd();
+    }
+  }
+
+  private damagePlayer(dmg: number, killer: Bot): void {
+    if (!this.player.alive || this.state !== 'playing') return;
+    this.player.hp -= dmg;
+    this.hud.setHP(this.player.hp);
+    this.hud.flashDamage();
+    this.audio.hurt();
+    if (this.player.hp <= 0) {
+      this.player.die();
+      this.score[killer.team]++;
+      this.hud.setScore(this.score[0], this.score[1]);
+      this.hud.killFeedAdd({ killer: killer.name, killerTeam: killer.team, victim: '你', victimTeam: TEAM.BLUE, headshot: false, weapon: '步枪', t: 0 });
+      const st = this.stats.find(s => s.name === killer.name);
+      if (st) st.kills++;
+      const stMe = this.stats.find(s => s.isPlayer);
+      if (stMe) stMe.deaths++;
+      this.hud.showDeath(killer.name, killer.team);
+      this.respawnT = CFG.respawnTime;
+      this.checkMatchEnd();
+    }
+  }
+
+  private checkMatchEnd(): void {
+    if (this.state !== 'playing') return;
+    if (this.score[0] >= CFG.killTarget || this.score[1] >= CFG.killTarget) this.endMatch();
+  }
+
+  // ================= 主循环 =================
+  private loop = (): void => {
+    requestAnimationFrame(this.loop);
+    const dt = Math.min(this.clock.getDelta(), 0.05);
+    this.gameT += dt;
+
+    if (this.state === 'menu') {
+      // 菜单背景：环绕镜头
+      const t = this.gameT * 0.08;
+      this.camera.position.set(Math.cos(t) * 46, 32, Math.sin(t) * 46);
+      this.camera.lookAt(0, -2, 0);
     }
 
-    if (this.state === 'playing') {
-      this.acc += dt;
-      const FIXED = 1 / 60;
-      let steps = 0;
-      while (this.acc >= FIXED && steps < 4) {
-        this.stepGame(FIXED);
-        this.acc -= FIXED;
-        steps++;
+    if (this.state === 'playing' || this.state === 'ended') {
+      // 玩家
+      if (this.state === 'playing') this.player.update(dt, this.gameT);
+
+      // 机器人间简单分离
+      const alive = this.bots.filter(b => b.alive);
+      for (let i = 0; i < alive.length; i++) {
+        for (let j = i + 1; j < alive.length; j++) {
+          const a = alive[i], b = alive[j];
+          const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+          const d = Math.hypot(dx, dz);
+          if (d < 0.9 && d > 1e-4) {
+            const push = (0.9 - d) / 2;
+            const nx = dx / d, nz = dz / d;
+            a.body.setTranslation({ x: a.pos.x - nx * push, y: a.pos.y, z: a.pos.z - nz * push }, false);
+            b.body.setTranslation({ x: b.pos.x + nx * push, y: b.pos.y, z: b.pos.z + nz * push }, false);
+          }
+        }
       }
-      if (steps === 4) this.acc = 0;
+
+      // 机器人 AI
+      for (const bot of this.bots) {
+        if (!bot.alive) { bot.update(dt, this.gameT, this.nav, this.world, [], this.botShoot); continue; }
+        const enemies: Array<{ pos: THREE.Vector3; alive: boolean; isPlayer: boolean; ref: unknown }> = this.bots
+          .filter(o => o.team !== bot.team && o.alive)
+          .map(o => ({ pos: o.pos, alive: o.alive, isPlayer: false, ref: o }));
+        if (bot.team === TEAM.RED && this.player.alive) {
+          enemies.push({ pos: this.player.pos, alive: true, isPlayer: true, ref: this.player });
+        }
+        bot.update(dt, this.gameT, this.nav, this.world, enemies, this.botShoot);
+      }
+
+      this.world.step();
+
+      // 玩家重生
+      if (!this.player.alive && this.state === 'playing') {
+        this.respawnT -= dt;
+        this.hud.setRespawnT(Math.max(this.respawnT, 0));
+        if (this.respawnT <= 0) {
+          const sp = BLUE_SPAWNS[Math.floor(Math.random() * BLUE_SPAWNS.length)];
+          this.player.teleport(sp[0], sp[1]);
+          this.player.revive();
+          this.hud.setHP(100);
+          this.hud.setAmmo(CFG.magSize, CFG.reserve, false);
+          this.hud.hideDeath();
+        }
+      }
+
+      // 机器人重生
+      for (let i = this.botRespawnQueue.length - 1; i >= 0; i--) {
+        const q = this.botRespawnQueue[i];
+        q.t -= dt;
+        if (q.t <= 0) {
+          q.bot.revive();
+          this.botRespawnQueue.splice(i, 1);
+        }
+      }
 
       // 计时
-      this.timeLeft -= dt;
-      this.hud.setTimer(this.timeLeft);
-      if (this.timeLeft <= 0) {
-        this.hud.setTimer(0);
-        this.endMatch();
+      if (this.state === 'playing') {
+        this.matchT -= dt;
+        this.hud.setTimer(Math.max(this.matchT, 0));
+        if (this.matchT <= 0) this.endMatch();
       }
     }
-
-    if (this.flyMode) this.updateFly(dt);
 
     this.effects.update(dt);
-
-    // HUD 每帧
-    if (this.state !== 'menu') {
-      const spreadPx = 4 + this.weapon.currentSpread(this.player.moveFactor, this.player.airFactor) * 900 + this.weapon.bloom * 20;
-      this.hud.setCrosshairSpread(spreadPx);
-      this.hud.setSpawnProtect(this.player.spawnProtecT > 0 && this.player.alive);
-
-      this.minimapTimer -= dt;
-      if (this.minimapTimer <= 0) {
-        this.minimapTimer = 0.12;
-        const now = performance.now() / 1000;
-        this.hud.drawMinimap(
-          this.player.pos, this.player.yaw,
-          this.bots.filter(b => b.team === TEAM_ALPHA).map(b => ({ x: b.pos.x, z: b.pos.z, team: 0, alive: b.alive })),
-          this.bots.filter(b => b.team === TEAM_BRAVO).map(b => ({
-            x: b.pos.x, z: b.pos.z, team: 1,
-            alive: b.alive,
-            visible: b.alive && (now - (b.lastShotTime || 0) < 2.5),
-          })),
-        );
-      }
-    }
-
+    this.hud.update(dt);
     this.renderer.render(this.scene, this.camera);
-  }
+  };
+}
 
-  private stepGame(dt: number) {
-    // 玩家
-    const lookDir = this.player.getLookDir(new THREE.Vector3());
-    this.player.update(dt);
-    if (this.player.alive) {
-      this.weapon.applyToCamera(this.camera);
-      this.weapon.update(dt, this.player.firing, this.player.moveFactor, this.player.airFactor,
-        this.player.eyePos, lookDir);
-      if (this.player.keys.has('KeyR')) {
-        this.player.keys.delete('KeyR');
-        if (this.weapon.startReload()) this.audio.reload();
-      }
-      // 换弹键也可用 E
-      if (this.player.keys.has('KeyE')) {
-        this.player.keys.delete('KeyE');
-        if (this.weapon.startReload()) this.audio.reload();
-      }
-    } else {
-      // 重生倒计时
-      this.respawnT -= dt;
-      this.hud.updateRespawnTimer(this.respawnT);
-      if (this.respawnT <= 0) {
-        const spawns = SPAWNS[TEAM_ALPHA];
-        const s = spawns[Math.floor(Math.random() * spawns.length)];
-        this.player.respawn(s[0], s[1], -Math.PI / 2);
-        this.hud.hideRespawn();
-        this.hud.setHealth(this.player.hp);
-      }
-    }
-
-    // 机器人
-    for (const b of this.bots) {
-      b.update(dt, this.player.char, this.player.alive, this.bots);
-    }
-
-    // 物理步进
-    world?.step();
-  }
-
-  private updateFly(dt: number) {
-    const speed = 30;
-    const k = this.player.keys;
-    const f = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
-    const r = new THREE.Vector3(-f.z, 0, f.x);
-    const move = new THREE.Vector3();
-    if (k.has('KeyW')) move.add(f);
-    if (k.has('KeyS')) move.sub(f);
-    if (k.has('KeyD')) move.add(r);
-    if (k.has('KeyA')) move.sub(r);
-    if (k.has('KeyE') || k.has('Space')) move.y += 1;
-    if (k.has('KeyQ')) move.y -= 1;
-    if (move.lengthSq() > 0) move.normalize();
-    this.camera.position.addScaledVector(move, speed * dt);
-    this.camera.rotation.set(this.player.pitch, this.player.yaw, 0, 'YXZ');
-  }
-
-  private debugTopDown() {
-    this.camera.position.set(0, 130, 0.01);
-    this.camera.rotation.set(-Math.PI / 2, 0, 0, 'YXZ');
-    this.renderer.render(this.scene, this.camera);
-    (window as any).__screenshotReady = true;
+// ---------- 全局声明 ----------
+declare global {
+  interface Window {
+    __errors: string[];
+    __game: unknown;
   }
 }
 
-// ---------- 工具 ----------
-function applySpread(dir: THREE.Vector3, spreadRad: number): THREE.Vector3 {
-  const a = Math.random() * Math.PI * 2;
-  const r = Math.sqrt(Math.random()) * spreadRad;
-  const up = Math.abs(dir.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-  const realUp = new THREE.Vector3().crossVectors(right, dir).normalize();
-  return dir.clone()
-    .addScaledVector(right, Math.cos(a) * r)
-    .addScaledVector(realUp, Math.sin(a) * r)
-    .normalize();
+function makeSunSprite(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  grad.addColorStop(0, 'rgba(255,252,240,1)');
+  grad.addColorStop(0.25, 'rgba(255,240,200,0.95)');
+  grad.addColorStop(1, 'rgba(255,230,170,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
 }
 
-function damageFalloff(dist: number): number {
-  if (dist <= WEAPON.falloffStart) return 1;
-  if (dist >= WEAPON.falloffEnd) return WEAPON.falloffMin;
-  const t = (dist - WEAPON.falloffStart) / (WEAPON.falloffEnd - WEAPON.falloffStart);
-  return 1 - t * (1 - WEAPON.falloffMin);
-}
-
-// ---------- 启动 ----------
+// 启动
 const game = new Game();
-game.init().catch((err) => {
-  console.error('游戏初始化失败:', err);
-  document.body.innerHTML = `<div style="color:#fff;padding:40px;font-family:sans-serif">
-    <h2>初始化失败</h2><pre>${String(err)}</pre></div>`;
-});
+game.init();

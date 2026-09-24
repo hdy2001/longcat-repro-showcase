@@ -1,505 +1,355 @@
-// ===== 机器人：网格 + AI =====
+// 机器人：导航 AI（A* 路径点）+ 视线感知 + 点射交火 + 撤退
 import * as THREE from 'three';
-import { BOT, TEAM_ALPHA, PLAYER_TEAM } from './config';
-import { Character, createCharacter, moveCharacter, raycastWorld } from './physics';
-import { WAYPOINTS, WAYPOINT_EDGES, BOT_OBJECTIVES } from './map/mapData';
-import { nearestWaypoint, findPath } from './waypoints';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { CFG, TEAM, TEAM_INFO, type TeamId } from './config';
+import { BLUE_SPAWNS, RED_SPAWNS } from './mapdata';
+import type { NavGraph } from './map';
+import { makeCamoTexture, makeTextSprite } from './textures';
 
-export type BotState = 'patrol' | 'engage' | 'hunt' | 'dead';
+const BOT_NAMES: Array<[string, TeamId]> = [
+  ['毒蝎', TEAM.RED], ['响尾蛇', TEAM.RED], ['秃鹫', TEAM.RED], ['沙暴', TEAM.RED], ['眼镜蛇', TEAM.RED],
+  ['猎鹰', TEAM.BLUE], ['孤狼', TEAM.BLUE], ['夜鹰', TEAM.BLUE], ['闪电', TEAM.BLUE],
+];
 
-const _v1 = new THREE.Vector3();
-const _v2 = new THREE.Vector3();
-const _dir = new THREE.Vector3();
+export type BotState = 'patrol' | 'engage' | 'pursue' | 'retreat';
 
-// 队伍配色
-const TEAM_VEST = [0xb08d4f, 0x5d7a4a];   // ALPHA 沙黄 / BRAVO 橄榄绿
-const TEAM_HELMET = [0x8a6f3e, 0x49603a];
+let camoTex: THREE.Texture | null = null;
 
 export class Bot {
   id: number;
-  team: number;
   name: string;
-  char: Character;
-  state: BotState = 'patrol';
-  hp = BOT.hp;
-  alive = true;
+  team: TeamId;
+  body: RAPIER.RigidBody;
+  collider: RAPIER.Collider;
+  controller: RAPIER.KinematicCharacterController;
   mesh: THREE.Group;
-  private head: THREE.Mesh;
-  private legL: THREE.Mesh;
-  private legR: THREE.Mesh;
-  private gunMesh: THREE.Group;
-  private nameSprite: THREE.Sprite;
-  private muzzle: THREE.Object3D;
+  hp = CFG.botHP;
+  alive = true;
 
-  // AI
-  private path: number[] = [];
-  private pathIdx = 0;
-  private repathTimer = 0;
-  private thinkTimer = 0;
-  private stuckTimer = 0;
-  private lastPos = new THREE.Vector3();
-  private targetBot: Bot | null = null;
-  private targetPlayerFlag = false;
-  playerAliveRef = true;
-  private targetLastKnown = new THREE.Vector3();
-  private reactTimer = 0;
-  private burstLeft = 0;
-  private shotCooldown = 0;
-  private loseSightTimer = 0;
-  private aimYaw = 0;
-  private aimPitch = 0;
-  private walkCycle = 0;
-  private stepTimer = 0;
-  spawnProtecT = 0;
-  lastAttacker: Bot | 'player' | null = null;
-  muzzleFlashT = 0;
-  lastShotTime = 0;
+  state: BotState = 'patrol';
+  path: number[] = [];
+  pathI = 0;
+  repathT = 0;
+  objective = -1;
+  lastKnown = new THREE.Vector3();
+  lastSeenT = 0;
+  reactT = 0;
+  burstLeft = 0;
+  burstPause = 0;
+  aimYaw = 0;
+  aimPitch = 0;
+  stuckT = 0;
+  lastPos = new THREE.Vector3();
+  private vy = 0;
+  private deadT = 0;
+  private mats: THREE.Material[] = [];
+  private ring: THREE.Mesh;
 
-  // 事件回调（由 main 注入）
-  onShoot: ((bot: Bot, origin: THREE.Vector3, dir: THREE.Vector3) => void) | null = null;
-  onFootstep: ((pos: THREE.Vector3, sprint: boolean) => void) | null = null;
-  onDeath: ((bot: Bot) => void) | null = null;
+  // 回调（由 Game 注入）
+  onFire: ((bot: Bot, from: THREE.Vector3, to: THREE.Vector3) => void) | null = null;
 
-  constructor(id: number, team: number, name: string, x: number, z: number) {
+  constructor(world: RAPIER.World, id: number) {
     this.id = id;
-    this.team = team;
-    this.name = name;
-    this.char = createCharacter(x, 0, z, BOT.height / 2 - BOT.radius, BOT.radius);
-    this.mesh = new THREE.Group();
-    this.buildMesh();
-    this.muzzle = new THREE.Object3D();
-    this.muzzle.position.set(0.14, 1.32, -0.5);
-    this.mesh.add(this.muzzle);
-    this.head = this.mesh.getObjectByName('head') as THREE.Mesh;
-    this.legL = this.mesh.getObjectByName('legL') as THREE.Mesh;
-    this.legR = this.mesh.getObjectByName('legR') as THREE.Mesh;
-    this.gunMesh = this.mesh.getObjectByName('gun') as THREE.Group;
-    this.nameSprite = this.mesh.getObjectByName('name') as THREE.Sprite;
-    this.spawnProtecT = BOT.spawnProtectTime;
-    this.aimYaw = Math.atan2(-x, -z) + Math.PI;
-  }
+    this.name = BOT_NAMES[id % BOT_NAMES.length][0];
+    this.team = BOT_NAMES[id % BOT_NAMES.length][1];
+    const spawns = this.team === TEAM.BLUE ? BLUE_SPAWNS : RED_SPAWNS;
+    const [sx, sz] = spawns[id % spawns.length];
 
-  get pos() { return this.char.pos; }
-  get eyePos(): THREE.Vector3 {
-    return _v1.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
-  }
+    this.body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(sx, 0.9, sz),
+    );
+    this.collider = world.createCollider(
+      RAPIER.ColliderDesc.capsule(0.5, CFG.radius).setFriction(0.2),
+      this.body,
+    );
+    this.controller = world.createCharacterController(0.02);
+    this.controller.enableAutostep(0.45, 0.2, true);
+    this.controller.setMaxSlopeClimbAngle(0.8);
+    this.controller.setApplyImpulsesToDynamicBodies(false);
 
-  private buildMesh() {
-    const g = this.mesh;
-    const vest = new THREE.MeshStandardMaterial({ color: TEAM_VEST[this.team], roughness: 0.9 });
-    const helmet = new THREE.MeshStandardMaterial({ color: TEAM_HELMET[this.team], roughness: 0.85 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc9a184, roughness: 0.9 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2c2c30, roughness: 0.6, metalness: 0.4 });
+    // ---- 外观 ----
+    if (!camoTex) camoTex = makeCamoTexture();
+    const teamColor = TEAM_INFO[this.team].color;
+    const g = new THREE.Group();
 
-    // 躯干
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.62, 0.3), vest);
-    body.position.y = 1.08;
-    body.castShadow = true;
-    g.add(body);
-    // 头
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), skin);
-    head.position.y = 1.62;
+    const bodyMat = new THREE.MeshLambertMaterial({ map: camoTex });
+    const helmMat = new THREE.MeshLambertMaterial({ color: teamColor });
+    const gunMat = new THREE.MeshLambertMaterial({ color: 0x22201e });
+    this.mats = [bodyMat, helmMat, gunMat];
+
+    const bodyMesh = new THREE.Mesh(new THREE.CapsuleGeometry(CFG.radius, 1.0, 4, 10), bodyMat);
+    bodyMesh.castShadow = true;
+    g.add(bodyMesh);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10), helmMat);
+    head.position.y = 0.72;
     head.castShadow = true;
-    head.name = 'head';
     g.add(head);
-    // 头盔
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), helmet);
-    helm.position.y = 1.66;
-    helm.castShadow = true;
-    g.add(helm);
-    // 腿
-    const legGeo = new THREE.BoxGeometry(0.17, 0.78, 0.2);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.95 });
-    const legL = new THREE.Mesh(legGeo, legMat);
-    legL.position.set(-0.14, 0.39, 0);
-    legL.castShadow = true;
-    legL.name = 'legL';
-    g.add(legL);
-    const legR = new THREE.Mesh(legGeo, legMat);
-    legR.position.set(0.14, 0.39, 0);
-    legR.castShadow = true;
-    legR.name = 'legR';
-    g.add(legR);
-    // 手臂
-    const armGeo = new THREE.BoxGeometry(0.12, 0.5, 0.14);
-    const arm = new THREE.Mesh(armGeo, vest);
-    arm.position.set(0.3, 1.1, -0.1);
-    arm.rotation.x = -1.1;
-    g.add(arm);
-    // 枪
-    const gun = new THREE.Group();
-    gun.name = 'gun';
-    const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.62), dark);
-    gunBody.position.set(0, 0, -0.28);
-    gun.add(gunBody);
-    const gunMag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.08), dark);
-    gunMag.position.set(0, -0.1, -0.1);
-    gun.add(gunMag);
-    gun.position.set(0.14, 1.32, -0.42);
+
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.62), gunMat);
+    gun.position.set(0.22, 0.32, -0.3);
     g.add(gun);
-    // 名牌
-    const nameMat = new THREE.SpriteMaterial({
-      map: makeNameTexture(this.name, this.team),
-      transparent: true,
-      depthWrite: false,
-    });
-    const name = new THREE.Sprite(nameMat);
-    name.scale.set(1.6, 0.4, 1);
-    name.position.y = 2.05;
-    name.name = 'name';
-    g.add(name);
+
+    // 脚下队伍光环
+    this.ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.42, 0.55, 20),
+      new THREE.MeshBasicMaterial({ color: teamColor, transparent: true, opacity: 0.55, side: THREE.DoubleSide }),
+    );
+    this.ring.rotation.x = -Math.PI / 2;
+    this.ring.position.y = -0.82;
+    g.add(this.ring);
+
+    // 名字标签
+    const tag = makeTextSprite(this.name, TEAM_INFO[this.team].css, 40);
+    tag.position.y = 1.35;
+    g.add(tag);
+
+    this.mesh = g;
   }
 
-  // 每帧更新
-  update(dt: number, playerChar: Character, playerAlive: boolean, bots: Bot[]) {
-    if (!this.alive) return;
-    this.playerAliveRef = playerAlive;
-    this.spawnProtecT = Math.max(0, this.spawnProtecT - dt);
-    this.thinkTimer -= dt;
-    this.shotCooldown -= dt;
-    this.repathTimer -= dt;
-    this.muzzleFlashT = Math.max(0, this.muzzleFlashT - dt);
-
-    if (this.thinkTimer <= 0) {
-      this.thinkTimer = 0.16 + Math.random() * 0.08;
-      this.think(playerChar, playerAlive, bots);
-    }
-
-    // 移动
-    let moveX = 0, moveZ = 0;
-    const engaging = this.state === 'engage' && this.hasTarget();
-    const speed = engaging ? BOT.engageSpeed : BOT.runSpeed;
-
-    if (engaging) {
-      const t = this.getCurrentTargetPos();
-      if (t) {
-        const dx = t.x - this.pos.x;
-        const dz = t.z - this.pos.z;
-        const dist = Math.hypot(dx, dz);
-        const desiredYaw = Math.atan2(dx, dz);
-        this.aimYaw = lerpAngle(this.aimYaw, desiredYaw, dt * 8);
-        const dy = (t.y + 1.2) - (this.pos.y + 1.55);
-        this.aimPitch = Math.atan2(dy, Math.max(0.1, dist));
-        const toward = dist > 22 ? 1 : dist < 8 ? -0.7 : 0;
-        const strafe = Math.sin(performance.now() / 900 + this.id * 2.1) > 0 ? 1 : -1;
-        moveX = (dx / (dist || 1)) * toward + (-dz / (dist || 1)) * strafe * 0.6;
-        moveZ = (dz / (dist || 1)) * toward + (dx / (dist || 1)) * strafe * 0.6;
-        const len = Math.hypot(moveX, moveZ) || 1;
-        moveX = (moveX / len) * speed;
-        moveZ = (moveZ / len) * speed;
-      }
-    } else if (this.pathIdx < this.path.length) {
-      const node = WAYPOINTS[this.path[this.pathIdx]];
-      const dx = node.x - this.pos.x;
-      const dz = node.z - this.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 1.0) {
-        this.pathIdx++;
-      } else {
-        const targetYaw = Math.atan2(dx, dz);
-        this.aimYaw = lerpAngle(this.aimYaw, targetYaw, dt * 6);
-        this.aimPitch = lerpAngle(this.aimPitch, 0, dt * 6);
-        moveX = (dx / dist) * speed;
-        moveZ = (dz / dist) * speed;
-      }
-    } else if (this.state === 'hunt') {
-      const dx = this.targetLastKnown.x - this.pos.x;
-      const dz = this.targetLastKnown.z - this.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 1.2) {
-        this.state = 'patrol';
-        this.repathTimer = 0;
-      } else {
-        const yaw = Math.atan2(dx, dz);
-        this.aimYaw = lerpAngle(this.aimYaw, yaw, dt * 6);
-        moveX = (dx / dist) * speed;
-        moveZ = (dz / dist) * speed;
-      }
-    }
-
-    // 机器人间分离
-    for (const b of bots) {
-      if (b === this || !b.alive) continue;
-      const dx = this.pos.x - b.pos.x;
-      const dz = this.pos.z - b.pos.z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < BOT.separation * BOT.separation && d2 > 0.0001) {
-        const d = Math.sqrt(d2);
-        const push = (BOT.separation - d) / BOT.separation;
-        moveX += (dx / d) * push * 3;
-        moveZ += (dz / d) * push * 3;
-      }
-    }
-
-    // 卡死检测
-    this.stuckTimer += dt;
-    if (this.stuckTimer > 1.0) {
-      const moved = this.pos.distanceTo(this.lastPos);
-      const tryingToMove = Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1;
-      if (tryingToMove && moved < 0.35) {
-        this.unstick();
-      }
-      this.stuckTimer = 0;
-      this.lastPos.copy(this.pos);
-    }
-
-    // 应用移动（重力积分）
-    const vy = this.char.vel.y - 18 * dt;
-    this.char.vel.y = Math.max(vy, -22);
-    const hasMove = moveX !== 0 || moveZ !== 0;
-    moveCharacter(this.char, moveX, this.char.vel.y * dt, moveZ, dt);
-    if (this.char.grounded) this.char.vel.y = Math.max(this.char.vel.y, -0.5);
-
-    // 动画 + 脚步
-    if (hasMove) {
-      const spd = Math.hypot(moveX, moveZ);
-      this.walkCycle += dt * spd * 2.2;
-      this.stepTimer -= dt * spd;
-      if (this.stepTimer <= 0 && this.char.grounded) {
-        this.stepTimer = 2.4;
-        this.onFootstep?.(this.pos, spd > 3.5);
-      }
-    }
-    this.mesh.position.copy(this.pos);
-    this.mesh.rotation.set(0, this.aimYaw + Math.PI, 0);
-    const swing = Math.sin(this.walkCycle) * 0.5;
-    this.legL.rotation.x = swing;
-    this.legR.rotation.x = -swing;
-    this.gunMesh.rotation.x = -this.aimPitch * 0.8;
-
-    // 开火
-    if (engaging) {
-      const t = this.getCurrentTargetPos();
-      if (t && this.reactTimer > 0) {
-        this.reactTimer -= dt;
-      } else if (t && this.reactTimer <= 0) {
-        if (this.burstLeft <= 0 && this.shotCooldown <= 0) {
-          this.burstLeft = randInt(BOT.burstLen[0], BOT.burstLen[1]);
-        }
-        if (this.burstLeft > 0 && this.shotCooldown <= 0) {
-          this.burstLeft--;
-          this.shotCooldown = this.burstLeft > 0 ? 60 / BOT.rpm : randRange(0.35, 0.8);
-          this.shootAt(t);
-        }
-      }
-    } else {
-      this.burstLeft = 0;
-    }
+  get pos(): THREE.Vector3 {
+    const t = this.body.translation();
+    return new THREE.Vector3(t.x, t.y, t.z);
   }
 
-  private hasTarget(): boolean {
-    if (this.targetBot) return this.targetBot.alive;
-    if (this.targetPlayerFlag) return this.playerAliveRef;
-    return false;
+  get eyePos(): THREE.Vector3 {
+    const t = this.body.translation();
+    return new THREE.Vector3(t.x, t.y + 0.55, t.z);
   }
 
-  private getCurrentTargetPos(): THREE.Vector3 | null {
-    if (this.targetBot && this.targetBot.alive) {
-      const p = this.targetBot.pos;
-      return _v2.set(p.x, p.y + 1.2, p.z);
-    }
-    if (this.targetPlayerFlag && this.playerAliveRef) {
-      const p = this.playerPosRef;
-      return _v2.set(p.x, p.y + 1.2, p.z);
-    }
-    return null;
+  /** 枪口位置 */
+  get muzzlePos(): THREE.Vector3 {
+    const p = this.eyePos;
+    const f = new THREE.Vector3(-Math.sin(this.aimYaw), 0, -Math.cos(this.aimYaw));
+    return p.add(f.multiplyScalar(0.5)).add(new THREE.Vector3(0, -0.15, 0));
   }
 
-  private playerPosRef = new THREE.Vector3();
-
-  private think(playerChar: Character, playerAlive: boolean, bots: Bot[]) {
-    this.playerPosRef.copy(playerChar.pos);
-    const eye = this.eyePos.clone();
-    const enemyTeam = this.team === TEAM_ALPHA ? 1 - TEAM_ALPHA : TEAM_ALPHA;
-
-    let seenBot: Bot | null = null;
-    let seenPlayer = false;
-    let bestDist = Infinity;
-
-    // 检查玩家（敌对时）
-    if (playerAlive && enemyTeam === PLAYER_TEAM) {
-      const dist = Math.hypot(playerChar.pos.x - this.pos.x, playerChar.pos.z - this.pos.z);
-      if (dist < BOT.sightRange && this.hasLineOfSight(eye, playerChar.pos, dist)) {
-        if (dist < bestDist) { bestDist = dist; seenPlayer = true; seenBot = null; }
-      }
-    }
-    // 检查对方 bots
-    for (const b of bots) {
-      if (!b.alive || b.team !== enemyTeam) continue;
-      const dist = Math.hypot(b.pos.x - this.pos.x, b.pos.z - this.pos.z);
-      if (dist > BOT.sightRange || dist >= bestDist) continue;
-      if (this.state === 'patrol' || this.state === 'hunt') {
-        const yawTo = Math.atan2(b.pos.x - this.pos.x, b.pos.z - this.pos.z);
-        if (Math.abs(angDiff(yawTo, this.aimYaw)) > (BOT.fovDeg / 2) * (Math.PI / 180)) continue;
-      }
-      if (!this.hasLineOfSight(eye, b.pos, dist)) continue;
-      bestDist = dist;
-      seenBot = b;
-      seenPlayer = false;
-    }
-
-    if (seenBot || seenPlayer) {
-      const src = seenBot ? seenBot.pos : playerChar.pos;
-      this.targetLastKnown.set(src.x, src.y, src.z);
-      const isNew = seenBot ? this.targetBot !== seenBot : !this.targetPlayerFlag;
-      if (isNew) {
-        this.reactTimer = randRange(BOT.reactTime[0], BOT.reactTime[1]);
-      }
-      this.targetBot = seenBot;
-      this.targetPlayerFlag = seenPlayer;
-      this.state = 'engage';
-      this.loseSightTimer = BOT.loseSightTime;
-      this.path = [];
-      this.pathIdx = 0;
-    } else if (this.state === 'engage') {
-      this.loseSightTimer -= 0.2;
-      if (this.loseSightTimer <= 0) {
-        this.state = 'hunt';
-        this.targetBot = null;
-        this.targetPlayerFlag = false;
-        this.path = [];
-        this.pathIdx = 0;
-        this.repathTimer = 0;
-      }
-    }
-
-    // 巡逻 / 追击选路
-    if (this.state === 'patrol' || this.state === 'hunt') {
-      if (this.repathTimer <= 0 || this.pathIdx >= this.path.length) {
-        this.repathTimer = randRange(6, 10);
-        let targetNode: number;
-        if (this.state === 'hunt') {
-          targetNode = nearestWaypoint(this.targetLastKnown.x, this.targetLastKnown.z, this.targetLastKnown.y);
-        } else {
-          const objectives = BOT_OBJECTIVES[this.team];
-          targetNode = objectives[randInt(0, objectives.length - 1)];
-        }
-        const from = nearestWaypoint(this.pos.x, this.pos.z, this.pos.y);
-        this.path = findPath(from, targetNode);
-        this.pathIdx = 0;
-      }
-    }
-  }
-
-  private hasLineOfSight(eye: THREE.Vector3, targetFeet: THREE.Vector3, dist: number): boolean {
-    const targetEye = _v1.set(targetFeet.x, targetFeet.y + 1.4, targetFeet.z);
-    _dir.copy(targetEye).sub(eye);
-    const d = _dir.length();
-    if (d < 0.001) return true;
-    _dir.normalize();
-    const wall = raycastWorld(eye, _dir, d, this.char.collider);
-    return !(wall && wall.dist < d - 0.5);
-  }
-
-  private shootAt(targetPos: THREE.Vector3) {
-    const origin = new THREE.Vector3();
-    this.muzzle.getWorldPosition(origin);
-    const err = (BOT.aimErrorDeg * Math.PI) / 180;
-    const dir = _dir.copy(targetPos).sub(origin).normalize();
-    dir.x += (Math.random() - 0.5) * err * 2;
-    dir.y += (Math.random() - 0.5) * err * 1.4;
-    dir.z += (Math.random() - 0.5) * err * 2;
-    dir.normalize();
-    this.muzzleFlashT = 0.06;
-    this.onShoot?.(this, origin, dir);
-  }
-
-  private unstick() {
-    const from = nearestWaypoint(this.pos.x, this.pos.z, this.pos.y);
-    const neighbors: number[] = [];
-    for (const [i, j] of WAYPOINT_EDGES) {
-      if (i === from) neighbors.push(j);
-      else if (j === from) neighbors.push(i);
-    }
-    if (neighbors.length) {
-      const t = neighbors[randInt(0, neighbors.length - 1)];
-      this.path = findPath(from, t);
-      this.pathIdx = 0;
-      this.state = 'patrol';
-      this.repathTimer = 4;
-    }
-    this.char.vel.y = 5;
-  }
-
-  takeDamage(dmg: number, attacker: Bot | 'player' | null, attackerPos?: THREE.Vector3): boolean {
-    if (!this.alive || this.spawnProtecT > 0) return false;
-    this.hp -= dmg;
-    this.lastAttacker = attacker;
-    if (attacker && attacker !== 'player') {
-      this.targetLastKnown.copy(attacker.pos);
-      this.state = 'hunt';
-      this.repathTimer = 0;
-      this.targetPlayerFlag = false;
-      this.targetBot = null;
-    } else if (attacker === 'player') {
-      // 被玩家打：警觉并追向玩家方位
-      if (attackerPos) this.targetLastKnown.copy(attackerPos);
-      this.targetPlayerFlag = true;
-      this.reactTimer = Math.min(this.reactTimer, 0.3);
-      this.state = 'hunt';
-      this.repathTimer = 0;
-      this.targetBot = null;
-    }
-    if (this.hp <= 0) {
-      this.die();
-      return true;
-    }
-    return false;
-  }
-
-  private die() {
+  die(): void {
     this.alive = false;
-    this.state = 'dead';
-    this.mesh.visible = false;
-    this.onDeath?.(this);
+    this.deadT = 0;
   }
 
-  respawn(x: number, z: number) {
+  revive(): void {
+    const spawns = this.team === TEAM.BLUE ? BLUE_SPAWNS : RED_SPAWNS;
+    const [sx, sz] = spawns[Math.floor(Math.random() * spawns.length)];
+    this.body.setTranslation({ x: sx, y: 0.9, z: sz }, true);
+    this.hp = CFG.botHP;
     this.alive = true;
-    this.hp = BOT.hp;
     this.state = 'patrol';
     this.path = [];
-    this.pathIdx = 0;
-    this.repathTimer = 0;
-    this.targetBot = null;
-    this.targetPlayerFlag = false;
-    this.spawnProtecT = BOT.spawnProtectTime;
-    this.char.pos.set(x, 0, z);
-    this.char.vel.set(0, 0, 0);
-    this.char.body.setNextKinematicTranslation({ x, y: 0, z });
+    this.objective = -1;
+    this.mats.forEach(m => { m.transparent = false; m.opacity = 1; });
+    this.mesh.rotation.set(0, 0, 0);
     this.mesh.visible = true;
-    this.mesh.position.set(x, 0, z);
   }
-}
 
-function randInt(a: number, b: number) { return a + Math.floor(Math.random() * (b - a + 1)); }
-function randRange(a: number, b: number) { return a + Math.random() * (b - a); }
-function lerpAngle(a: number, b: number, t: number): number {
-  let d = b - a;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return a + d * Math.min(1, t);
-}
-function angDiff(a: number, b: number): number {
-  let d = a - b;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return d;
-}
+  /** 选取战略目标点 */
+  private pickObjective(nav: NavGraph): void {
+    const p = this.pos;
+    const nodes = nav.nodes;
+    const enemyX = this.team === TEAM.BLUE ? 20 : -20;
+    let target: number;
+    const roll = Math.random();
+    if (roll < 0.55) {
+      // 敌方腹地中随机
+      const far = nodes.map((n, i) => ({ n, i }))
+        .filter(({ n }) => Math.abs(n.x - enemyX) < 32 && Math.abs(n.x - p.x) > 25);
+      target = far.length
+        ? far[Math.floor(Math.random() * far.length)].i
+        : Math.floor(Math.random() * nodes.length);
+    } else if (roll < 0.8) {
+      // 中路一带随机
+      const mid = nodes.filter(n => Math.abs(n.x) < 12 && Math.abs(n.z) < 24);
+      target = mid.length ? nodes.indexOf(mid[Math.floor(Math.random() * mid.length)]) : Math.floor(Math.random() * nodes.length);
+    } else {
+      target = Math.floor(Math.random() * nodes.length);
+    }
+    const from = nav.nearestNode(p.x, p.z);
+    this.path = nav.findPath(from, target);
+    this.pathI = 0;
+    this.objective = target;
+  }
 
-function makeNameTexture(name: string, team: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 64;
-  const ctx = c.getContext('2d')!;
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.font = 'bold 34px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
-  ctx.shadowBlur = 5;
-  ctx.fillStyle = team === TEAM_ALPHA ? '#ffc46b' : '#7de08a';
-  ctx.fillText(name, 128, 32);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  update(
+    dt: number,
+    now: number,
+    nav: NavGraph,
+    world: RAPIER.World,
+    enemies: Array<{ pos: THREE.Vector3; alive: boolean; isPlayer: boolean; ref: unknown }>,
+    onShot: (bot: Bot, from: THREE.Vector3, to: THREE.Vector3) => void,
+  ): void {
+    if (!this.alive) {
+      // 死亡倒地 + 淡出
+      this.deadT += dt;
+      this.mesh.rotation.z = Math.min(this.deadT * 4, Math.PI / 2);
+      if (this.deadT > 1.2) {
+        const k = Math.max(1 - (this.deadT - 1.2) / 0.8, 0);
+        this.mats.forEach(m => { m.transparent = true; m.opacity = k; });
+        this.mesh.visible = k > 0.02;
+      }
+      return;
+    }
+
+    const p = this.pos;
+    const eye = this.eyePos;
+
+    // ---------- 感知 ----------
+    let visible: { pos: THREE.Vector3; ref: unknown; isPlayer: boolean } | null = null;
+    let visibleDist = Infinity;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const dx = e.pos.x - p.x, dz = e.pos.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > CFG.botSightRange || dist >= visibleDist) continue;
+      // 视野角
+      const ang = Math.atan2(-dx, -dz);
+      let dAng = ang - this.aimYaw;
+      while (dAng > Math.PI) dAng -= Math.PI * 2;
+      while (dAng < -Math.PI) dAng += Math.PI * 2;
+      if (Math.abs(dAng) > CFG.botFov / 2 && dist > 6) continue;
+      // LOS 射线
+      const dir = new THREE.Vector3(dx / dist, (e.pos.y + 0.3 - eye.y) / dist, dz / dist);
+      const ray = new RAPIER.Ray({ x: eye.x, y: eye.y, z: eye.z }, { x: dir.x, y: dir.y, z: dir.z });
+      const hit = world.castRay(ray, dist, true, undefined, undefined, this.collider, undefined);
+      if (hit) {
+        if (hit.toi < dist - 0.6) continue; // 被墙挡住
+      }
+      visible = { pos: e.pos.clone().add(new THREE.Vector3(0, 0.3, 0)), ref: e.ref, isPlayer: e.isPlayer };
+      visibleDist = dist;
+    }
+
+    if (visible) {
+      if (this.state !== 'engage') this.reactT = now + CFG.botReaction * (0.7 + Math.random() * 0.6);
+      this.state = 'engage';
+      this.lastKnown.copy(visible.pos);
+      this.lastSeenT = now;
+    } else if (this.state === 'engage') {
+      this.state = now - this.lastSeenT < 2.5 ? 'pursue' : 'patrol';
+    }
+    if (this.hp < 35 && this.state === 'patrol') this.state = 'retreat';
+
+    // ---------- 行为 ----------
+    let moveDir: THREE.Vector3 | null = null;
+    if (this.state === 'engage' && visible) {
+      // 面向敌人
+      const dx = visible.pos.x - p.x, dz = visible.pos.z - p.z;
+      this.aimYaw = Math.atan2(-dx, -dz);
+      const distY = (visible.pos.y + 0.2) - eye.y;
+      this.aimPitch = Math.atan2(distY, Math.hypot(dx, dz));
+      // 射击窗口
+      if (now >= this.reactT) this.combatFire(dt, visible.pos, visibleDist, visible.isPlayer, onShot);
+      // 近距离侧移
+      if (visibleDist < 8) {
+        const strafe = new THREE.Vector3(-(visible.pos.z - p.z), 0, visible.pos.x - p.x).normalize().multiplyScalar(this.id % 2 === 0 ? 1 : -1);
+        moveDir = strafe;
+      }
+    } else {
+      // 沿路径移动
+      if (this.pathI >= this.path.length || this.repathT <= 0) {
+        if (this.state === 'retreat') {
+          const sx = this.team === TEAM.BLUE ? BLUE_SPAWNS[0] : RED_SPAWNS[0];
+          this.path = nav.findPath(nav.nearestNode(p.x, p.z), nav.nearestNode(sx[0], sx[1]));
+          this.pathI = 0;
+          this.repathT = 6;
+          if (this.hp > 60) this.state = 'patrol';
+        } else {
+          this.pickObjective(nav);
+          this.repathT = 7 + Math.random() * 5;
+        }
+      }
+      const targetNode = this.path[this.pathI];
+      if (targetNode !== undefined) {
+        const n = nav.nodes[targetNode];
+        const dx = n.x - p.x, dz = n.z - p.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.8) {
+          this.pathI++;
+        } else {
+          moveDir = new THREE.Vector3(dx / d, 0, dz / d);
+          if (this.state !== 'pursue') this.aimYaw = Math.atan2(-dx / d, -dz / d);
+        }
+      } else {
+        this.pathI = this.path.length;
+      }
+      // pursue：到达最后可见点后转巡逻
+      if (this.state === 'pursue') {
+        const d = Math.hypot(this.lastKnown.x - p.x, this.lastKnown.z - p.z);
+        if (d < 2) this.state = 'patrol';
+        else {
+          // 朝最后已知位置走
+          const dir = new THREE.Vector3(this.lastKnown.x - p.x, 0, this.lastKnown.z - p.z).normalize();
+          moveDir = dir;
+          this.aimYaw = Math.atan2(-dir.x, -dir.z);
+        }
+      }
+      this.aimPitch *= 0.9;
+    }
+    this.repathT -= dt;
+
+    // ---------- 移动 ----------
+    if (moveDir) {
+      const desired = { x: moveDir.x * CFG.botSpeed * dt, y: this.vy * dt, z: moveDir.z * CFG.botSpeed * dt };
+      if (this.controller.computedGrounded()) this.vy = -0.5;
+      this.vy += CFG.worldGravity * dt;
+      this.controller.computeColliderMovement(this.collider, desired);
+      const m = this.controller.computedMovement();
+      const t = this.body.translation();
+      this.body.setNextKinematicTranslation({ x: t.x + m.x, y: t.y + m.y, z: t.z + m.z });
+    } else {
+      // 站立：贴地
+      if (this.controller.computedGrounded()) this.vy = -0.5;
+      this.vy += CFG.worldGravity * dt;
+      this.controller.computeColliderMovement(this.collider, { x: 0, y: this.vy * dt, z: 0 });
+      const m = this.controller.computedMovement();
+      const t = this.body.translation();
+      this.body.setNextKinematicTranslation({ x: t.x, y: t.y + m.y, z: t.z });
+    }
+
+    // 卡死检测：长时间不动则重寻路
+    if (moveDir && p.distanceToSquared(this.lastPos) < (dt * 0.4) ** 2) {
+      this.stuckT += dt;
+      if (this.stuckT > 1.2) {
+        this.stuckT = 0;
+        this.pathI = this.path.length;
+        this.repathT = 0;
+      }
+    } else this.stuckT = 0;
+    this.lastPos.copy(p);
+
+    // ---------- 同步网格 ----------
+    this.mesh.position.copy(p);
+    this.mesh.rotation.y = this.aimYaw + Math.PI;
+    this.mesh.rotation.x = this.state === 'engage' ? -this.aimPitch * 0.4 : 0;
+  }
+
+  private combatFire(
+    dt: number,
+    targetPos: THREE.Vector3,
+    dist: number,
+    isPlayer: boolean,
+    onShot: (bot: Bot, from: THREE.Vector3, to: THREE.Vector3) => void,
+  ): void {
+    if (this.burstPause > 0) {
+      this.burstPause -= dt;
+      return;
+    }
+    if (this.burstLeft <= 0) {
+      this.burstLeft = CFG.botBurst[0] + Math.floor(Math.random() * (CFG.botBurst[1] - CFG.botBurst[0] + 1));
+    }
+    this.burstLeft--;
+    if (this.burstLeft <= 0) {
+      this.burstPause = CFG.botBurstPause[0] + Math.random() * (CFG.botBurstPause[1] - CFG.botBurstPause[0]);
+    }
+
+    // 从眼睛发射，带误差
+    const from = this.eyePos;
+    const aimAt = targetPos.clone();
+    const err = CFG.botAimError * (0.7 + dist / 45);
+    aimAt.x += (Math.random() - 0.5) * 2 * err * dist * 0.14;
+    aimAt.y += (Math.random() - 0.5) * 2 * err * dist * 0.06;
+    aimAt.z += (Math.random() - 0.5) * 2 * err * dist * 0.14;
+    const dir = aimAt.sub(from).normalize();
+    void isPlayer;
+    onShot(this, from.clone(), from.clone().add(dir.multiplyScalar(CFG.range)));
+  }
 }

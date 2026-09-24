@@ -1,199 +1,235 @@
-// ===== 玩家：输入 + 指针锁定 + 移动 + 相机 =====
+// 玩家：第一人称控制器（Rapier 角色控制器）+ 武器视图模型
 import * as THREE from 'three';
-import { PLAYER } from './config';
-import { Character, createCharacter, moveCharacter } from './physics';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { CFG } from './config';
 
 export class Player {
-  char: Character;
-  camera: THREE.PerspectiveCamera;
+  body: RAPIER.RigidBody;
+  collider: RAPIER.Collider;
+  controller: RAPIER.KinematicCharacterController;
+  mesh: THREE.Group;
+
+  hp = CFG.playerHP;
+  alive = true;
+
   yaw = 0;
   pitch = 0;
-  hp = PLAYER.maxHp;
-  alive = true;
-  spawnProtecT = 0;
-
   keys = new Set<string>();
-  firing = false;
-  locked = false;
+  reloading = false;
+  reloadT = 0;
+  mag = CFG.magSize;
+  reserve = CFG.reserve;
+  lastShot = 0;
+  triggerHeld = false;
+  adsHeld = false;
+  adsK = 0;             // 0..1
+  spreadBloom = 0;      // 连射扩散
+  recoilPitch = 0;
+  recoilYaw = 0;
+  bobT = 0;
+  stepT = 0;
+  fovKick = 0;
 
-  // 移动状态（供武器/音效读取）
-  moveFactor = 0;   // 0~1
-  airFactor = 0;    // 0~1
-  sprinting = false;
-  private stepTimer = 0;
-  private bobPhase = 0;
-  private recoilAccum = 0;
+  onShot: (() => void) | null = null;
+  onReload: (() => void) | null = null;
+  onStep: ((sprint: boolean) => void) | null = null;
+  onAmmoChanged: (() => void) | null = null;
 
-  onFootstep: ((sprint: boolean) => void) | null = null;
-  onJump: (() => void) | null = null;
-  onLand: (() => void) | null = null;
-  onDeath: (() => void) | null = null;
-  onLockChange: ((locked: boolean) => void) | null = null;
+  constructor(world: RAPIER.World, camera: THREE.PerspectiveCamera, spawn: [number, number]) {
+    this.body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn[0], 0.9, spawn[1]),
+    );
+    this.collider = world.createCollider(
+      RAPIER.ColliderDesc.capsule(0.5, CFG.radius).setFriction(0.2),
+      this.body,
+    );
+    this.controller = world.createCharacterController(0.02);
+    this.controller.enableAutostep(0.45, 0.2, true);
+    this.controller.setMaxSlopeClimbAngle(0.8);
+    this.controller.setMinSlopeSlideAngle(0.9);
+    this.controller.setApplyImpulsesToDynamicBodies(false);
 
-  constructor(camera: THREE.PerspectiveCamera, x: number, z: number, yaw: number) {
-    this.camera = camera;
-    this.yaw = yaw;
-    this.char = createCharacter(x, 0, z, PLAYER.height / 2 - PLAYER.radius, PLAYER.radius);
-    this.spawnProtecT = PLAYER.spawnProtectTime;
+    // 武器视图模型（挂在相机上）
+    this.mesh = buildViewModel();
+    camera.add(this.mesh);
   }
 
-  get pos() { return this.char.pos; }
+  get pos(): THREE.Vector3 {
+    const t = this.body.translation();
+    return new THREE.Vector3(t.x, t.y, t.z);
+  }
+
   get eyePos(): THREE.Vector3 {
-    return new THREE.Vector3(this.pos.x, this.pos.y + PLAYER.eyeHeight, this.pos.z);
+    const t = this.body.translation();
+    return new THREE.Vector3(t.x, t.y + CFG.eyeHeight, t.z);
   }
 
-  bind(canvas: HTMLCanvasElement) {
-    document.addEventListener('keydown', (e) => {
-      if (e.repeat) return;
-      this.keys.add(e.code);
-    });
-    document.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => this.keys.clear());
-    canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) this.firing = true;
-    });
-    window.addEventListener('mouseup', (e) => {
-      if (e.button === 0) this.firing = false;
-    });
-    document.addEventListener('mousemove', (e) => {
-      if (!this.locked || !this.alive) return;
-      const sens = 0.0021;
-      this.yaw -= e.movementX * sens;
-      this.pitch -= e.movementY * sens;
-      this.pitch = Math.max(-1.52, Math.min(1.52, this.pitch));
-    });
-    document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === canvas;
-      if (!this.locked) this.firing = false;
-      this.onLockChange?.(this.locked);
-    });
+  get forward(): THREE.Vector3 {
+    return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
   }
 
-  requestLock(canvas: HTMLCanvasElement) {
-    if (!this.locked) canvas.requestPointerLock();
+  lookDelta(dx: number, dy: number): void {
+    const s = 0.0021 * (1 - this.adsK * 0.45);
+    this.yaw -= dx * s;
+    this.pitch -= dy * s;
+    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
   }
 
-  // 当前视线方向
-  getLookDir(out: THREE.Vector3): THREE.Vector3 {
-    const cp = Math.cos(this.pitch);
-    return out.set(
-      -Math.sin(this.yaw) * cp,
-      Math.sin(this.pitch),
-      -Math.cos(this.yaw) * cp,
-    ).normalize();
+  startReload(): void {
+    if (this.reloading || this.mag >= CFG.magSize || this.reserve <= 0 || !this.alive) return;
+    this.reloading = true;
+    this.reloadT = CFG.reloadTime;
+    this.onReload?.();
   }
 
-  // 射击时施加后坐力
-  addRecoil(pitchDeg: number, yawDeg: number) {
-    this.pitch += (pitchDeg * Math.PI) / 180;
-    this.yaw += (yawDeg * Math.PI) / 180;
-    this.recoilAccum = Math.min(1.5, this.recoilAccum + 0.25);
-  }
+  update(dt: number, now: number): void {
+    if (!this.alive) return;
 
-  takeDamage(dmg: number, fromPos: THREE.Vector3): boolean {
-    if (!this.alive || this.spawnProtecT > 0) return false;
-    this.hp -= dmg;
-    if (this.hp <= 0) {
-      this.hp = 0;
-      this.die();
-      return true;
-    }
-    return false;
-  }
+    // ---- 移动 ----
+    const f = this.forward;
+    const r = new THREE.Vector3(-f.z, 0, f.x);
+    const wish = new THREE.Vector3();
+    if (this.keys.has('KeyW')) wish.add(f);
+    if (this.keys.has('KeyS')) wish.sub(f);
+    if (this.keys.has('KeyD')) wish.add(r);
+    if (this.keys.has('KeyA')) wish.sub(r);
+    const sprint = this.keys.has('ShiftLeft') && !this.adsHeld && wish.dot(f) > 0;
+    let speed = sprint ? CFG.sprintSpeed : this.adsHeld ? CFG.adsSpeed : CFG.walkSpeed;
+    if (wish.lengthSq() > 0) wish.normalize();
 
-  private die() {
-    this.alive = false;
-    this.firing = false;
-    this.onDeath?.();
-  }
-
-  respawn(x: number, z: number, yaw: number) {
-    this.alive = true;
-    this.hp = PLAYER.maxHp;
-    this.yaw = yaw;
-    this.pitch = 0;
-    this.spawnProtecT = PLAYER.spawnProtectTime;
-    this.char.pos.set(x, 0, z);
-    this.char.vel.set(0, 0, 0);
-    this.char.body.setNextKinematicTranslation({ x, y: 0, z });
-  }
-
-  update(dt: number) {
-    this.spawnProtecT = Math.max(0, this.spawnProtecT - dt);
-    if (!this.alive) {
-      // 死亡视角缓降
-      this.camera.position.set(this.pos.x, Math.max(0.4, this.pos.y + 0.5), this.pos.z);
-      this.camera.rotation.set(0, this.yaw, 0, 'YXZ');
-      return;
-    }
-
-    const k = this.keys;
-    const fwd = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
-    const strafe = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
-    this.sprinting = k.has('ShiftLeft') && fwd > 0;
-
-    let speed = this.sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
-
-    // 期望速度（相对朝向）
-    const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
-    let wx = (-sin * fwd + cos * strafe);
-    let wz = (-cos * fwd - sin * strafe);
-    const wlen = Math.hypot(wx, wz);
-    if (wlen > 0.01) { wx = (wx / wlen) * speed; wz = (wz / wlen) * speed; }
-
-    // 简单加速模型
-    const accel = this.char.grounded ? PLAYER.accel : PLAYER.airAccel;
-    const cur = this.char.vel;
-    const dx = wx - cur.x;
-    const dz = wz - cur.z;
-    const dlen = Math.hypot(dx, dz);
-    if (dlen > 0.01) {
-      const step = Math.min(dlen, accel * dt);
-      cur.x += (dx / dlen) * step;
-      cur.z += (dz / dlen) * step;
-    } else { cur.x = 0; cur.z = 0; }
-
-    // 跳跃
-    if (k.has('Space') && this.char.grounded) {
-      this.char.vel.y = PLAYER.jumpVel;
-      this.onJump?.();
-    }
-
-    // 重力
-    const vy = this.char.vel.y - PLAYER.gravity * dt;
-    const wasAirborne = !this.char.grounded;
-    const fallSpeed = this.char.vel.y;
-    this.char.vel.y = Math.max(vy, -24);
-    moveCharacter(this.char, cur.x, this.char.vel.y * dt, cur.z, dt);
-    if (wasAirborne && this.char.grounded && fallSpeed < -6) this.onLand?.();
-    if (this.char.grounded) this.char.vel.y = Math.max(this.char.vel.y, -0.5);
-
-    // 移动因子
-    const hSpeed = Math.hypot(cur.x, cur.z);
-    this.moveFactor = Math.min(1, hSpeed / PLAYER.sprintSpeed);
-    this.airFactor = this.char.grounded ? 0 : 1;
+    // 跳跃：对运动学刚体直接位移 + 维护垂直速度
+    if (this.controller.computedGrounded()) this.vy = -0.5;
+    if (this.keys.has('Space') && this.controller.computedGrounded()) this.vy = CFG.jumpVel;
+    this.vy += CFG.worldGravity * dt;
+    const t = this.body.translation();
+    const desired = { x: wish.x * speed * dt, y: this.vy * dt, z: wish.z * speed * dt };
+    this.controller.computeColliderMovement(this.collider, desired);
+    const m = this.controller.computedMovement();
+    const nt = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z };
+    this.body.setNextKinematicTranslation(nt);
 
     // 脚步声
-    if (this.char.grounded && hSpeed > 0.5) {
-      this.stepTimer -= dt * hSpeed;
-      if (this.stepTimer <= 0) {
-        this.stepTimer = 3.4;
-        this.onFootstep?.(this.sprinting);
+    if (wish.lengthSq() > 0 && this.controller.computedGrounded()) {
+      this.stepT -= dt * (sprint ? 1.5 : 1);
+      if (this.stepT <= 0) {
+        this.stepT = 0.42;
+        this.onStep?.(sprint);
       }
-      this.bobPhase += dt * hSpeed * 1.6;
     }
 
-    // 相机：位置 + 呼吸摆动 + 后坐力恢复
-    this.recoilAccum = Math.max(0, this.recoilAccum - dt * 3);
-    const bobY = Math.sin(this.bobPhase * 2) * 0.025 * (1 - this.airFactor * 0.7) * (hSpeed > 0.5 ? 1 : 0);
-    const bobX = Math.cos(this.bobPhase) * 0.015 * (1 - this.airFactor * 0.7) * (hSpeed > 0.5 ? 1 : 0);
-    this.camera.position.set(
-      this.pos.x + bobX * Math.cos(this.yaw),
-      this.pos.y + PLAYER.eyeHeight + bobY,
-      this.pos.z - bobX * Math.sin(this.yaw),
-    );
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    // 死亡时稍微侧倾
-    if (!this.alive) this.camera.rotation.z = 0.4;
+    // ---- 视角 ----
+    this.bobT += dt * (wish.lengthSq() > 0 ? (sprint ? 11 : 8) : 2);
+    const bobY = Math.sin(this.bobT * 2) * 0.018 * (1 - this.adsK);
+    const bobX = Math.cos(this.bobT) * 0.01 * (1 - this.adsK);
+
+    // ---- 射击 ----
+    this.spreadBloom = Math.max(0, this.spreadBloom - dt * 0.25);
+    this.recoilPitch = Math.max(0, this.recoilPitch - dt * 0.09);
+    this.recoilYaw = Math.max(-1, Math.min(1, this.recoilYaw - this.recoilYaw * dt * 9));
+
+    if (this.reloading) {
+      this.reloadT -= dt;
+      if (this.reloadT <= 0) {
+        const need = CFG.magSize - this.mag;
+        const take = Math.min(need, this.reserve);
+        this.mag += take;
+        this.reserve -= take;
+        this.reloading = false;
+        this.onAmmoChanged?.();
+      }
+    }
+
+    if (this.triggerHeld && !this.reloading && now - this.lastShot >= CFG.fireInterval) {
+      if (this.mag > 0) {
+        this.lastShot = now;
+        this.mag--;
+        this.spreadBloom = Math.min(1, this.spreadBloom + 0.16);
+        this.recoilPitch += CFG.recoil;
+        this.recoilYaw += (Math.random() - 0.5) * CFG.recoil * 0.5;
+        this.pitch += CFG.recoil * 0.35;
+        this.yaw += (Math.random() - 0.5) * CFG.recoil * 0.3;
+        this.onShot?.();
+        if (this.mag === 0) this.startReload();
+        this.onAmmoChanged?.();
+      } else {
+        this.startReload();
+      }
+    }
+
+    this.adsK += ((this.adsHeld ? 1 : 0) - this.adsK) * Math.min(dt * 10, 1);
+
+    // ---- 相机 ----
+    const cam = this.mesh.parent as THREE.PerspectiveCamera;
+    cam.position.set(this.eyePos.x + bobX, this.eyePos.y + bobY, this.eyePos.z);
+    cam.rotation.order = 'YXZ';
+    cam.rotation.y = this.yaw + this.recoilYaw * 0.02;
+    cam.rotation.x = this.pitch - this.recoilPitch * 0.035;
+    const targetFov = 75 - this.adsK * 28 + this.fovKick;
+    if (Math.abs(cam.fov - targetFov) > 0.1) {
+      cam.fov += (targetFov - cam.fov) * Math.min(dt * 12, 1);
+      cam.updateProjectionMatrix();
+    }
+
+    // ---- 视图模型姿态 ----
+    const vm = this.mesh;
+    vm.position.set(0.28 - this.adsK * 0.145, -0.26 + this.adsK * 0.075 + bobY * 0.4, -0.5 + this.adsK * 0.1);
+    vm.rotation.x = -this.recoilPitch * 0.12;
+    const rl = this.reloading ? Math.sin(Math.min((CFG.reloadTime - this.reloadT) / CFG.reloadTime, 1) * Math.PI) : 0;
+    vm.rotation.x -= rl * 0.7;
+    vm.position.y -= rl * 0.12;
+    vm.visible = true;
   }
+
+  private vy = 0;
+
+  get isMoving(): boolean { return this.keys.size > 0; }
+
+  currentSpread(): number {
+    const move = this.isMoving ? CFG.spreadMove : 0;
+    return CFG.spreadBase + move * (1 - this.adsK * 0.6) + this.spreadBloom * CFG.spreadMove * 2.4 - (this.adsK * (CFG.spreadBase - CFG.spreadAds));
+  }
+
+  teleport(x: number, z: number): void {
+    this.body.setTranslation({ x, y: 0.9, z }, true);
+    this.vy = 0;
+  }
+
+  die(): void {
+    this.alive = false;
+    this.mesh.visible = false;
+  }
+
+  revive(): void {
+    this.alive = true;
+    this.hp = CFG.playerHP;
+    this.mag = CFG.magSize;
+    this.reserve = CFG.reserve;
+    this.reloading = false;
+    this.spreadBloom = 0;
+  }
+}
+
+// ---------- 步枪视图模型 ----------
+function buildViewModel(): THREE.Group {
+  const g = new THREE.Group();
+  const metal = new THREE.MeshLambertMaterial({ color: 0x2e2a26 });
+  const wood = new THREE.MeshLambertMaterial({ color: 0x6b4a2a });
+
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.x = rx;
+    g.add(m);
+    return m;
+  };
+
+  add(new THREE.BoxGeometry(0.055, 0.09, 0.5), metal, 0, 0, -0.1);            // 机匣
+  add(new THREE.CylinderGeometry(0.016, 0.016, 0.42, 8), metal, 0, 0.012, -0.5, Math.PI / 2); // 枪管
+  add(new THREE.BoxGeometry(0.05, 0.07, 0.22), wood, 0, -0.01, -0.32);        // 护木
+  add(new THREE.BoxGeometry(0.045, 0.16, 0.07), wood, 0, -0.11, 0.06, 0.35); // 握把
+  add(new THREE.BoxGeometry(0.04, 0.2, 0.09), wood, 0, -0.14, 0.16, 0.15);    // 枪托
+  const mag = add(new THREE.BoxGeometry(0.045, 0.22, 0.08), metal, 0, -0.16, -0.08, 0.25); // 弹匣
+  mag.name = 'mag';
+  add(new THREE.BoxGeometry(0.02, 0.05, 0.02), metal, 0, 0.065, -0.28);      // 准星
+  return g;
 }

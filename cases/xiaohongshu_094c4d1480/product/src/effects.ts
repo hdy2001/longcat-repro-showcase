@@ -1,136 +1,84 @@
-// ===== 特效：曳光弹 / 枪口火光 / 命中粒子 =====
+// 战斗特效：弹道曳光 / 枪口火光 / 命中粒子 / 血雾
 import * as THREE from 'three';
 
-interface Tracer {
-  line: THREE.Line;
-  life: number;
-  maxLife: number;
-}
-
-interface Particle {
-  mesh: THREE.Mesh;
-  vel: THREE.Vector3;
-  life: number;
-  maxLife: number;
-  gravity: number;
-}
-
-const MAX_TRACERS = 64;
-const MAX_PARTICLES = 400;
+interface Tracer { line: THREE.Line; life: number; maxLife: number }
+interface Particle { pts: THREE.Points; vel: Float32Array; life: number; maxLife: number; per: number }
+interface Flash { sprite: THREE.Sprite; light: THREE.PointLight; life: number }
 
 export class Effects {
   private scene: THREE.Scene;
   private tracers: Tracer[] = [];
   private particles: Particle[] = [];
-  private tracerPool: THREE.Line[] = [];
-  private particleGeo = new THREE.BoxGeometry(0.06, 0.06, 0.06);
-  private sandMat = new THREE.MeshBasicMaterial({ color: 0xd8bd85 });
-  private sparkMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
-  private bloodMat = new THREE.MeshBasicMaterial({ color: 0x8a2020 });
-  private flashMat: THREE.SpriteMaterial;
-  private flashLight: THREE.PointLight;
-  private flashLightLife = 0;
+  private flashes: Flash[] = [];
+  private tracerMat = new THREE.LineBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0.9 });
+  private sparkGeo = new THREE.BufferGeometry();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.flashMat = new THREE.SpriteMaterial({
-      map: makeFlashTexture(),
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    this.flashLight = new THREE.PointLight(0xffc36b, 0, 9, 2);
-    scene.add(this.flashLight);
-    // 曳光池
-    for (let i = 0; i < MAX_TRACERS; i++) {
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
-      const mat = new THREE.LineBasicMaterial({
-        color: 0xffe0a0, transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-      });
-      const line = new THREE.Line(geo, mat);
-      line.frustumCulled = false;
-      line.visible = false;
-      scene.add(line);
-      this.tracerPool.push(line);
-    }
-    // 粒子池
-    for (let i = 0; i < MAX_PARTICLES; i++) {
-      const mesh = new THREE.Mesh(this.particleGeo, this.sandMat);
-      mesh.visible = false;
-      scene.add(mesh);
-    }
+    // 共享火花几何
+    this.sparkGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30 * 3), 3));
   }
 
-  // 曳光：从 from 到 to
-  tracer(from: THREE.Vector3, to: THREE.Vector3, color = 0xffe0a0) {
-    const line = this.tracerPool.find(l => !l.visible);
-    if (!line) return;
-    const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
-    pos.setXYZ(0, from.x, from.y, from.z);
-    pos.setXYZ(1, to.x, to.y, to.z);
-    pos.needsUpdate = true;
-    (line.material as THREE.LineBasicMaterial).color.setHex(color);
-    line.visible = true;
+  /** 曳光：从 from 到 to 的亮线，快速消散 */
+  tracer(from: THREE.Vector3, to: THREE.Vector3): void {
+    const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const line = new THREE.Line(geo, this.tracerMat.clone());
+    this.scene.add(line);
     this.tracers.push({ line, life: 0.07, maxLife: 0.07 });
   }
 
-  // 枪口火光
-  muzzleFlash(pos: THREE.Vector3, withLight: boolean) {
-    const mat = this.flashMat.clone();
-    const sprite = new THREE.Sprite(mat);
-    sprite.position.copy(pos);
-    const s = 0.5 + Math.random() * 0.25;
-    sprite.scale.set(s, s, 1);
-    this.scene.add(sprite);
-    setTimeout(() => {
-      this.scene.remove(sprite);
-      mat.dispose();
-    }, 45);
-    if (withLight) {
-      this.flashLight.position.copy(pos);
-      this.flashLight.intensity = 26;
-      this.flashLightLife = 0.05;
-    }
+  /** 枪口火光：精灵 + 点光，1~2 帧 */
+  muzzleFlash(pos: THREE.Vector3, big = false): void {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grad.addColorStop(0, 'rgba(255,255,220,1)');
+    grad.addColorStop(0.4, 'rgba(255,190,80,0.9)');
+    grad.addColorStop(1, 'rgba(255,120,20,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    const t = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sp.position.copy(pos);
+    const s = big ? 0.9 : 0.45;
+    sp.scale.set(s, s, 1);
+    const light = new THREE.PointLight(0xffb050, big ? 14 : 5, big ? 9 : 5);
+    light.position.copy(pos);
+    this.scene.add(sp, light);
+    this.flashes.push({ sprite: sp, light, life: 0.045 });
   }
 
-  // 弹着点粒子
-  impact(point: THREE.Vector3, normal: THREE.Vector3, kind: 'sand' | 'stone' | 'flesh') {
-    const mat = kind === 'flesh' ? this.bloodMat : kind === 'stone' ? this.sparkMat : this.sandMat;
-    const count = kind === 'flesh' ? 10 : 8;
-    for (let i = 0; i < count; i++) {
-      const mesh = this.particles.length < MAX_PARTICLES
-        ? (() => {
-            const m = new THREE.Mesh(this.particleGeo, mat);
-            m.visible = false;
-            this.scene.add(m);
-            return m;
-          })()
-        : this.particles.find(p => p.life <= 0)?.mesh;
-      if (!mesh) return;
-      mesh.visible = true;
-      mesh.position.copy(point).addScaledVector(normal, 0.03);
-      const vel = new THREE.Vector3(
-        (Math.random() - 0.5) * 3 + normal.x * (1 + Math.random() * 2),
-        Math.random() * 3 + normal.y * 2,
-        (Math.random() - 0.5) * 3 + normal.z * (1 + Math.random() * 2),
-      );
-      this.particles.push({
-        mesh, vel, life: 0.45 + Math.random() * 0.2, maxLife: 0.6, gravity: 9,
-      });
+  /** 命中扬尘 / 碎木屑 */
+  impact(pos: THREE.Vector3, color = 0xc8a870, count = 10, spread = 2.2): void {
+    const n = count;
+    const posArr = new Float32Array(n * 3);
+    const vel = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      posArr[i * 3] = pos.x; posArr[i * 3 + 1] = pos.y; posArr[i * 3 + 2] = pos.z;
+      vel[i * 3] = (Math.random() - 0.5) * spread;
+      vel[i * 3 + 1] = Math.random() * spread * 0.9;
+      vel[i * 3 + 2] = (Math.random() - 0.5) * spread;
     }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+    const mat = new THREE.PointsMaterial({ color, size: 0.09, transparent: true, opacity: 1, depthWrite: false });
+    const pts = new THREE.Points(geo, mat);
+    this.scene.add(pts);
+    this.particles.push({ pts, vel, life: 0.45, maxLife: 0.45, per: n });
   }
 
-  update(dt: number) {
-    // 曳光衰减
+  update(dt: number): void {
+    // 曳光
     for (let i = this.tracers.length - 1; i >= 0; i--) {
-      const t = this.tracers[i];
-      t.life -= dt;
-      const k = Math.max(0, t.life / t.maxLife);
-      (t.line.material as THREE.LineBasicMaterial).opacity = k * 0.9;
-      if (t.life <= 0) {
-        t.line.visible = false;
+      const tr = this.tracers[i];
+      tr.life -= dt;
+      const k = Math.max(tr.life / tr.maxLife, 0);
+      (tr.line.material as THREE.LineBasicMaterial).opacity = k * 0.9;
+      if (tr.life <= 0) {
+        this.scene.remove(tr.line);
+        tr.line.geometry.dispose();
+        (tr.line.material as THREE.Material).dispose();
         this.tracers.splice(i, 1);
       }
     }
@@ -138,46 +86,34 @@ export class Effects {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
-      if (p.life <= 0) {
-        p.mesh.visible = false;
-        this.particles.splice(i, 1);
-        continue;
+      const arr = p.pts.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const a = arr.array as Float32Array;
+      for (let j = 0; j < p.per; j++) {
+        p.vel[j * 3 + 1] -= 7 * dt;
+        a[j * 3] += p.vel[j * 3] * dt;
+        a[j * 3 + 1] = Math.max(0.02, a[j * 3 + 1] + p.vel[j * 3 + 1] * dt);
+        a[j * 3 + 2] += p.vel[j * 3 + 2] * dt;
       }
-      p.vel.y -= p.gravity * dt;
-      p.mesh.position.addScaledVector(p.vel, dt);
-      const s = Math.max(0.2, p.life / p.maxLife);
-      p.mesh.scale.setScalar(s);
+      arr.needsUpdate = true;
+      (p.pts.material as THREE.PointsMaterial).opacity = Math.max(p.life / p.maxLife, 0);
+      if (p.life <= 0) {
+        this.scene.remove(p.pts);
+        p.pts.geometry.dispose();
+        (p.pts.material as THREE.Material).dispose();
+        this.particles.splice(i, 1);
+      }
     }
-    // 枪口灯衰减
-    if (this.flashLightLife > 0) {
-      this.flashLightLife -= dt;
-      if (this.flashLightLife <= 0) this.flashLight.intensity = 0;
+    // 火光
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const f = this.flashes[i];
+      f.life -= dt;
+      f.light.intensity *= 0.6;
+      f.sprite.material.opacity = Math.max(f.life / 0.045, 0);
+      if (f.life <= 0) {
+        this.scene.remove(f.sprite, f.light);
+        f.sprite.material.dispose();
+        this.flashes.splice(i, 1);
+      }
     }
   }
-}
-
-function makeFlashTexture(): THREE.CanvasTexture {
-  const S = 64;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createRadialGradient(S / 2, S / 2, 2, S / 2, S / 2, S / 2);
-  g.addColorStop(0, 'rgba(255,250,220,1)');
-  g.addColorStop(0.3, 'rgba(255,210,120,0.8)');
-  g.addColorStop(1, 'rgba(255,160,60,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
-  // 星芒
-  ctx.strokeStyle = 'rgba(255,230,160,0.9)';
-  ctx.lineWidth = 3;
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + 0.4;
-    ctx.beginPath();
-    ctx.moveTo(S / 2, S / 2);
-    ctx.lineTo(S / 2 + Math.cos(a) * S * 0.48, S / 2 + Math.sin(a) * S * 0.48);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }

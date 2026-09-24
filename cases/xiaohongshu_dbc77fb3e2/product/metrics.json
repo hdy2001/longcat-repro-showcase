@@ -1,0 +1,116 @@
+{
+ "generated_at": "2026-09-24 00:51:34",
+ "prompt_file": "prompt_gen.txt",
+ "notes": "wall_s=API 生成调用墙钟时间(含重试), 不含本地渲染; cost_usd=OpenRouter usage.cost",
+ "models": {
+  "gpt56_terra_high": {
+   "label": "GPT 5.6 Terra high",
+   "model_id": "openai/gpt-5.6-terra",
+   "effort": "high",
+   "total_wall_s": 100.824,
+   "calls": [
+    {
+     "model_id": "openai/gpt-5.6-terra",
+     "wall_s": 100.812,
+     "finish_reason": "stop",
+     "prompt_tokens": 2461,
+     "completion_tokens": 10672,
+     "reasoning_tokens": 451,
+     "cost_usd": 0.13287285
+    }
+   ],
+   "cost_usd": 0.132873,
+   "prompt_tokens": 2461,
+   "completion_tokens": 10672,
+   "reasoning_tokens": 451,
+   "html": "workspace/decks/gpt56_terra_high.html",
+   "html_chars": 26752,
+   "nslides": 4,
+   "valid_html": true
+  },
+  "gpt56_sol_high": {
+   "label": "GPT 5.6 Sol high",
+   "model_id": "openai/gpt-5.6-sol",
+   "effort": "high",
+   "total_wall_s": 129.313,
+   "calls": [
+    {
+     "model_id": "openai/gpt-5.6-sol",
+     "wall_s": 129.312,
+     "finish_reason": "stop",
+     "prompt_tokens": 2461,
+     "completion_tokens": 16134,
+     "reasoning_tokens": 3617,
+     "cost_usd": 0.16581609
+    }
+   ],
+   "cost_usd": 0.165816,
+   "prompt_tokens": 2461,
+   "completion_tokens": 16134,
+   "reasoning_tokens": 3617,
+   "html": "workspace/decks/gpt56_sol_high.html",
+   "html_chars": 36059,
+   "nslides": 4,
+   "valid_html": true
+  },
+  "gpt56_luna_max": {
+   "label": "GPT 5.6 Luna max",
+   "model_id": "openai/gpt-5.6-luna",
+   "effort": "max",
+   "total_wall_s": 342.546,
+   "calls": [
+    {
+     "model_id": "openai/gpt-5.6-luna",
+     "wall_s": 242.533,
+     "finish_reason": "length",
+     "prompt_tokens": 2461,
+     "completion_tokens": 30000,
+     "reasoning_tokens": 23343,
+     "cost_usd": 0.036248949
+    },
+    {
+     "model_id": "openai/gpt-5.6-luna",
+     "wall_s": 100.003,
+     "finish_reason": "stop",
+     "prompt_tokens": 9160,
+     "completion_tokens": 13834,
+     "reasoning_tokens": 6052,
+     "cost_usd": 0.0181420569
+    }
+   ],
+   "cost_usd": 0.054391,
+   "prompt_tokens": 11621,
+   "completion_tokens": 43834,
+   "reasoning_tokens": 29395,
+   "html": "workspace/decks/gpt56_luna_max.html",
+   "html_chars": 21570,
+   "nslides": 3,
+   "valid_html": false
+  },
+  "gpt6_astra_high": {
+   "label": "GPT 6 Astra high",
+   "model_id": "openai/gpt-6-astra",
+   "effort": "high",
+   "total_wall_s": 386.472,
+   "calls": [
+    {
+     "model_id": "openai/gpt-6-astra",
+     "wall_s": 386.463,
+     "finish_reason": "stop",
+     "prompt_tokens": 2461,
+     "completion_tokens": 22368,
+     "reasoning_tokens": 8468,
+     "cost_usd": 1.13766345
+    }
+   ],
+   "cost_usd": 1.137663,
+   "prompt_tokens": 2461,
+   "completion_tokens": 22368,
+   "reasoning_tokens": 8468,
+   "html": "workspace/decks/gpt6_astra_high.html",
+   "html_chars": 39925,
+   "nslides": 4,
+   "valid_html": true
+  }
+ }
+}

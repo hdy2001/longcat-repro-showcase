@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>佛光寺东大殿 · 木构图志</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='7' fill='%23b23a1f'/%3E%3Cg fill='%23f4f1ea'%3E%3Crect x='8' y='26' width='24' height='7' rx='1.2'/%3E%3Crect x='10' y='15' width='20' height='6' rx='1'/%3E%3Crect x='15' y='6' width='10' height='4.5' rx='1'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f4f1ea; --card:rgba(255,255,255,.78);
+  --ink:#26231d; --ink2:#7d7666; --ink3:#a89f8d;
+  --line:rgba(38,35,29,.16); --line2:rgba(38,35,29,.34);
+  --accent:#b23a1f; --teal:#3f7a63;
+  --serif:"Songti SC","STSong","Noto Serif CJK SC","Noto Serif SC","Source Han Serif SC","SimSun",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:14px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+#scene{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+#scene.dragging{cursor:grabbing}
+#scene.pick{cursor:pointer}
+
+/* ---------- loader ---------- */
+#loader{position:fixed;inset:0;background:var(--paper);z-index:100;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:26px;transition:opacity .7s ease;}
+#loader.done{opacity:0;pointer-events:none}
+#loader .seal{width:58px;height:58px;animation:sealIn 1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes sealIn{from{transform:translateY(14px) scale(.92);opacity:0}to{transform:none;opacity:1}}
+#loader h2{font-family:var(--serif);font-size:30px;font-weight:700;letter-spacing:.28em;text-indent:.28em}
+#loader .en{font-size:11px;letter-spacing:.42em;text-indent:.42em;color:var(--ink2)}
+#loader .bar{width:150px;height:1px;background:var(--line);position:relative;overflow:hidden}
+#loader .bar i{position:absolute;left:-40%;top:0;height:100%;width:40%;background:var(--accent);animation:bar 1.1s ease-in-out infinite}
+@keyframes bar{to{left:100%}}
+#loader .loadtip{font-size:12px;color:var(--ink2);letter-spacing:.2em}
+
+/* ---------- header ---------- */
+header{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;
+  justify-content:space-between;padding:18px 26px;pointer-events:none}
+header>*{pointer-events:auto}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .seal{width:34px;height:34px;flex:none}
+.brand b{font-family:var(--serif);font-size:19px;font-weight:700;letter-spacing:.14em;display:block;line-height:1.15}
+.brand span{font-size:9.5px;letter-spacing:.34em;color:var(--ink2);display:block}
+.top-actions{display:flex;align-items:center;gap:10px}
+.tbtn{font-family:var(--sans);font-size:12px;letter-spacing:.12em;color:var(--ink);
+  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 15px;
+  cursor:pointer;backdrop-filter:blur(8px);transition:all .25s}
+.tbtn:hover{border-color:var(--line2);background:#fff}
+.tbtn.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.mat-switch{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);
+  border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
+.mat-switch .ms-label{font-size:11px;color:var(--ink2);letter-spacing:.18em;margin-right:2px}
+.mat-switch .dot{width:17px;height:17px;border-radius:50%;border:1px solid var(--line2);cursor:pointer;
+  transition:transform .25s, box-shadow .25s;position:relative}
+.mat-switch .dot:hover{transform:scale(1.15)}
+.mat-switch .dot.on{box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--accent)}
+
+/* ---------- info card (panorama) ---------- */
+#infoCard{position:fixed;left:26px;top:50%;transform:translateY(-50%);z-index:15;width:300px;
+  transition:opacity .5s ease,transform .5s ease}
+#infoCard.hide{opacity:0;pointer-events:none;transform:translateY(-46%)}
+.ic-kicker{font-size:10.5px;letter-spacing:.32em;color:var(--accent);margin-bottom:14px;font-weight:600}
+#infoCard h1{font-family:var(--serif);font-size:52px;font-weight:700;letter-spacing:.06em;line-height:1.12}
+.ic-en{font-family:Georgia,"Times New Roman",serif;font-size:15px;letter-spacing:.24em;color:var(--ink2);margin-top:7px}
+.ic-sub{font-family:var(--serif);font-size:14.5px;color:var(--ink);margin-top:14px;letter-spacing:.05em}
+.ic-facts{margin-top:20px;border-top:1px solid var(--line)}
+.ic-facts .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.ic-facts .k{color:var(--ink2);letter-spacing:.14em;flex:none}
+.ic-facts .v{text-align:right}
+.ic-tag{margin-top:20px;font-family:var(--serif);font-size:15px;color:var(--ink);letter-spacing:.06em}
+.primary{display:inline-block;margin-top:18px;font-family:var(--sans);font-size:13px;letter-spacing:.14em;
+  color:#f7f3ea;background:var(--accent);border:none;border-radius:999px;padding:11px 26px;cursor:pointer;
+  transition:transform .25s,background .25s}
+.primary:hover{transform:translateY(-2px);background:#9c3018}
+.primary.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2)}
+.primary.ghost:hover{border-color:var(--ink)}
+
+/* ---------- mode switch ---------- */
+#modeSwitch{position:fixed;left:26px;bottom:24px;z-index:20;display:flex;background:var(--card);
+  border:1px solid var(--line);border-radius:999px;padding:4px;backdrop-filter:blur(10px)}
+#modeSwitch button{font-family:var(--sans);font-size:12.5px;letter-spacing:.1em;border:none;background:transparent;
+  color:var(--ink2);padding:8px 20px;border-radius:999px;cursor:pointer;transition:all .3s;white-space:nowrap}
+#modeSwitch button small{display:block;font-size:8.5px;letter-spacing:.26em;opacity:.75;margin-top:1px}
+#modeSwitch button.on{background:var(--ink);color:var(--paper)}
+
+/* ---------- panels ---------- */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(12px);
+  box-shadow:0 10px 34px rgba(38,35,29,.07)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{font-size:11.5px;letter-spacing:.1em;color:var(--ink2);background:transparent;
+  border:1px solid var(--line);border-radius:999px;padding:6px 13px;cursor:pointer;transition:all .25s}
+.chips button:hover{border-color:var(--line2);color:var(--ink)}
+.chips button.off{opacity:.38;text-decoration:line-through}
+.chips-label{font-size:10px;letter-spacing:.3em;color:var(--ink3);margin:10px 0 6px}
+
+#panelPano{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:18;padding:12px 16px;
+  transition:opacity .5s,transform .5s;max-width:min(92vw,560px)}
+#panelPano.hide{opacity:0;pointer-events:none;transform:translateX(-50%) translateY(12px)}
+
+/* ---------- dougong panel ---------- */
+#panelDougong{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:18;width:min(92vw,460px);
+  padding:14px 18px 16px;transition:opacity .5s,transform .5s}
+#panelDougong.hide{opacity:0;pointer-events:none;transform:translateX(-50%) translateY(12px)}
+.dg-tabs{display:flex;gap:6px;margin-bottom:12px}
+.dg-tabs .tab{flex:1;font-family:var(--sans);font-size:13px;letter-spacing:.1em;padding:9px 6px 8px;
+  background:transparent;border:1px solid var(--line);border-radius:11px;cursor:pointer;color:var(--ink2);transition:all .25s}
+.dg-tabs .tab small{display:block;font-size:8px;letter-spacing:.3em;opacity:.7;margin-top:1px}
+.dg-tabs .tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.dg-row{display:flex;align-items:center;gap:10px}
+.mini-btn{font-family:var(--sans);font-size:11.5px;letter-spacing:.08em;color:var(--ink);
+  background:transparent;border:1px solid var(--line2);border-radius:999px;padding:7px 14px;cursor:pointer;transition:all .25s;white-space:nowrap}
+.mini-btn:hover{border-color:var(--ink)}
+.mini-btn:disabled{opacity:.3;cursor:default}
+.dg-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);margin-top:9px;letter-spacing:.06em}
+input[type=range]{flex:1;appearance:none;-webkit-appearance:none;height:2px;background:var(--line2);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--accent);border:2.5px solid var(--paper);box-shadow:0 0 0 1px var(--accent);cursor:grab}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--accent);border:2.5px solid var(--paper);box-shadow:0 0 0 1px var(--accent)}
+.dg-step{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.dg-step .sn{font-family:Georgia,serif;font-size:21px;color:var(--accent);letter-spacing:.04em;min-width:64px}
+.dg-step .progress{flex:1;height:2px;background:var(--line)}
+.dg-step .progress i{display:block;height:100%;background:var(--accent);width:0%;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.dg-part-name{font-family:var(--serif);font-size:19px;font-weight:700;letter-spacing:.05em;margin-top:6px}
+.dg-part-name small{font-family:Georgia,serif;font-size:11px;color:var(--ink2);letter-spacing:.16em;margin-left:10px}
+.dg-part-desc{font-size:12px;color:var(--ink2);margin-top:3px;min-height:20px}
+#btnInstall{margin-top:4px}
+
+/* ---------- part list ---------- */
+#partList{position:fixed;right:26px;top:50%;transform:translateY(-50%);z-index:15;width:212px;
+  transition:opacity .5s,transform .5s}
+#partList.hide{opacity:0;pointer-events:none;transform:translateY(-46%)}
+#partList h3{font-size:10px;letter-spacing:.32em;color:var(--ink3);margin-bottom:10px;text-align:right}
+#partItems{list-style:none}
+#partItems li{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:10px;margin-bottom:6px;background:var(--card);backdrop-filter:blur(8px);transition:all .3s}
+#partItems li .n{font-family:Georgia,serif;font-size:11px;color:var(--ink2);width:16px;flex:none}
+#partItems li .t{flex:1;font-size:12.5px;letter-spacing:.05em}
+#partItems li .t small{display:block;font-family:Georgia,serif;font-size:9px;color:var(--ink3);letter-spacing:.1em}
+#partItems li .st{width:7px;height:7px;border-radius:50%;border:1px solid var(--ink3);flex:none;transition:all .3s}
+#partItems li.done .st{background:var(--ink);border-color:var(--ink)}
+#partItems li.next{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+#partItems li.next .st{background:var(--accent);border-color:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+#partItems li.next .t{color:var(--accent)}
+@keyframes pulse{50%{opacity:.25}}
+
+/* ---------- hint / tooltip / toast ---------- */
+#hint{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:14;font-size:11.5px;
+  letter-spacing:.18em;color:var(--ink2);background:var(--card);border:1px solid var(--line);
+  border-radius:999px;padding:8px 20px;backdrop-filter:blur(8px);white-space:nowrap;transition:opacity .4s}
+#tooltip{position:fixed;z-index:30;pointer-events:none;background:var(--ink);color:var(--paper);
+  font-size:12px;letter-spacing:.06em;padding:6px 12px;border-radius:8px;opacity:0;transition:opacity .18s;
+  transform:translate(14px,14px);white-space:nowrap}
+#tooltip small{display:block;font-family:Georgia,serif;font-size:9px;letter-spacing:.18em;opacity:.65}
+#toast{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.94);z-index:40;text-align:center;
+  background:var(--card);border:1px solid var(--line);border-radius:20px;padding:34px 46px;backdrop-filter:blur(14px);
+  box-shadow:0 24px 70px rgba(38,35,29,.16);opacity:0;pointer-events:none;transition:all .45s cubic-bezier(.2,.9,.3,1.2)}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+#toast h3{font-family:var(--serif);font-size:26px;letter-spacing:.1em}
+#toast p{font-size:12px;color:var(--ink2);margin:8px 0 18px}
+#toast .row{display:flex;gap:10px;justify-content:center}
+
+/* ---------- archive drawer ---------- */
+#scrim{position:fixed;inset:0;background:rgba(38,35,29,.28);z-index:44;opacity:0;pointer-events:none;transition:opacity .4s}
+#scrim.show{opacity:1;pointer-events:auto}
+#archiveDrawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,92vw);z-index:45;background:var(--paper);
+  border-left:1px solid var(--line);padding:28px 26px;overflow-y:auto;transform:translateX(102%);
+  transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+#archiveDrawer.show{transform:none}
+#archiveDrawer h3{font-family:var(--serif);font-size:22px;letter-spacing:.12em}
+#archiveDrawer .ad-en{font-family:Georgia,serif;font-size:10px;letter-spacing:.34em;color:var(--ink2);margin:4px 0 20px}
+#archiveDrawer figure{margin-bottom:22px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+#archiveDrawer img{width:100%;display:block}
+#archiveDrawer figcaption{padding:12px 14px;font-size:12px;border-top:1px solid var(--line)}
+#archiveDrawer figcaption b{display:block;font-family:var(--serif);font-size:13.5px;letter-spacing:.06em;margin-bottom:3px}
+#archiveDrawer figcaption span{color:var(--ink2);font-size:11px}
+#drawerClose{margin-top:2px}
+
+/* ---------- responsive ---------- */
+@media (max-width:860px){
+  #infoCard{width:250px;left:18px}
+  #infoCard h1{font-size:36px}
+  .ic-facts .row:nth-child(4){display:none}
+  #modeSwitch{left:14px;bottom:86px}
+  #panelPano,#panelDougong{bottom:16px}
+  #partList{display:none}
+  #hint{display:none}
+  header{padding:14px 16px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div id="loader">
+  <svg class="seal" viewBox="0 0 40 40"><rect width="40" height="40" rx="7" fill="#b23a1f"/><g fill="#f4f1ea"><rect x="8" y="26" width="24" height="7" rx="1.2"/><rect x="10" y="15" width="20" height="6" rx="1"/><rect x="15" y="6" width="10" height="4.5" rx="1"/></g></svg>
+  <h2>木构图志</h2>
+  <div class="en">TIMBER ATLAS</div>
+  <div class="bar"><i></i></div>
+  <div class="loadtip" data-i18n="loading">正在营造…</div>
+</div>
+
+<header>
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 40 40"><rect width="40" height="40" rx="7" fill="#b23a1f"/><g fill="#f4f1ea"><rect x="8" y="26" width="24" height="7" rx="1.2"/><rect x="10" y="15" width="20" height="6" rx="1"/><rect x="15" y="6" width="10" height="4.5" rx="1"/></g></svg>
+    <div><b data-i18n="brand">木构图志</b><span>TIMBER ATLAS</span></div>
+  </div>
+  <div class="top-actions">
+    <div class="mat-switch" id="matSwitch">
+      <span class="ms-label" data-i18n="matLabel">材质</span>
+      <div class="dot on" data-mat="current" style="background:#7c2a1c" title="现状"></div>
+      <div class="dot" data-mat="painted" style="background:#2f6e5a" title="彩绘"></div>
+      <div class="dot" data-mat="wood" style="background:#c9a172" title="原木"></div>
+    </div>
+    <button class="tbtn" id="archiveBtn" data-i18n="archiveBtn">档案</button>
+    <button class="tbtn" id="langToggle">EN</button>
+  </div>
+</header>
+
+<aside id="infoCard">
+  <div class="ic-kicker" data-i18n="infoKicker">TIMBER ATLAS · 佛光寺东大殿</div>
+  <h1 data-i18n="infoH1">佛光寺东大殿</h1>
+  <div class="ic-en" data-i18n="infoEn">EAST HALL · FOGUANG TEMPLE</div>
+  <div class="ic-sub" data-i18n="infoSub">唐 · 大中十一年（857）· 山西五台山</div>
+  <div class="ic-facts">
+    <div class="row"><span class="k" data-i18n="fBuiltK">建造</span><span class="v" data-i18n="fBuiltV">唐大中十一年 · 857 年</span></div>
+    <div class="row"><span class="k" data-i18n="fFormK">形制</span><span class="v" data-i18n="fFormV">单檐庑殿顶 · 面阔七间</span></div>
+    <div class="row"><span class="k" data-i18n="fBrK">斗拱</span><span class="v" data-i18n="fBrV">双杪双下昂 · 七铺作</span></div>
+    <div class="row"><span class="k" data-i18n="fRedisK">发现</span><span class="v" data-i18n="fRedisV">梁思成 · 林徽因 · 1937</span></div>
+  </div>
+  <div class="ic-tag" data-i18n="tagline">拆开，看懂中国古建</div>
+  <button class="primary" id="focusBtn" data-i18n="focusBtn">聚焦斗拱 →</button>
+</aside>
+
+<aside id="partList" class="hide">
+  <h3 data-i18n="partListTitle">铺作 · 安装顺序</h3>
+  <ol id="partItems"></ol>
+</aside>
+
+<div id="modeSwitch">
+  <button class="on" data-mode="pano" data-i18n="modePano">全景建筑<small>PANORAMA</small></button>
+  <button data-mode="dougong" data-i18n="modeDougong">斗拱拆解<small>DOUGONG</small></button>
+</div>
+
+<div id="panelPano" class="panel">
+  <div class="chips-label" data-i18n="layersLabel">构造层次</div>
+  <div class="chips" id="layerChips">
+    <button data-layer="roof" data-i18n="layerRoof">屋顶</button>
+    <button data-layer="walls" data-i18n="layerWalls">墙身</button>
+    <button data-layer="frame" data-i18n="layerFrame">梁架</button>
+    <button data-layer="brackets" data-i18n="layerBrackets">斗拱</button>
+  </div>
+  <div class="chips-label" data-i18n="viewsLabel">视角</div>
+  <div class="chips" id="viewChips">
+    <button data-view="front" data-i18n="viewFront">正视</button>
+    <button data-view="side" data-i18n="viewSide">侧视</button>
+    <button data-view="iso" data-i18n="viewIso">轴测</button>
+  </div>
+</div>
+
+<div id="panelDougong" class="panel hide">
+  <div class="dg-tabs">
+    <button class="tab on" id="tabExplode" data-i18n="tabExplode">拆解探索<small>EXPLODE</small></button>
+    <button class="tab" id="tabAssemble" data-i18n="tabAssemble">引导拼装<small>ASSEMBLE</small></button>
+  </div>
+  <div id="dgExplode">
+    <div class="dg-row">
+      <button class="mini-btn" id="btnExplodeAll" data-i18n="explodeAll">全部拆出</button>
+      <input id="explodeSlider" type="range" min="0" max="100" value="100" data-i18n-ph="sliderPh">
+      <button class="mini-btn" id="btnAssembleAll" data-i18n="assembleAll">全部装回</button>
+    </div>
+    <div class="dg-meta"><span id="explodeCount"></span><span data-i18n="explodeTip">拖动滑杆 · 悬停查看构件</span></div>
+  </div>
+  <div id="dgAssemble" hidden>
+    <div class="dg-step">
+      <span class="sn" id="stepNum"></span>
+      <div class="progress"><i id="stepBar"></i></div>
+    </div>
+    <div class="dg-part-name" id="curPartName"></div>
+    <div class="dg-part-desc" id="curPartDesc"></div>
+    <div class="dg-row">
+      <button class="primary" id="btnInstall" data-i18n="install">安装构件</button>
+      <button class="mini-btn" id="btnUndo" data-i18n="undo">上一步</button>
+      <span class="dg-meta" style="margin:0 0 0 auto" data-i18n="assembleHint">点击悬浮构件亦可安装</span>
+    </div>
+  </div>
+  <div class="dg-row" style="margin-top:12px">
+    <button class="mini-btn" id="btnExitDougong" data-i18n="exitDougong">← 返回全景</button>
+  </div>
+</div>
+
+<div id="hint" data-i18n="hintPano">拖拽旋转 · 滚轮缩放 · 点击斗拱聚焦</div>
+<div id="tooltip"></div>
+
+<div id="toast">
+  <h3 data-i18n="complete">七铺作 · 拼装完成</h3>
+  <p data-i18n="completeSub">出檐深远，举重若轻</p>
+  <div class="row">
+    <button class="primary ghost" id="toastExplode" data-i18n="viewExplode">查看拆解</button>
+    <button class="primary" id="toastPano" data-i18n="backPano">返回全景</button>
+  </div>
+</div>
+
+<div id="scrim"></div>
+<aside id="archiveDrawer">
+  <h3 data-i18n="archiveTitle">参考档案</h3>
+  <div class="ad-en">REFERENCE ARCHIVE</div>
+  <figure><img src="{{IMG:img_00}}" alt="cover"><figcaption><b data-i18n="ar1T">封面 · 木构图志</b><span data-i18n="ar1D">斗拱构件拆解意象 · TIMBER ATLAS / 01</span></figcaption></figure>
+  <figure><img src="{{IMG:scene_02}}" alt="hall"><figcaption><b data-i18n="ar2T">东大殿 · 现状外观</b><span data-i18n="ar2D">单檐庑殿顶 · 灰瓦朱柱土墙 · 857 年遗构</span></figcaption></figure>
+  <figure><img src="{{IMG:scene_06}}" alt="drawing"><figcaption><b data-i18n="ar3T">外檐柱头铺作 · 实测详图</b><span data-i18n="ar3D">张荣、刘畅、臧春雨《佛光寺东大殿实测数据解读》· 2007</span></figcaption></figure>
+  <figure><img src="{{IMG:scene_04}}" alt="chiwen"><figcaption><b data-i18n="ar4T">鸱尾 · 正脊两端</b><span data-i18n="ar4D">绿釉鱼龙 · 实物与三维模型对照</span></figcaption></figure>
+  <button class="tbtn" id="drawerClose" data-i18n="drawerClose">关闭</button>
+</aside>
+
+{{THREE_JS}}
+<script>
+{{APP_JS}}
+</script>
+</body>
+</html>

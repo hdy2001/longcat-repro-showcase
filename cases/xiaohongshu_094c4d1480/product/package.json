@@ -1,21 +1,21 @@
 {
-  "name": "dune-strike-fps",
-  "private": true,
+  "name": "workspace",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Dune Strike - original desert military base team deathmatch FPS (Three.js + Rapier + Pointer Lock + Web Audio)",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.20.0",
-    "three": "^0.186.0"
+    "@dimforge/rapier3d-compat": "^0.11.2",
+    "esbuild": "^0.28.2",
+    "three": "^0.186.0",
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
-    "@types/three": "^0.186.0",
-    "typescript": "~5.8.3",
-    "vite": "^6.3.5"
+    "@types/three": "^0.186.0"
   }
 }

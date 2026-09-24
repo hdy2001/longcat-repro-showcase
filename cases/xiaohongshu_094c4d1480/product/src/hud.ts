@@ -1,253 +1,185 @@
-// ===== HUD：DOM 更新 + 小地图 + 击杀播报 =====
-import * as THREE from 'three';
-import { TEAM_NAMES, TEAM_COLORS, MATCH } from './config';
-import { WALLS, SITE_MARKERS, MAP } from './map/mapData';
+// HUD / 菜单 / 记分板（纯 DOM 操作）
+import { TEAM_INFO } from './config';
 
-export interface KillEvent {
-  killer: string;
-  killerTeam: number;
-  victim: string;
-  victimTeam: number;
-  headshot: boolean;
-  isMe: boolean;
+export interface KillEntry {
+  killer: string; killerTeam: number; victim: string; victimTeam: number;
+  headshot: boolean; weapon: string; t: number;
+}
+
+export interface ScoreRow {
+  name: string; team: number; kills: number; deaths: number; isPlayer: boolean;
+}
+
+function el<T extends HTMLElement>(id: string): T {
+  const e = document.getElementById(id);
+  if (!e) throw new Error(`缺少元素 #${id}`);
+  return e as T;
 }
 
 export class HUD {
-  private el = (id: string) => document.getElementById(id)!;
-  private hud!: HTMLElement;
-  private crosshair!: HTMLElement;
-  private hitmarker!: HTMLElement;
-  private killfeed!: HTMLElement;
-  private minimap!: HTMLCanvasElement;
-  private mmCtx: CanvasRenderingContext2D;
-  private hpBar!: HTMLElement;
-  private hpNum!: HTMLElement;
-  private ammoMag!: HTMLElement;
-  private ammoReserve!: HTMLElement;
-  private scoreAlpha!: HTMLElement;
-  private scoreBravo!: HTMLElement;
-  private timer!: HTMLElement;
-  private vignette!: HTMLElement;
-  private lowhp!: HTMLElement;
-  private dmgDir!: HTMLElement;
-  private killBanner!: HTMLElement;
-  private respawnOverlay!: HTMLElement;
-  private respawnTimer!: HTMLElement;
-  private deathCause!: HTMLElement;
-  private spawnProtect!: HTMLElement;
-  private hintBar!: HTMLElement;
-  private hintTimer: ReturnType<typeof setTimeout> | null = null;
+  onStart: (() => void) | null = null;
+  onRestart: (() => void) | null = null;
+  onResume: (() => void) | null = null;
+
+  private killFeedEl = el('killfeed');
+  private hpBar = el('hp-fill');
+  private hpText = el('hp-text');
+  private ammoMag = el('ammo-mag');
+  private ammoReserve = el('ammo-reserve');
+  private scoreBlue = el('score-blue');
+  private scoreRed = el('score-red');
+  private timerEl = el('match-timer');
+  private hitmarkerEl = el('hitmarker');
+  private vignette = el('dmg-vignette');
+  private deathOverlay = el('death-overlay');
+  private deathInfo = el('death-info');
+  private respawnT = el('respawn-t');
+  private msgEl = el('center-msg');
+  private scoreboardEl = el('scoreboard');
+  private menuEl = el('menu');
+  private hudEl = el('hud');
+  private pauseEl = el('pause');
+  private endEl = el('end-screen');
+  private endTitle = el('end-title');
+  private endStats = el('end-stats');
+  private vignetteT = 0;
+  private msgT = 0;
+  private hmT = 0;
 
   constructor() {
-    this.hud = this.el('hud');
-    this.crosshair = this.el('crosshair');
-    this.hitmarker = this.el('hitmarker');
-    this.killfeed = this.el('killfeed');
-    this.minimap = this.el('minimap') as HTMLCanvasElement;
-    this.mmCtx = this.minimap.getContext('2d')!;
-    this.hpBar = this.el('hp-bar');
-    this.hpNum = this.el('hp-num');
-    this.ammoMag = this.el('ammo-mag');
-    this.ammoReserve = this.el('ammo-reserve');
-    this.scoreAlpha = this.el('score-alpha');
-    this.scoreBravo = this.el('score-bravo');
-    this.timer = this.el('round-timer');
-    this.vignette = this.el('damage-vignette');
-    this.lowhp = this.el('lowhp-vignette');
-    this.dmgDir = this.el('dmg-dir');
-    this.killBanner = this.el('kill-banner');
-    this.respawnOverlay = this.el('respawn-overlay');
-    this.respawnTimer = this.el('respawn-timer');
-    this.deathCause = this.el('death-cause');
-    this.spawnProtect = this.el('spawn-protect');
-    this.hintBar = this.el('hint-bar');
-    this.drawMinimapBase();
+    el<HTMLButtonElement>('btn-start').addEventListener('click', () => this.onStart?.());
+    el<HTMLButtonElement>('btn-restart').addEventListener('click', () => this.onRestart?.());
+    el<HTMLButtonElement>('btn-resume').addEventListener('click', () => this.onResume?.());
   }
 
-  show() { this.hud.classList.remove('hidden'); }
-  hide() { this.hud.classList.add('hidden'); }
-
-  setCrosshairSpread(px: number) {
-    this.crosshair.style.setProperty('--sp', `${px.toFixed(1)}px`);
+  showMenu(show: boolean): void {
+    this.menuEl.classList.toggle('hidden', !show);
   }
 
-  setHitmarker(headshot: boolean) {
-    this.hitmarker.classList.toggle('headshot', headshot);
-    this.hitmarker.classList.remove('show');
-    void this.hitmarker.offsetWidth;
-    this.hitmarker.classList.add('show');
+  showHUD(show: boolean): void {
+    this.hudEl.classList.toggle('hidden', !show);
   }
 
-  addKill(e: KillEvent) {
-    const row = document.createElement('div');
-    row.className = 'kf-row' + (e.isMe ? ' me' : '');
-    const hs = e.headshot ? ' ☠' : '';
-    row.innerHTML =
-      `<span class="kf-killer ${e.killerTeam === 0 ? 'alpha' : 'bravo'}">${e.killer}</span>` +
-      `<span class="kf-weapon">[MK-4${hs}]</span>` +
-      `<span class="kf-victim ${e.victimTeam === 0 ? 'alpha' : 'bravo'}">${e.victim}</span>`;
-    this.killfeed.prepend(row);
-    while (this.killfeed.children.length > 6) this.killfeed.lastChild!.remove();
-    setTimeout(() => { row.style.opacity = '0'; row.style.transition = 'opacity 0.5s'; }, 4200);
-    setTimeout(() => row.remove(), 4800);
+  showPause(show: boolean): void {
+    this.pauseEl.classList.toggle('hidden', !show);
   }
 
-  setScores(a: number, b: number) {
-    this.scoreAlpha.textContent = String(a);
-    this.scoreBravo.textContent = String(b);
+  showHitmarker(head: boolean): void {
+    this.hmT = 0.18;
+    this.hitmarkerEl.classList.toggle('head', head);
+    this.hitmarkerEl.classList.remove('show');
+    void this.hitmarkerEl.offsetWidth; // 重启动画
+    this.hitmarkerEl.classList.add('show');
   }
 
-  setTimer(seconds: number) {
-    const m = Math.floor(Math.max(0, seconds) / 60);
-    const s = Math.floor(Math.max(0, seconds) % 60);
-    this.timer.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-    this.timer.classList.toggle('urgent', seconds < 30);
+  flashDamage(): void {
+    this.vignetteT = 0.5;
   }
 
-  setHealth(hp: number) {
-    const pct = Math.max(0, hp);
-    this.hpBar.style.width = `${pct}%`;
-    this.hpNum.textContent = String(Math.ceil(pct));
-    this.hpBar.className = pct > 55 ? '' : pct > 28 ? 'mid' : 'low';
-    this.lowhp.classList.toggle('pulse', pct <= 30 && pct > 0);
+  killFeedAdd(e: KillEntry): void {
+    const div = document.createElement('div');
+    div.className = 'kf-row';
+    const kc = TEAM_INFO[e.killerTeam].css;
+    const vc = TEAM_INFO[e.victimTeam].css;
+    div.innerHTML = `<span style="color:${kc}">${e.killer}</span>` +
+      `<span class="kf-weapon">[${e.weapon}${e.headshot ? ' 爆头' : ''}]</span>` +
+      `<span style="color:${vc}">${e.victim}</span>`;
+    this.killFeedEl.prepend(div);
+    while (this.killFeedEl.children.length > 5) this.killFeedEl.lastChild!.remove();
+    setTimeout(() => { div.classList.add('fade'); }, 4200);
+    setTimeout(() => { div.remove(); }, 5000);
   }
 
-  setAmmo(mag: number, reserve: number) {
-    this.ammoMag.textContent = String(mag);
-    this.ammoReserve.textContent = String(reserve);
-    this.ammoMag.classList.toggle('empty', mag === 0);
+  setHP(hp: number): void {
+    const k = Math.max(hp, 0) / 100;
+    this.hpBar.style.width = `${k * 100}%`;
+    this.hpBar.style.background = k > 0.5 ? '#7fd069' : k > 0.25 ? '#e8b93c' : '#e0483c';
+    this.hpText.textContent = `${Math.max(Math.ceil(hp), 0)}`;
   }
 
-  setSpawnProtect(on: boolean) {
-    this.spawnProtect.classList.toggle('hidden', !on);
+  setAmmo(mag: number, reserve: number, reloading: boolean): void {
+    this.ammoMag.textContent = reloading ? '--' : `${mag}`;
+    this.ammoReserve.textContent = `${reserve}`;
   }
 
-  damageFlash(strength = 0.85) {
-    this.vignette.style.opacity = String(strength);
-    setTimeout(() => { this.vignette.style.opacity = '0'; }, 130);
+  setScore(blue: number, red: number): void {
+    this.scoreBlue.textContent = `${blue}`;
+    this.scoreRed.textContent = `${red}`;
   }
 
-  damageFrom(angleRad: number) {
-    const arc = document.createElement('div');
-    arc.className = 'dmg-arc';
-    arc.style.setProperty('--ang', `${angleRad}rad`);
-    this.dmgDir.appendChild(arc);
-    setTimeout(() => arc.remove(), 900);
+  setTimer(sec: number): void {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    this.timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  showKillBanner(text: string) {
-    this.killBanner.textContent = text;
-    this.killBanner.classList.remove('hidden');
-    // 重新触发动画
-    this.killBanner.style.animation = 'none';
-    void this.killBanner.offsetWidth;
-    this.killBanner.style.animation = '';
+  centerMsg(text: string, dur = 2.2): void {
+    this.msgEl.textContent = text;
+    this.msgEl.classList.add('show');
+    this.msgT = dur;
   }
 
-  showRespawn(cause: string, t: number) {
-    this.deathCause.textContent = cause;
-    this.respawnTimer.textContent = t.toFixed(1);
-    this.respawnOverlay.classList.remove('hidden');
+  showDeath(killerName: string, team: number): void {
+    this.deathInfo.innerHTML = `阵亡于 <span style="color:${TEAM_INFO[team].css}">${killerName}</span>`;
+    this.deathOverlay.classList.remove('hidden');
   }
 
-  updateRespawnTimer(t: number) {
-    this.respawnTimer.textContent = Math.max(0, t).toFixed(1);
+  setRespawnT(sec: number): void {
+    this.respawnT.textContent = `${Math.ceil(sec)}`;
   }
 
-  hideRespawn() {
-    this.respawnOverlay.classList.add('hidden');
+  hideDeath(): void {
+    this.deathOverlay.classList.add('hidden');
   }
 
-  flashHint() {
-    this.hintBar.style.opacity = '1';
-    if (this.hintTimer) clearTimeout(this.hintTimer);
-    this.hintTimer = setTimeout(() => { this.hintBar.style.opacity = '0'; }, 6000);
-  }
-
-  // ---------- 小地图 ----------
-  private mmScale = 1;
-  private mmOffX = 0;
-  private mmOffZ = 0;
-
-  private drawMinimapBase() {
-    const c = this.minimap;
-    this.mmScale = Math.min(c.width / (MAP.maxX - MAP.minX), c.height / (MAP.maxZ - MAP.minZ));
-    this.mmOffX = -(MAP.minX) * this.mmScale;
-    this.mmOffZ = -(MAP.minZ) * this.mmScale;
-    // 底
-    this.mmCtx.fillStyle = 'rgba(14, 16, 10, 0.9)';
-    this.mmCtx.fillRect(0, 0, c.width, c.height);
-  }
-
-  private mmX(x: number) { return x * this.mmScale + this.mmOffX; }
-  private mmZ(z: number) { return z * this.mmScale + this.mmOffZ; }
-
-  drawMinimap(
-    playerPos: THREE.Vector3,
-    playerYaw: number,
-    teammates: { x: number; z: number; team: number; alive: boolean }[],
-    enemies: { x: number; z: number; visible: boolean; alive: boolean }[],
-  ) {
-    const ctx = this.mmCtx;
-    const c = this.minimap;
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.fillStyle = 'rgba(20, 22, 14, 0.92)';
-    ctx.fillRect(0, 0, c.width, c.height);
-
-    // 墙体
-    ctx.fillStyle = 'rgba(190, 160, 100, 0.85)';
-    for (const w of WALLS) {
-      const x = this.mmX(Math.min(w.x1, w.x2)) - 1;
-      const z = this.mmZ(Math.min(w.z1, w.z2)) - 1;
-      const sx = (Math.abs(w.x2 - w.x1) + 1) * this.mmScale + 2;
-      const sz = (Math.abs(w.z2 - w.z1) + 1) * this.mmScale + 2;
-      ctx.fillRect(x, z, Math.max(sx, 2), Math.max(sz, 2));
+  showScoreboard(rows: ScoreRow[]): void {
+    const sorted = [...rows].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    let html = '<table><tr><th></th><th>玩家</th><th>击杀</th><th>阵亡</th></tr>';
+    for (const r of sorted) {
+      const c = TEAM_INFO[r.team].css;
+      html += `<tr class="${r.isPlayer ? 'me' : ''}">` +
+        `<td class="dot" style="background:${c}"></td>` +
+        `<td>${r.name}</td><td>${r.kills}</td><td>${r.deaths}</td></tr>`;
     }
+    html += '</table>';
+    this.scoreboardEl.innerHTML = html;
+    this.scoreboardEl.classList.remove('hidden');
+  }
 
-    // 包点
-    for (const s of SITE_MARKERS) {
-      ctx.fillStyle = 'rgba(255, 200, 80, 0.9)';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(s.label, this.mmX(s.x), this.mmZ(s.z));
+  hideScoreboard(): void {
+    this.scoreboardEl.classList.add('hidden');
+  }
+
+  showEnd(victory: boolean, blue: number, red: number, rows: ScoreRow[]): void {
+    this.endTitle.textContent = victory ? '胜 利' : '战 败';
+    this.endTitle.className = victory ? 'win' : 'lose';
+    const me = rows.find(r => r.isPlayer);
+    const sorted = [...rows].sort((a, b) => b.kills - a.kills);
+    let html = `<p>最终比分 <b>${blue} : ${red}</b></p><table><tr><th></th><th>玩家</th><th>击杀</th><th>阵亡</th></tr>`;
+    for (const r of sorted) {
+      const c = TEAM_INFO[r.team].css;
+      html += `<tr class="${r.isPlayer ? 'me' : ''}">` +
+        `<td class="dot" style="background:${c}"></td>` +
+        `<td>${r.name}</td><td>${r.kills}</td><td>${r.deaths}</td></tr>`;
     }
+    html += '</table>';
+    this.endStats.innerHTML = html;
+    void me;
+    this.endEl.classList.remove('hidden');
+  }
 
-    // 队友
-    for (const t of teammates) {
-      if (!t.alive) continue;
-      ctx.fillStyle = '#6db3ff';
-      ctx.beginPath();
-      ctx.arc(this.mmX(t.x), this.mmZ(t.z), 3, 0, 7);
-      ctx.fill();
+  update(dt: number): void {
+    if (this.vignetteT > 0) {
+      this.vignetteT -= dt;
+      this.vignette.style.opacity = `${Math.max(this.vignetteT, 0) * 1.6}`;
     }
-    // 敌人（可见时）
-    for (const e of enemies) {
-      if (!e.visible || !e.alive) continue;
-      ctx.fillStyle = '#ff5140';
-      ctx.beginPath();
-      ctx.arc(this.mmX(e.x), this.mmZ(e.z), 3.2, 0, 7);
-      ctx.fill();
+    if (this.msgT > 0) {
+      this.msgT -= dt;
+      if (this.msgT <= 0) this.msgEl.classList.remove('show');
     }
-
-    // 玩家箭头
-    const px = this.mmX(playerPos.x);
-    const pz = this.mmZ(playerPos.z);
-    ctx.save();
-    ctx.translate(px, pz);
-    ctx.rotate(-playerYaw);
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(4, 5);
-    ctx.lineTo(0, 2.6);
-    ctx.lineTo(-4, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // 边框
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
+    if (this.hmT > 0) {
+      this.hmT -= dt;
+      if (this.hmT <= 0) this.hitmarkerEl.classList.remove('show');
+    }
   }
 }

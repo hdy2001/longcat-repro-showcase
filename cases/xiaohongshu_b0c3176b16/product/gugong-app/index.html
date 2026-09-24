@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>紫禁城 · 夜景漫游 — Vibe Motion 3D</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      #app {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #02050a;
+        color: #eef4ff;
+        font: 13px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #app {
+        display: grid;
+        place-items: center;
+      }
+
+      .preview-shell {
+        position: relative;
+        width: min(calc(100vw - 36px), calc((100vh - 36px) * 9 / 16));
+        aspect-ratio: 9 / 16;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .webgl-canvas {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .camera-frame {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border: 1px solid rgba(226, 239, 255, 0.62);
+        pointer-events: none;
+      }
+
+      /* 参考图风格的蓝图线稿装饰（截图时会被一起截入） */
+      .blueprint-deco {
+        position: absolute;
+        z-index: 3;
+        pointer-events: none;
+        color: rgba(210, 228, 248, 0.5);
+        font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .blueprint-deco--compass {
+        top: 5.5%;
+        right: 4.5%;
+        width: 13vmin;
+        height: 13vmin;
+        opacity: 0.85;
+      }
+
+      .blueprint-deco--sketch {
+        bottom: 24%;
+        right: 4.5%;
+        width: 20vmin;
+        opacity: 0.5;
+      }
+
+      .blueprint-deco--labels {
+        bottom: 25.5%;
+        right: 4.5%;
+        text-align: right;
+        letter-spacing: 0.08em;
+      }
+
+      .blueprint-deco--labels div + div {
+        margin-top: 1px;
+      }
+
+      .blueprint-deco--title {
+        top: 4.5%;
+        left: 5%;
+      }
+
+      .blueprint-deco--title .bp-name {
+        font-size: 3.4vmin;
+        font-weight: 700;
+        letter-spacing: 0.35em;
+        color: rgba(232, 220, 190, 0.92);
+        text-shadow: 0 0 12px rgba(245, 196, 81, 0.35);
+      }
+
+      .blueprint-deco--title .bp-sub {
+        margin-top: 1vmin;
+        font-size: 1.5vmin;
+        letter-spacing: 0.22em;
+        color: rgba(210, 228, 248, 0.75);
+      }
+
+      .blueprint-deco--title .bp-rule {
+        margin-top: 1.2vmin;
+        width: 34vmin;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(245, 196, 81, 0.8), transparent);
+      }
+
+      .blueprint-deco--corner {
+        position: absolute;
+        z-index: 3;
+        width: 9vmin;
+        height: 9vmin;
+        border: 1px solid rgba(210, 228, 248, 0.35);
+        pointer-events: none;
+      }
+
+      .blueprint-deco--corner-tl { top: 2.2%; left: 2.4%; border-right: 0; border-bottom: 0; }
+      .blueprint-deco--corner-tr { top: 2.2%; right: 2.4%; border-left: 0; border-bottom: 0; }
+      .blueprint-deco--corner-bl { bottom: 2.2%; left: 2.4%; border-right: 0; border-top: 0; }
+      .blueprint-deco--corner-br { bottom: 2.2%; right: 2.4%; border-left: 0; border-top: 0; }
+
+      /* 解说字幕层（位于预览壳内，导出帧中可见） */
+      .subtitle-layer {
+        position: absolute;
+        left: 6%;
+        right: 6%;
+        bottom: 6.5%;
+        z-index: 4;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.2vmin;
+      }
+
+      .location-tag {
+        font-size: 1.9vmin;
+        letter-spacing: 0.4em;
+        color: #f5c451;
+        text-shadow: 0 0 10px rgba(245, 196, 81, 0.55), 0 1px 3px rgba(0, 0, 0, 0.8);
+        opacity: 0;
+        transition: opacity 0.45s ease;
+      }
+
+      .location-tag.is-visible {
+        opacity: 1;
+      }
+
+      .subtitle-text {
+        padding: 1.4vmin 3.2vmin;
+        border: 1px solid rgba(245, 196, 81, 0.45);
+        border-radius: 2px;
+        background: rgba(3, 6, 12, 0.55);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(6px);
+        color: #f6f9ff;
+        font-size: 2.6vmin;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        line-height: 1.55;
+        text-align: center;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.45s ease, transform 0.45s ease;
+      }
+
+      .subtitle-text.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .app-export {
+        display: block;
+      }
+
+      .app-export .preview-shell {
+        width: auto;
+        height: auto;
+        aspect-ratio: auto;
+      }
+
+      .app-export .camera-frame,
+      .app-export .render-panel,
+      .app-export .camera-controls {
+        display: none;
+      }
+
+      .camera-controls {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        z-index: 10;
+        width: min(360px, calc(100vw - 36px));
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(5, 8, 14, 0.78);
+        color: #f4f7fb;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.38);
+      }
+
+      .camera-controls__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .camera-controls__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .camera-controls__grid {
+        display: grid;
+        grid-template-columns: 68px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .camera-controls__grid span {
+        color: #c9d6e8;
+      }
+
+      .camera-controls code {
+        min-width: 0;
+        color: #f4f7fb;
+        font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        overflow-wrap: anywhere;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .camera-controls__slider {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 46px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .camera-controls__slider input {
+        width: 100%;
+        min-width: 0;
+        accent-color: #f5c451;
+      }
+
+      .camera-controls__button {
+        min-width: 0;
+        height: 30px;
+        padding: 0 12px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #eef4ff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .camera-controls__button:hover,
+      .camera-controls__button:focus-visible,
+      .camera-controls__button[aria-pressed="true"] {
+        background: rgba(245, 196, 81, 0.22);
+        border-color: rgba(245, 196, 81, 0.55);
+        outline: none;
+      }
+
+      .camera-controls__button--toggle {
+        min-width: 118px;
+      }
+
+      .render-panel {
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        z-index: 10;
+        width: min(320px, calc(100vw - 36px));
+        padding: 14px;
+        border: 1px solid rgba(226, 239, 255, 0.18);
+        border-radius: 8px;
+        background: rgba(8, 16, 22, 0.78);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+        backdrop-filter: blur(14px);
+      }
+
+      .frame-control {
+        display: grid;
+        grid-template-columns: 54px 84px 1fr;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        color: #dce6ef;
+      }
+
+      .frame-control input[type="number"] {
+        width: 84px;
+        min-height: 32px;
+        padding: 0 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 6px;
+        color: #eef4ff;
+        background: rgba(0, 0, 0, 0.22);
+      }
+
+      .frame-control output {
+        color: #9fb0bf;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .frame-range {
+        width: 100%;
+        margin: 10px 0 12px;
+        accent-color: #61d394;
+      }
+
+      .export-size-control {
+        display: grid;
+        grid-template-columns: 54px 1fr;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        margin-bottom: 10px;
+        color: #dce6ef;
+      }
+
+      .export-size-control select {
+        min-height: 32px;
+        padding: 0 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 6px;
+        color: #eef4ff;
+        background: rgba(0, 0, 0, 0.22);
+      }
+
+      .export-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .export-controls button {
+        min-height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 6px;
+        color: #eef4ff;
+        background: #315a63;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      .export-controls button:hover {
+        background: #3e707b;
+      }
+
+      .export-controls button:disabled {
+        color: #78909d;
+        background: rgba(49, 90, 99, 0.38);
+        cursor: not-allowed;
+      }
+
+      .export-status {
+        min-height: 18px;
+        margin-top: 10px;
+        color: #9fb0bf;
+        font-size: 12px;
+      }
+
+      .export-status:empty {
+        display: none;
+      }
+
+      @media (max-width: 620px) {
+        .render-panel {
+          top: 12px;
+          right: 12px;
+          width: calc(100vw - 24px);
+          padding: 12px;
+        }
+
+        .camera-controls {
+          left: 12px;
+          bottom: 12px;
+          width: calc(100vw - 24px);
+        }
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "three/addons/": "./node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="app">
+      <section id="preview-shell" class="preview-shell" aria-label="9:16 故宫夜景场景">
+        <div class="camera-frame" aria-hidden="true"></div>
+
+        <div class="blueprint-deco blueprint-deco--corner blueprint-deco--corner-tl"></div>
+        <div class="blueprint-deco blueprint-deco--corner blueprint-deco--corner-tr"></div>
+        <div class="blueprint-deco blueprint-deco--corner blueprint-deco--corner-bl"></div>
+        <div class="blueprint-deco blueprint-deco--corner blueprint-deco--corner-br"></div>
+
+        <div class="blueprint-deco blueprint-deco--title">
+          <div class="bp-name">紫禁城 · 夜景漫游</div>
+          <div class="bp-sub">3D 重建 · 动画演绎 · 9:16</div>
+          <div class="bp-rule"></div>
+        </div>
+
+        <svg class="blueprint-deco blueprint-deco--compass" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="1" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.6" />
+          <path d="M50 8 L56 50 L50 92 L44 50 Z" fill="none" stroke="currentColor" stroke-width="1" />
+          <path d="M8 50 L50 44 L92 50 L50 56 Z" fill="none" stroke="currentColor" stroke-width="1" />
+          <text x="50" y="22" text-anchor="middle" font-size="13" fill="currentColor">北</text>
+        </svg>
+
+        <svg class="blueprint-deco blueprint-deco--sketch" viewBox="0 0 120 90" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="0.8">
+            <path d="M6 34 L60 10 L114 34" />
+            <path d="M14 34 L14 38 L106 38 L106 34" />
+            <path d="M20 38 L20 78 L100 78 L100 38" />
+            <path d="M32 78 L32 52 L44 52 L44 78" />
+            <path d="M56 78 L56 52 L64 52 L64 78" />
+            <path d="M76 78 L76 52 L88 52 L88 78" />
+            <path d="M6 30 L6 34 M114 30 L114 34" />
+            <path d="M4 32 L116 32" stroke-dasharray="3 3" />
+          </g>
+        </svg>
+
+        <div class="blueprint-deco blueprint-deco--labels">
+          <div>三维建模 · VISION-TO-CAD</div>
+          <div>场景搭建 · 动画演绎</div>
+        </div>
+
+        <div class="subtitle-layer" aria-hidden="true">
+          <div class="location-tag" id="location-tag"></div>
+          <div class="subtitle-text" id="subtitle-text"></div>
+        </div>
+      </section>
+
+      <section class="render-panel" aria-label="Render controls">
+        <label class="frame-control">
+          Frame
+          <input id="render-frame" type="number" min="0" step="1" value="0" />
+          <output id="render-frame-count">1 / 600</output>
+        </label>
+        <input
+          id="render-frame-range"
+          class="frame-range"
+          type="range"
+          min="0"
+          max="599"
+          step="1"
+          value="0"
+        />
+        <label class="export-size-control">
+          Size
+          <select id="export-scale">
+            <option value="1" selected>720×1280</option>
+            <option value="2">1440×2560</option>
+          </select>
+        </label>
+        <div class="export-controls">
+          <button id="export-frame" type="button">Export PNG</button>
+          <button id="export-sequence" type="button">Export ZIP</button>
+        </div>
+        <div id="export-status" class="export-status" role="status" aria-live="polite"></div>
+      </section>
+    </main>
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

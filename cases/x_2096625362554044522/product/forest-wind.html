@@ -1,905 +1,1246 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2a1838">
 <title>Forest Wind — 森の風</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;900&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; }
-  body {
-    font-family: 'Noto Serif JP', serif;
-    background: #2a2030;
-    user-select: none;
-    -webkit-user-select: none;
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; background:#2a1838;
+    font-family:"Avenir Next","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-user-select:none; user-select:none;
   }
-  canvas { display: block; }
-
-  /* ---------- HUD ---------- */
-  .hud {
-    position: fixed;
-    z-index: 5;
-    background: rgba(38, 26, 46, 0.38);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 12px;
-    padding: 14px 20px;
-    color: #f3e9f2;
-    pointer-events: none;
-  }
-  #hud-left  { left: 22px;  bottom: 22px; }
-  #hud-right { right: 22px; top: 22px; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; padding: 3px 0; }
-  #hud-right .row { flex-direction: row; }
-  .label { font-size: 10px; letter-spacing: 0.25em; color: #c9b3d6; }
-  .value { font-size: 22px; font-weight: 600; color: #ffffff; text-shadow: 0 1px 8px rgba(90, 40, 100, 0.5); }
-  .unit  { font-size: 11px; color: #cbb8d4; margin-left: 4px; font-weight: 400; }
-  .dim   { font-size: 12px; color: #a98fb4; margin-left: 3px; font-weight: 400; }
-
-  @keyframes statPulse {
-    0%   { transform: scale(1); }
-    40%  { transform: scale(1.22); color: #ffd9ec; }
-    100% { transform: scale(1); }
-  }
-  .pulse { display: inline-block; animation: statPulse 0.5s ease; }
-
-  /* ---------- center message / flash / vignette ---------- */
-  #msg {
-    position: fixed; top: 16%; left: 0; width: 100%;
-    text-align: center; z-index: 6; pointer-events: none;
-    font-size: 22px; font-weight: 600; color: #fff;
-    text-shadow: 0 2px 16px rgba(80, 40, 90, 0.7);
-    opacity: 0; transition: opacity 0.45s ease;
-    letter-spacing: 0.15em;
-  }
-  #flash {
-    position: fixed; inset: 0; z-index: 4; pointer-events: none;
-    background: radial-gradient(ellipse at center, rgba(214, 120, 140, 0.55), rgba(150, 60, 90, 0.75));
-    opacity: 0; transition: opacity 0.6s ease;
-  }
+  #scene { position:fixed; inset:0; display:block; touch-action:none; }
   #vignette {
-    position: fixed; inset: 0; z-index: 3; pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 52%, rgba(46, 24, 54, 0.38) 100%);
+    position:fixed; inset:0; pointer-events:none; z-index:3;
+    background:radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(43,16,56,0.30) 100%);
   }
-
-  /* ---------- start overlay ---------- */
-  #start {
-    position: fixed; inset: 0; z-index: 10;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: linear-gradient(180deg, rgba(70, 52, 108, 0.94) 0%, rgba(158, 106, 146, 0.9) 48%, rgba(232, 158, 120, 0.88) 100%);
-    backdrop-filter: blur(7px);
-    -webkit-backdrop-filter: blur(7px);
-    transition: opacity 1.3s ease;
-    text-align: center;
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:5; display:none; }
+  #hud.show { display:block; }
+  .hud-panel {
+    position:absolute; color:#fff4e8; text-shadow:0 1px 4px rgba(30,10,40,.6);
+    background:rgba(43,20,60,0.34); border:1px solid rgba(255,220,230,0.16);
+    border-radius:12px; padding:10px 16px; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+    font-size:13px; letter-spacing:.08em;
   }
-  #start.hidden { opacity: 0; pointer-events: none; }
-  .title-en {
-    font-size: clamp(42px, 8vw, 84px);
-    font-weight: 900; color: #fdf6ee;
-    letter-spacing: 0.2em; margin-right: -0.2em;
-    text-shadow: 0 4px 34px rgba(50, 18, 70, 0.5);
+  #hud-bl { left:18px; bottom:18px; }
+  #hud-tr { right:18px; top:18px; text-align:right; }
+  .row { display:flex; align-items:baseline; gap:8px; margin:3px 0; }
+  #hud-tr .row { justify-content:flex-end; }
+  .hud-label { opacity:.72; font-size:10.5px; letter-spacing:.12em; min-width:56px; }
+  .hud-val { font-size:19px; font-weight:700; color:#ffe9c8; font-variant-numeric:tabular-nums; }
+  .hud-unit { font-size:10px; opacity:.6; }
+  /* ---------- Toast ---------- */
+  #toast {
+    position:fixed; top:16%; left:50%; transform:translate(-50%,-8px); z-index:8;
+    background:rgba(48,20,62,0.6); color:#ffe3cf; padding:9px 24px; border-radius:999px;
+    font-size:14px; letter-spacing:.14em; opacity:0; pointer-events:none;
+    transition:opacity .35s ease, transform .35s ease;
+    border:1px solid rgba(255,215,225,0.18); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    white-space:nowrap;
   }
-  .title-jp {
-    margin-top: 18px;
-    font-size: clamp(20px, 3vw, 30px);
-    color: #f6e3d0; font-weight: 600;
-    letter-spacing: 0.55em; margin-right: -0.55em;
-    text-shadow: 0 2px 18px rgba(60, 20, 60, 0.55);
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  /* ---------- Title screen ---------- */
+  #title-screen {
+    position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at 50% 42%, rgba(46,22,64,0.14) 0%, rgba(30,12,48,0.55) 100%);
+    transition:opacity .9s ease; backdrop-filter:blur(1.5px); -webkit-backdrop-filter:blur(1.5px);
   }
-  .title-sub {
-    margin-top: 12px; font-size: 12px; color: rgba(253, 246, 238, 0.65);
-    letter-spacing: 0.35em; margin-right: -0.35em;
+  #title-screen.hidden { opacity:0; pointer-events:none; }
+  .title-inner { text-align:center; padding:34px 52px; border-radius:18px; background:rgba(38,18,56,0.28); border:1px solid rgba(255,225,235,0.10); }
+  .jp-title {
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Songti SC","SimSun",serif;
+    font-size:clamp(22px,3.2vw,32px); letter-spacing:.55em; margin-left:.55em;
+    color:#ffd9c4; text-shadow:0 2px 14px rgba(255,120,110,.35);
   }
-  #stamp {
-    width: 88px; height: 88px; margin: 40px 0 20px;
-    background: #b23a2e; color: #fdf6ee;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 56px; font-weight: 900;
-    border-radius: 12px; transform: rotate(-5deg);
-    box-shadow: 0 8px 28px rgba(90, 20, 20, 0.45), inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  .en-title {
+    margin-top:10px; font-size:clamp(40px,7.5vw,88px); font-weight:800; letter-spacing:.30em; margin-left:.30em;
+    color:#fff3e6; text-shadow:0 4px 34px rgba(214,70,90,.5), 0 2px 8px rgba(20,5,30,.55);
   }
-  #takeFlight {
-    font-family: inherit; font-size: 15px; letter-spacing: 0.35em; margin-right: -0.35em;
-    padding: 15px 44px;
-    background: transparent; color: #fdf6ee;
-    border: 1.5px solid rgba(253, 246, 238, 0.75); border-radius: 999px;
-    cursor: pointer; transition: all 0.3s ease;
+  .tagline { margin-top:12px; color:#e8c9d8; font-size:13px; letter-spacing:.18em; opacity:.85; }
+  #start-btn { margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:12px; background:none; border:none; cursor:pointer; }
+  .seal {
+    width:88px; height:88px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(155deg,#d8402a,#a02318); color:#fff2e6;
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Songti SC","SimSun",serif; font-size:46px;
+    border-radius:12px; transform:rotate(-2.5deg);
+    box-shadow:0 8px 26px rgba(190,35,25,.5), inset 0 0 0 3px rgba(255,238,220,.38), inset 0 0 18px rgba(120,10,5,.55);
+    transition:transform .2s ease;
   }
-  #takeFlight:hover { background: rgba(253, 246, 238, 0.16); transform: translateY(-2px); }
-  .hint {
-    position: absolute; bottom: 34px;
-    font-size: 11px; color: rgba(253, 246, 238, 0.6);
-    letter-spacing: 0.22em; line-height: 2;
+  #start-btn:hover .seal { transform:rotate(2deg) scale(1.07); }
+  .take-flight { color:#ffe4d2; letter-spacing:.42em; margin-left:.42em; font-size:14px; }
+  .controls { margin-top:26px; display:inline-block; text-align:left; }
+  .ctrl-row { display:flex; justify-content:space-between; gap:28px; color:#f3dbe4; font-size:12.5px; padding:3px 0; letter-spacing:.06em; }
+  .ctrl-keys { color:#ffbf9a; font-weight:700; min-width:120px; }
+  .hint { margin-top:14px; font-size:11px; color:#d9b8cc; letter-spacing:.14em; }
+  /* ---------- Chapter overlay ---------- */
+  #chapter {
+    position:fixed; inset:0; z-index:9; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(26,10,40,0.70), rgba(20,8,34,0.92));
+    opacity:0; pointer-events:none; transition:opacity 1s ease;
+  }
+  #chapter.show { opacity:1; }
+  .ch-inner { text-align:center; }
+  .ch-jp {
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Songti SC",serif;
+    color:#ff9d88; font-size:clamp(18px,2.4vw,26px); letter-spacing:.7em; margin-left:.7em; margin-bottom:16px;
+  }
+  .ch-en { color:#fff0e2; font-size:clamp(26px,4.6vw,52px); letter-spacing:.22em; margin-left:.22em; font-weight:700; text-shadow:0 4px 30px rgba(255,120,100,.35); }
+  /* ---------- Fatal error ---------- */
+  #fatal {
+    position:fixed; inset:0; z-index:99; display:none; align-items:center; justify-content:center;
+    color:#ffd9c9; background:#2a1838; font-size:15px; letter-spacing:.1em; text-align:center; padding:24px;
   }
 </style>
 </head>
 <body>
-
+<canvas id="scene"></canvas>
 <div id="vignette"></div>
-<div id="flash"></div>
 
-<div id="hud-left" class="hud">
-  <div class="row"><span class="label">空速 AIRSPEED</span><span class="value"><span id="v-spd">0</span><span class="unit">km/h</span></span></div>
-  <div class="row"><span class="label">地速 GROUND</span><span class="value"><span id="v-gspd">0</span><span class="unit">km/h</span></span></div>
-  <div class="row"><span class="label">高度 ALT</span><span class="value"><span id="v-alt">0</span><span class="unit">m</span></span></div>
-</div>
-
-<div id="hud-right" class="hud">
-  <div class="row"><span class="label">魂 SOULS</span><span class="value" id="v-souls">0</span></div>
-  <div class="row"><span class="label">鳥居 TORII</span><span class="value" id="v-gates">0<span class="dim">/13</span></span></div>
-  <div class="row"><span class="label">距離 DIST</span><span class="value"><span id="v-dist">0.0</span><span class="unit">km</span></span></div>
-</div>
-
-<div id="msg"></div>
-
-<div id="start">
-  <div class="title-en">FOREST WIND</div>
-  <div class="title-jp">森の風</div>
-  <div class="title-sub">A QUIET FLIGHT OVER THE FOREST</div>
-  <div id="stamp">飛</div>
-  <button id="takeFlight">Take flight</button>
-  <div class="hint">
-    W/S 或 ↑/↓ 俯仰 &nbsp;·&nbsp; A/D 或 ←/→ 滚转转向 &nbsp;·&nbsp; Shift 乘风加速 &nbsp;·&nbsp; Ctrl 减速 &nbsp;·&nbsp; Space 改平 &nbsp;·&nbsp; M 声音
+<div id="hud">
+  <div id="hud-bl" class="hud-panel">
+    <div class="row"><span class="hud-label">空速 AIR</span><span class="hud-val" id="hud-airspeed">0</span><span class="hud-unit">km/h</span></div>
+    <div class="row"><span class="hud-label">地速 GND</span><span class="hud-val" id="hud-groundspeed">0</span><span class="hud-unit">km/h</span></div>
+    <div class="row"><span class="hud-label">高度 ALT</span><span class="hud-val" id="hud-altitude">0</span><span class="hud-unit">m</span></div>
+  </div>
+  <div id="hud-tr" class="hud-panel">
+    <div class="row"><span class="hud-label">灵魂 SOULS</span><span class="hud-val" id="hud-souls">0</span><span class="hud-unit">✦</span></div>
+    <div class="row"><span class="hud-label">鸟居 TORII</span><span class="hud-val" id="hud-gates">0</span><span class="hud-unit">⛩</span></div>
+    <div class="row"><span class="hud-label">距离 DIST</span><span class="hud-val" id="hud-dist">0.0</span><span class="hud-unit">km</span></div>
   </div>
 </div>
 
-<script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
-</script>
+<div id="toast"></div>
 
-<script type="module">
-import * as THREE from 'three';
+<div id="chapter">
+  <div class="ch-inner">
+    <div class="ch-jp">第一章 · 杉木之海</div>
+    <div class="ch-en">Chapter One — The Cedar Sea</div>
+  </div>
+</div>
+
+<div id="title-screen">
+  <div class="title-inner">
+    <div class="jp-title">森の風</div>
+    <h1 class="en-title">FOREST WIND</h1>
+    <div class="tagline">莱特飞行器 · 杉木之海 — a flight over the cedar sea</div>
+    <button id="start-btn" type="button">
+      <span class="seal">飛</span>
+      <span class="take-flight">Take flight</span>
+    </button>
+    <div class="controls">
+      <div class="ctrl-row"><span class="ctrl-keys">W / ↑</span><span>爬升 climb</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">S / ↓</span><span>俯冲 dive</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">A D / ← →</span><span>滚转转向 bank &amp; turn</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">Shift</span><span>御风加速 boost</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">Ctrl</span><span>减速 brake</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">Space</span><span>改平 level out</span></div>
+      <div class="ctrl-row"><span class="ctrl-keys">触屏拖拽</span><span>touch drag 亦可操控</span></div>
+    </div>
+    <div class="hint">爬升会损失速度 · 低速将失速下坠 · 俯冲可以增速</div>
+  </div>
+</div>
+
+<div id="fatal"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+'use strict';
+
+window.__errs = [];
+window.addEventListener('error', function (e) {
+  window.__errs.push(String(e.message || e));
+  var f = document.getElementById('fatal');
+  f.style.display = 'flex';
+  f.textContent = 'Error: ' + (e.message || e) + ' — 请刷新页面重试';
+});
+
+if (typeof THREE === 'undefined') {
+  var f0 = document.getElementById('fatal');
+  f0.style.display = 'flex';
+  f0.textContent = 'Three.js 加载失败，请检查网络连接后刷新页面。';
+  return;
+}
 
 /* ============================================================
-   basics
+   工具函数
 ============================================================ */
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function hash2(a, b) {
+  var s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453123;
+  return s - Math.floor(s);
+}
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+/* ============================================================
+   渲染器 / 场景 / 相机 / 光照
+============================================================ */
+var canvas = document.getElementById('scene');
+var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
-document.body.appendChild(renderer.domElement);
+renderer.setClearColor(0x2a1838, 1);
 
-const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xecc3cd, 150, 2600);
+var scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xdca3ba, 0.0016);
 
-const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 9000);
+var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 6000);
+camera.position.set(24, 86, 10);
 
-scene.add(new THREE.HemisphereLight(0xf6cfe0, 0x5c6b58, 0.95));
-const sunLight = new THREE.DirectionalLight(0xffd9b0, 0.85);
-sunLight.position.set(-700, 520, -1200);
-scene.add(sunLight);
+var hemi = new THREE.HemisphereLight(0xf4c6da, 0x3d4a3a, 1.05);
+scene.add(hemi);
+var sunDir = new THREE.Vector3(0.55, 0.5, -0.65).normalize();
+var dirLight = new THREE.DirectionalLight(0xffe2b8, 0.95);
+scene.add(dirLight);
+scene.add(dirLight.target);
 
 /* ============================================================
-   sky dome (pink → purple gradient) + sun glow
+   天空穹顶（粉紫渐变） + 太阳
 ============================================================ */
-const sky = new THREE.Mesh(
-  new THREE.SphereGeometry(3400, 24, 12),
+var sky = new THREE.Mesh(
+  new THREE.SphereGeometry(2600, 24, 12),
   new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    vertexShader: `
-      varying vec3 vP;
-      void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `
-      varying vec3 vP;
-      void main() {
-        float h = normalize(vP).y;
-        vec3 top = vec3(0.36, 0.24, 0.52);
-        vec3 mid = vec3(0.80, 0.53, 0.68);
-        vec3 hor = vec3(0.99, 0.78, 0.60);
-        vec3 c = h > 0.18 ? mix(mid, top, smoothstep(0.18, 0.75, h))
-                          : mix(hor, mid, smoothstep(-0.06, 0.18, h));
-        gl_FragColor = vec4(c, 1.0);
-      }`
+    uniforms: {
+      uTop: { value: new THREE.Color(0x4e3a68) },
+      uMid: { value: new THREE.Color(0xb56b9b) },
+      uBot: { value: new THREE.Color(0xf6c9c0) }
+    },
+    vertexShader: [
+      'varying vec3 vPos;',
+      'void main(){ vPos = position;',
+      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform vec3 uTop; uniform vec3 uMid; uniform vec3 uBot;',
+      'varying vec3 vPos;',
+      'void main(){',
+      '  float h = normalize(vPos).y;',
+      '  vec3 col = h >= 0.0 ? mix(uMid, uTop, smoothstep(0.02, 0.62, h))',
+      '                      : mix(uMid, uBot, smoothstep(0.0, -0.28, h));',
+      '  gl_FragColor = vec4(col, 1.0);',
+      '}'
+    ].join('\n')
   })
 );
+sky.frustumCulled = false;
 scene.add(sky);
 
-/* canvas texture helpers */
-function makeRadialTexture(stops) {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const g = c.getContext('2d');
-  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  for (const [o, col] of stops) gr.addColorStop(o, col);
-  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+function makeGlowTexture(size, inner, outer) {
+  var c = document.createElement('canvas'); c.width = c.height = size;
+  var x = c.getContext('2d');
+  var g = x.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0, inner);
+  g.addColorStop(1, outer);
+  x.fillStyle = g;
+  x.fillRect(0, 0, size, size);
   return new THREE.CanvasTexture(c);
 }
-function makeLeafTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const g = c.getContext('2d');
-  g.translate(32, 32); g.rotate(0.6);
-  const gr = g.createRadialGradient(0, 0, 2, 0, 0, 20);
-  gr.addColorStop(0, '#f6c667');
-  gr.addColorStop(0.7, '#e89a3e');
-  gr.addColorStop(1, 'rgba(217,126,53,0)');
-  g.fillStyle = gr;
-  g.beginPath(); g.ellipse(0, 0, 11, 17, 0, 0, Math.PI * 2); g.fill();
-  return new THREE.CanvasTexture(c);
-}
-const glowTex = makeRadialTexture([[0, 'rgba(255,255,255,1)'], [0.25, 'rgba(200,235,255,0.75)'], [1, 'rgba(120,190,255,0)']]);
-const leafTex = makeLeafTexture();
+var glowTex = makeGlowTexture(128, 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0)');
+var mistTex = makeGlowTexture(128, 'rgba(255,244,248,0.85)', 'rgba(255,244,248,0)');
 
-const sunDir = new THREE.Vector3(-700, 520, -1200).normalize();
-const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-  map: glowTex, color: 0xffd2a0, transparent: true, opacity: 0.95,
+var sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTex, color: 0xffd9a8, transparent: true, opacity: 0.95,
   blending: THREE.AdditiveBlending, depthWrite: false, fog: false
 }));
-sunSprite.position.copy(sunDir).multiplyScalar(2900);
-sunSprite.scale.set(1100, 1100, 1);
-scene.add(sunSprite);
+sunSpr.scale.set(460, 460, 1);
+scene.add(sunSpr);
 
 /* ============================================================
-   terrain — gentle heightfield with watercolor vertex colors
+   几何合并助手（顶点着色，低多边形）
 ============================================================ */
-function terrainHeight(x, z) {
-  let h = 0;
-  h += 22 * Math.sin(x * 0.0038 + 1.3) * Math.cos(z * 0.0031 + 0.4);
-  h += 12 * Math.sin(x * 0.0092 + 4.1) * Math.sin(z * 0.0078 + 2.2);
-  h +=  5 * Math.sin(x * 0.0210 + 0.7) * Math.cos(z * 0.0170 + 5.0);
-  h +=  2.2 * Math.sin(x * 0.050) * Math.sin(z * 0.043);
-  return h + 6;
-}
+var tmpColor = new THREE.Color();
+var tmpM = new THREE.Matrix4(), tmpM2 = new THREE.Matrix4(), tmpM3 = new THREE.Matrix4();
+var tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler();
+var tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3(), tmpV3 = new THREE.Vector3();
+var tmpS = new THREE.Vector3();
 
-const TERRAIN_SIZE = 6000;
-const terraGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, 150, 150);
-terraGeo.rotateX(-Math.PI / 2);
-{
-  const pos = terraGeo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const cLow = new THREE.Color(0x7d8a6f);
-  const cMid = new THREE.Color(0x66755c);
-  const cHigh = new THREE.Color(0x828a7c);
-  const tmp = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const h = terrainHeight(x, z);
-    pos.setY(i, h);
-    const t = clamp((h + 20) / 55, 0, 1);
-    tmp.copy(cLow).lerp(cMid, clamp(t * 1.6, 0, 1)).lerp(cHigh, clamp((t - 0.6) * 2, 0, 1));
-    const j = 0.92 + Math.random() * 0.16;
-    colors[i * 3] = tmp.r * j; colors[i * 3 + 1] = tmp.g * j; colors[i * 3 + 2] = tmp.b * j;
+function colored(geo, hex) {
+  var c = new THREE.Color(hex);
+  var n = geo.attributes.position.count;
+  var arr = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) { arr[i*3] = c.r; arr[i*3+1] = c.g; arr[i*3+2] = c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+function part(geo, hex) { colored(geo, hex); return { geo: geo }; }
+function box(w, h, d, x, y, z, hex) {
+  var g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); return part(g, hex);
+}
+function mergeParts(parts) {
+  var P = [], N = [], C = [];
+  for (var p = 0; p < parts.length; p++) {
+    var src = parts[p].geo;
+    var g = src.index ? src.toNonIndexed() : src;
+    var pa = g.attributes.position, na = g.attributes.normal, ca = g.attributes.color;
+    for (var i = 0; i < pa.count; i++) {
+      P.push(pa.getX(i), pa.getY(i), pa.getZ(i));
+      N.push(na.getX(i), na.getY(i), na.getZ(i));
+      C.push(ca.getX(i), ca.getY(i), ca.getZ(i));
+    }
   }
-  terraGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  terraGeo.computeVertexNormals();
+  var out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  return out;
 }
-scene.add(new THREE.Mesh(terraGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-
-/* winding path the torii gates follow (also used for tree clearing) */
-const pathX = z => Math.sin(-z * 0.0042) * 120;
+function wireGeo(ax, ay, az, bx, by, bz, r) {
+  var dx = bx-ax, dy = by-ay, dz = bz-az;
+  var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  var g = new THREE.CylinderGeometry(r, r, len, 4, 1);
+  g.translate(0, len / 2, 0);
+  var q = new THREE.Quaternion().setFromUnitVectors(tmpV.set(0, 1, 0), tmpV2.set(dx/len, dy/len, dz/len));
+  tmpM.compose(tmpV3.set(ax, ay, az), q, tmpS.set(1, 1, 1));
+  g.applyMatrix4(tmpM);
+  return part(g, 0x2c241c);
+}
 
 /* ============================================================
-   layered mountains
+   地形高度函数（解析式，供地面/树木/碰撞共用）
 ============================================================ */
-function mountainRing(count, rMin, rMax, hMin, hMax, baseMin, baseMax, colA, colB) {
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2 + Math.random() * 0.35;
-    const r = rMin + Math.random() * (rMax - rMin);
-    const h = hMin + Math.random() * (hMax - hMin);
-    const b = baseMin + Math.random() * (baseMax - baseMin);
-    const m = new THREE.Mesh(
-      new THREE.ConeGeometry(b, h, 5 + Math.floor(Math.random() * 2)),
-      new THREE.MeshLambertMaterial({ color: new THREE.Color(colA).lerp(new THREE.Color(colB), Math.random()), flatShading: true })
-    );
-    m.position.set(Math.cos(a) * r, h / 2 - 18, Math.sin(a) * r);
-    m.rotation.y = Math.random() * Math.PI;
-    scene.add(m);
-  }
+function terrainH(x, z) {
+  return 4.0 * Math.sin(x * 0.008 + 1.3) * Math.cos(z * 0.009 + 0.7)
+       + 2.2 * Math.sin(x * 0.021 + 4.0) * Math.sin(z * 0.017 + 2.0)
+       + 1.2 * Math.cos(x * 0.043) * Math.cos(z * 0.037);
 }
-mountainRing(14, 1700, 2700, 260, 560, 380, 680, 0x8a76ad, 0xa58bb8); // far purple ridge
-mountainRing(12, 900, 1450, 150, 360, 280, 520, 0x71837c, 0x82948a);  // nearer gray-green hills
+
+/* ---------- 地面（滚动起伏的谷底） ---------- */
+var groundGeo = new THREE.PlaneGeometry(3000, 3000, 88, 88);
+groundGeo.rotateX(-Math.PI / 2);
+(function paintGround() {
+  var gp = groundGeo.attributes.position;
+  var cols = new Float32Array(gp.count * 3);
+  var base = new THREE.Color(0x3e4c38), moss = new THREE.Color(0x4d5c42), dry = new THREE.Color(0x59604a);
+  for (var i = 0; i < gp.count; i++) {
+    var h = hash2(i * 0.37 + 0.11, i * 1.13 + 0.57);
+    var c = h < 0.22 ? moss : (h < 0.30 ? dry : base);
+    var v = 0.90 + 0.20 * hash2(i * 0.71, i * 0.31);
+    cols[i*3] = c.r * v; cols[i*3+1] = c.g * v; cols[i*3+2] = c.b * v;
+  }
+  groundGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+})();
+var ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+ground.frustumCulled = false;
+scene.add(ground);
 
 /* ============================================================
-   torii gates (vermilion) along the winding path
+   共享材质
 ============================================================ */
-const gates = [];
-const noTree = []; // {x, z, r} clearings — gates/houses/lanterns register here
-function makeTorii() {
-  const g = new THREE.Group();
-  const red = new THREE.MeshLambertMaterial({ color: 0xc23b2e, flatShading: true });
-  const dark = new THREE.MeshLambertMaterial({ color: 0x9c2f24, flatShading: true });
-  const stone = new THREE.MeshLambertMaterial({ color: 0x8d8a92, flatShading: true });
-  const P = 4.2, H = 7.8;
-  for (const sd of [-1, 1]) {
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.44, H, 6), red);
-    pillar.position.set(sd * P, H / 2, 0); pillar.rotation.z = -sd * 0.045;
-    g.add(pillar);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.7, 1.3), stone);
-    base.position.set(sd * P, 0.35, 0);
-    g.add(base);
+var matStandard = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.0, flatShading: true });
+var matGround = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+
+/* ============================================================
+   实例化环境（InstancedMesh，按机位窗口重建）
+============================================================ */
+function makeInst(geo, mat, cap) {
+  var m = new THREE.InstancedMesh(geo, mat, cap);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.frustumCulled = false;
+  m.count = 0;
+  for (var i = 0; i < cap; i++) m.setColorAt(i, tmpColor.setRGB(1, 1, 1));
+  scene.add(m);
+  return m;
+}
+function setInst(mesh, i, x, y, z, rotY, sx, sy, sz) {
+  tmpQ.setFromEuler(tmpE.set(0, rotY, 0));
+  tmpM.compose(tmpV.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz));
+  mesh.setMatrixAt(i, tmpM);
+}
+
+/* ---------- 杉树（深灰绿色杉树海） ---------- */
+var treeGeo = mergeParts([
+  (function(){ var g = new THREE.CylinderGeometry(0.22, 0.4, 2.6, 5); g.translate(0, 1.3, 0); return part(g, 0x584534); })(),
+  (function(){ var g = new THREE.ConeGeometry(2.7, 5.6, 6); g.translate(0, 4.6, 0); return part(g, 0x42513c); })(),
+  (function(){ var g = new THREE.ConeGeometry(1.9, 4.4, 6); g.translate(0, 7.6, 0); return part(g, 0x4a5a40); })(),
+  (function(){ var g = new THREE.ConeGeometry(1.05, 3.2, 6); g.translate(0, 9.8, 0); return part(g, 0x55684a); })()
+]);
+var TREE_CAP = 6200;
+var treeMesh = makeInst(treeGeo, matStandard, TREE_CAP);
+var treeTints = [0xffffff, 0xe6efdc, 0xd9e6f0, 0xf0e6cf].map(function (h) { return new THREE.Color(h); });
+
+/* ---------- 陡峭山峰（2 个变体） ---------- */
+function makePeakGeo(seed) {
+  var g = new THREE.ConeGeometry(1, 1, 9, 4);
+  var pos = g.attributes.position;
+  for (var i = 0; i < pos.count; i++) {
+    var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    if (y < 0.49) {
+      var a = Math.atan2(z, x) + seed;
+      var j = 0.7 + 0.6 * hash2(Math.round(a * 3) + seed * 17, i);
+      pos.setX(i, x * j); pos.setZ(i, z * j);
+    } else {
+      pos.setX(i, x * (0.85 + 0.3 * hash2(i * 3.1, seed)));
+      pos.setZ(i, z * (0.85 + 0.3 * hash2(i * 1.7, seed + 9)));
+    }
   }
-  const kasagi = new THREE.Mesh(new THREE.BoxGeometry(11.6, 0.8, 1.05), dark);
-  kasagi.position.y = H + 0.3; g.add(kasagi);
-  const nuki = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.55, 0.7), red);
-  nuki.position.y = H - 1.2; g.add(nuki);
-  const plaque = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.15, 0.28), dark);
-  plaque.position.y = H - 0.4; g.add(plaque);
+  g.translate(0, 0.5, 0);
+  var cols = new Float32Array(pos.count * 3);
+  var c1 = new THREE.Color(0x42513c), c2 = new THREE.Color(0x6f7d61), cc = new THREE.Color();
+  for (var k = 0; k < pos.count; k++) {
+    var t = clamp(pos.getY(k), 0, 1);
+    cc.copy(c1).lerp(c2, t);
+    cols[k*3] = cc.r; cols[k*3+1] = cc.g; cols[k*3+2] = cc.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   return g;
 }
-const GATE_COUNT = 13;
-for (let i = 0; i < GATE_COUNT; i++) {
-  const z = -160 - i * 205;
-  const x = pathX(z);
-  const y = terrainHeight(x, z) + 25 + Math.sin(i * 1.7) * 7;
-  const g = makeTorii();
-  g.position.set(x, y, z);
-  const fwd = new THREE.Vector3(pathX(z - 15) - pathX(z + 15), 0, -30).normalize();
-  g.rotation.y = Math.atan2(fwd.x, fwd.z);
-  scene.add(g);
-  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
-  gates.push({ pos: g.position.clone(), fwd, right, prev: 1e9, passed: false });
-  noTree.push({ x, z, r: 30 });
+var peakMeshA = makeInst(makePeakGeo(1.7), matStandard, 12);
+var peakMeshB = makeInst(makePeakGeo(4.3), matStandard, 12);
+var peakTints = [0xffffff, 0xe8e4f0, 0xdfe8da].map(function (h) { return new THREE.Color(h); });
+
+/* ---------- 日式小房子 + 暖窗 ---------- */
+var houseGeo = mergeParts([
+  box(6, 3.4, 5, 0, 1.7, 0, 0x4c4038),
+  (function(){ var g = new THREE.ConeGeometry(4.5, 2.4, 4); g.rotateY(Math.PI / 4); g.scale(1, 1, 0.78); g.translate(0, 4.6, 0); return part(g, 0x3d4a55); })()
+]);
+var HOUSE_CAP = 32;
+var houseMesh = makeInst(houseGeo, matStandard, HOUSE_CAP);
+var houseGlowMesh = makeInst(
+  mergeParts([box(1.6, 1.1, 0.18, 0, 1.5, 2.56, 0xffd98a)]),
+  new THREE.MeshBasicMaterial({ color: 0xffd98a }), HOUSE_CAP);
+
+/* ---------- 石灯笼 + 暖光 ---------- */
+var lanternGeo = mergeParts([
+  box(0.8, 0.4, 0.8, 0, 0.2, 0, 0x6f746c),
+  (function(){ var g = new THREE.CylinderGeometry(0.26, 0.34, 1.1, 6); g.translate(0, 0.95, 0); return part(g, 0x7a7f78); })(),
+  box(0.62, 0.52, 0.62, 0, 1.76, 0, 0x82877f),
+  (function(){ var g = new THREE.ConeGeometry(0.56, 0.5, 4); g.rotateY(Math.PI / 4); g.translate(0, 2.28, 0); return part(g, 0x646a62); })()
+]);
+var LANTERN_CAP = 48;
+var lanternMesh = makeInst(lanternGeo, matStandard, LANTERN_CAP);
+var lanternGlowMesh = makeInst(
+  mergeParts([box(0.4, 0.34, 0.4, 0, 1.76, 0, 0xffc873)]),
+  new THREE.MeshBasicMaterial({ color: 0xffc873 }), LANTERN_CAP);
+
+/* ---------- 山顶红色鸟居 ---------- */
+function buildToriiGeo() {
+  return mergeParts([
+    box(1.5, 22, 1.5, -8, 11, 0, 0xc23a24),
+    box(1.5, 22, 1.5, 8, 11, 0, 0xc23a24),
+    box(1.1, 2.8, 1.1, 0, 20.6, 0, 0xc23a24),
+    box(20.6, 1.5, 1.9, 0, 21.2, 0, 0xc23a24),
+    box(21.4, 1.7, 2.1, 0, 23.3, 0, 0xb03420),
+    box(21.9, 0.55, 2.3, 0, 24.35, 0, 0x241d18)
+  ]);
+}
+var toriiGeo = buildToriiGeo();
+var toriiPeakMesh = makeInst(toriiGeo, matStandard, 12);
+
+/* ---------- 云（淡粉水彩团） ---------- */
+var cloudMesh = makeInst(
+  new THREE.IcosahedronGeometry(1, 0),
+  new THREE.MeshBasicMaterial({ color: 0xfae9f1, transparent: true, opacity: 0.72, depthWrite: false, fog: true }), 16);
+
+/* ============================================================
+   远景山脉（两层剪影，跟随飞机）
+============================================================ */
+function makeRing(n, rMin, rMax, hex) {
+  var geo = new THREE.ConeGeometry(1, 1, 7, 2); geo.translate(0, 0.5, 0);
+  var mat = new THREE.MeshStandardMaterial({ color: hex, roughness: 1, flatShading: true });
+  var mesh = makeInst(geo, mat, n);
+  var offs = [];
+  for (var i = 0; i < n; i++) {
+    var a = i / n * Math.PI * 2 + hash2(i, 7) * 0.6;
+    var r = rMin + hash2(i, 3) * (rMax - rMin);
+    offs.push({ x: Math.cos(a) * r, z: Math.sin(a) * r,
+      w: 300 + hash2(i, 9) * 280, h: 420 + hash2(i, 5) * 420, rot: hash2(i, 11) * 6.283 });
+  }
+  return { mesh: mesh, offs: offs };
+}
+var ring1 = makeRing(18, 620, 950, 0x5d5a7a);
+var ring2 = makeRing(14, 950, 1350, 0x6d6488);
+function updateRings() {
+  var px = flyer.position.x, pz = flyer.position.z;
+  var rings = [ring1, ring2];
+  for (var r = 0; r < rings.length; r++) {
+    var mesh = rings[r].mesh, offs = rings[r].offs;
+    for (var i = 0; i < offs.length; i++) {
+      var o = offs[i];
+      tmpQ.setFromEuler(tmpE.set(0, o.rot, 0));
+      tmpM.compose(tmpV.set(px + o.x, 0, pz + o.z), tmpQ, tmpS.set(o.w, o.h, o.w));
+      mesh.setMatrixAt(i, tmpM);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
 }
 
 /* ============================================================
-   japanese houses & stone lanterns
+   1903 莱特飞行器（双翼 + 交叉张线桁架）
 ============================================================ */
-function makeHouse() {
-  const g = new THREE.Group();
-  const wall = new THREE.MeshLambertMaterial({ color: 0xe7dbc4, flatShading: true });
-  const roofM = new THREE.MeshLambertMaterial({ color: 0x5b5160, flatShading: true });
-  const wood = new THREE.MeshLambertMaterial({ color: 0x6b4f3a, flatShading: true });
-  const stone = new THREE.MeshLambertMaterial({ color: 0x8d8a92, flatShading: true });
-  const base = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.7, 7.6), stone); base.position.y = 0.35; g.add(base);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.6, 7), wall); body.position.y = 2.5; g.add(body);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(5.9, 3.4, 4), roofM);
-  roof.position.y = 6.1; roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 1.12); g.add(roof);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.1, 0.2), wood);
-  door.position.set(0.8, 1.75, 3.55); g.add(door);
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.0), new THREE.MeshBasicMaterial({ color: 0xffc98a }));
-  win.position.set(-1.4, 2.7, 3.53); g.add(win);
+var flyer = new THREE.Group();
+flyer.rotation.order = 'YXZ';
+(function buildFlyer() {
+  var muslinParts = [];
+  muslinParts.push(part(new THREE.BoxGeometry(10.6, 0.09, 1.7).translate(0, 0, 0.1), 0xf0e6d2));      // 下翼
+  muslinParts.push(part(new THREE.BoxGeometry(10.8, 0.09, 1.7).translate(0, 1.95, -0.25), 0xf0e6d2));  // 上翼（前错）
+  muslinParts.push(part(new THREE.BoxGeometry(3.6, 0.07, 0.95).translate(0, -0.15, -4.35), 0xf0e6d2));  // 前升降舵（鸭式）
+  muslinParts.push(part(new THREE.BoxGeometry(0.07, 1.35, 0.8).translate(-0.8, 0.6, 3.9), 0xf0e6d2));   // 左方向舵
+  muslinParts.push(part(new THREE.BoxGeometry(0.07, 1.35, 0.8).translate(0.8, 0.6, 3.9), 0xf0e6d2));    // 右方向舵
+  var muslin = new THREE.Mesh(mergeParts(muslinParts),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true, side: THREE.DoubleSide }));
+  flyer.add(muslin);
+
+  var structParts = [];
+  // 翼梁
+  structParts.push(box(10.7, 0.07, 0.07, 0, 0.02, -0.7, 0x8a6849));
+  structParts.push(box(10.9, 0.07, 0.07, 0, 1.97, -0.95, 0x8a6849));
+  // 桁架立柱
+  var xs = [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2];
+  for (var i = 0; i < xs.length; i++) structParts.push(box(0.1, 1.95, 0.16, xs[i], 0.975, -0.05, 0x8a6849));
+  // 起落橇
+  structParts.push(box(0.16, 0.16, 6.6, -1.05, -1.05, 0.4, 0x8a6849));
+  structParts.push(box(0.16, 0.16, 6.6, 1.05, -1.05, 0.4, 0x8a6849));
+  structParts.push(box(0.08, 1.1, 0.08, -1.05, -0.5, -1.6, 0x8a6849));
+  structParts.push(box(0.08, 1.1, 0.08, 1.05, -0.5, -1.6, 0x8a6849));
+  structParts.push(box(0.08, 1.1, 0.08, -1.05, -0.5, 1.9, 0x8a6849));
+  structParts.push(box(0.08, 1.1, 0.08, 1.05, -0.5, 1.9, 0x8a6849));
+  // 发动机
+  structParts.push(box(0.65, 0.5, 0.8, 0, 0.0, 2.6, 0x3a332c));
+  // 俯卧驾驶员
+  structParts.push((function(){ var g = new THREE.CylinderGeometry(0.15, 0.19, 1.35, 6); g.rotateX(Math.PI / 2); g.translate(0, 0.32, -0.55); return part(g, 0x35302c); })());
+  structParts.push((function(){ var g = new THREE.SphereGeometry(0.15, 8, 6); g.translate(0, 0.42, -1.3); return part(g, 0xc9a583); })());
+  // 交叉张线（每节间 X 形，莱特标志性桁架）
+  var bays = [[-4.2, -2.5], [-2.5, -0.8], [-0.8, 0.8], [0.8, 2.5], [2.5, 4.2]];
+  for (var b = 0; b < bays.length; b++) {
+    var x1 = bays[b][0], x2 = bays[b][1];
+    structParts.push(wireGeo(x1, 0.1, -0.05, x2, 1.88, -0.3, 0.022));
+    structParts.push(wireGeo(x2, 0.1, -0.05, x1, 1.88, -0.3, 0.022));
+  }
+  // 前升降舵张线
+  structParts.push(wireGeo(-0.5, 0.15, -3.2, -1.5, 0.05, -4.1, 0.018));
+  structParts.push(wireGeo(0.5, 0.15, -3.2, 1.5, 0.05, -4.1, 0.018));
+  structParts.push(wireGeo(-0.5, 0.15, -3.4, 0.5, 0.05, -4.3, 0.018));
+  // 起落橇着陆张线
+  structParts.push(wireGeo(-1.05, -1.0, 2.6, -0.8, 0.05, 1.2, 0.018));
+  structParts.push(wireGeo(1.05, -1.0, 2.6, 0.8, 0.05, 1.2, 0.018));
+  structParts.push(wireGeo(-1.05, -1.0, -1.8, -0.8, 0.05, -1.0, 0.018));
+  structParts.push(wireGeo(1.05, -1.0, -1.8, 0.8, 0.05, -1.0, 0.018));
+  var struct = new THREE.Mesh(mergeParts(structParts),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.05, flatShading: true }));
+  flyer.add(struct);
+})();
+function makeProp() {
+  var g = new THREE.Group();
+  var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.34, 6).rotateX(Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.85, flatShading: true }));
+  g.add(hub);
+  var bladeMat = new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.85, flatShading: true });
+  var b1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.0, 0.05), bladeMat);
+  var b2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.0, 0.05), bladeMat);
+  b2.rotation.z = Math.PI / 2;
+  b1.position.z = b2.position.z = -0.12;
+  g.add(b1); g.add(b2);
   return g;
 }
-for (let i = 0; i < 9; i++) {
-  let x, z, ok = false, guard = 0;
-  while (!ok && guard++ < 200) {
-    const a = Math.random() * Math.PI * 2;
-    const r = 220 + Math.random() * 1300;
-    x = Math.cos(a) * r; z = Math.sin(a) * r;
-    ok = !(z < 300 && Math.abs(x - pathX(z)) < 34) &&
-         Math.hypot(x, z - 320) > 90 &&
-         !noTree.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 20);
-  }
-  const h = makeHouse();
-  h.position.set(x, terrainHeight(x, z), z);
-  h.rotation.y = Math.random() * Math.PI * 2;
-  scene.add(h);
-  noTree.push({ x, z, r: 26 });
-}
+var propL = makeProp(); propL.position.set(-1.7, 0.1, 3.05); flyer.add(propL);
+var propR = makeProp(); propR.position.set(1.7, 0.1, 3.05); flyer.add(propR);
+flyer.position.set(0, 82, 0);
+scene.add(flyer);
 
-const lanternGlowMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffb066, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
-function makeLantern() {
-  const g = new THREE.Group();
-  const stone = new THREE.MeshLambertMaterial({ color: 0x97918a, flatShading: true });
-  const add = (geo, y) => { const mm = new THREE.Mesh(geo, stone); mm.position.y = y; g.add(mm); };
-  add(new THREE.BoxGeometry(0.95, 0.5, 0.95), 0.25);
-  add(new THREE.CylinderGeometry(0.2, 0.27, 1.1, 6), 1.05);
-  add(new THREE.BoxGeometry(0.68, 0.4, 0.68), 1.8);
-  const fire = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.32, 0.42),
-    new THREE.MeshLambertMaterial({ color: 0xffd9a0, emissive: 0xff9c3c, emissiveIntensity: 1.0 }));
-  fire.position.y = 1.8; g.add(fire);
-  add(new THREE.ConeGeometry(0.62, 0.5, 4), 2.2); g.children[g.children.length - 1].rotation.y = Math.PI / 4;
-  add(new THREE.SphereGeometry(0.13, 6, 5), 2.55);
-  const glow = new THREE.Sprite(lanternGlowMat);
-  glow.scale.set(3.2, 3.2, 1); glow.position.y = 1.8; g.add(glow);
-  return g;
+/* ============================================================
+   可穿越鸟居（大红鸟居） + 光环
+============================================================ */
+var GATE_CAP = 12;
+var toriiMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, emissive: 0x3d0d05, flatShading: true });
+var gateMesh = makeInst(toriiGeo, toriiMat, GATE_CAP);
+var gateHalos = [];
+for (var ghi = 0; ghi < GATE_CAP; ghi++) {
+  var hs = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0xff6a4a, transparent: true, opacity: 0.45,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  hs.scale.set(30, 30, 1);
+  scene.add(hs);
+  gateHalos.push(hs);
 }
-for (let i = 0; i < 18; i++) {
-  const z = -60 - i * 150;
-  const x = pathX(z) + (i % 2 ? 13 : -13);
-  const l = makeLantern();
-  l.position.set(x, terrainHeight(x, z), z);
-  scene.add(l);
-  noTree.push({ x, z, r: 5 });
+var gates = [];
+for (var gi = 0; gi < GATE_CAP; gi++) gates.push({ x: 0, y: 0, baseY: 0, z: 0, rot: 0, seed: Math.random() * 10 });
+
+function avoidPeaksFor(g) {
+  for (var i = 0; i < peaksList.length; i++) {
+    var pk = peaksList[i];
+    var dx = g.x - pk.x, dz = g.z - pk.z;
+    if (dx * dx + dz * dz < (pk.r + 20) * (pk.r + 20) && g.y < pk.h + 30) g.y = pk.h + 35;
+  }
+}
+function placeGate(g, initial, idx) {
+  var fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  var ahead = initial ? 130 + idx * 120 : 300 + Math.random() * 380;
+  g.x = flyer.position.x + fx * ahead + (Math.random() - 0.5) * 240;
+  g.z = flyer.position.z + fz * ahead + (Math.random() - 0.5) * 140;
+  g.baseY = g.y = clamp(flyer.position.y + (Math.random() - 0.5) * 140, 24, 300);
+  g.rot = Math.random() * Math.PI * 2;
+  avoidPeaksFor(g);
 }
 
 /* ============================================================
-   conifer forest (instanced) — placed after structures so
-   gates / houses / lanterns stay clear
+   灵魂光点（蓝白发光，可收集）
 ============================================================ */
-const TREE_COUNT = 500;
-const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2.8, 5); trunkGeo.translate(0, 1.4, 0);
-const coneLoGeo = new THREE.ConeGeometry(3.6, 7, 6); coneLoGeo.translate(0, 5.5, 0);
-const coneHiGeo = new THREE.ConeGeometry(2.3, 6, 6); coneHiGeo.translate(0, 9.6, 0);
-const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4f3a, flatShading: true });
-const folMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
-const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, TREE_COUNT);
-const coneLo = new THREE.InstancedMesh(coneLoGeo, folMat.clone(), TREE_COUNT);
-const coneHi = new THREE.InstancedMesh(coneHiGeo, folMat.clone(), TREE_COUNT);
-
-{
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-  const s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
-  let placed = 0, guard = 0;
-  while (placed < TREE_COUNT && guard++ < 8000) {
-    const x = (Math.random() * 2 - 1) * 2300;
-    const z = (Math.random() * 2 - 1) * 2300;
-    if (z < 280 && Math.abs(x - pathX(z)) < 22) continue;               // flight corridor
-    if (Math.hypot(x - 0, z - 320) < 45) continue;                       // spawn clearing
-    if (noTree.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
-    const sc = 0.8 + Math.random() * 0.95;
-    const y = terrainHeight(x, z) - 0.4;
-    e.set((Math.random() - 0.5) * 0.09, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.09);
-    q.setFromEuler(e);
-    p.set(x, y, z); s.set(sc, sc * (0.9 + Math.random() * 0.25), sc);
-    m.compose(p, q, s);
-    trunks.setMatrixAt(placed, m);
-    coneLo.setMatrixAt(placed, m);
-    coneHi.setMatrixAt(placed, m);
-    if (Math.random() < 0.16) col.setHSL(0.055 + Math.random() * 0.045, 0.62, 0.40 + Math.random() * 0.09);
-    else col.setHSL(0.26 + Math.random() * 0.07, 0.26 + Math.random() * 0.15, 0.30 + Math.random() * 0.10);
-    coneLo.setColorAt(placed, col);
-    coneHi.setColorAt(placed, col);
-    placed++;
-  }
-  trunks.count = coneLo.count = coneHi.count = placed;
-  scene.add(trunks, coneLo, coneHi);
+var ORB_CAP = 24;
+var orbMesh = makeInst(
+  new THREE.SphereGeometry(1.1, 10, 8),
+  new THREE.MeshBasicMaterial({ color: 0xd8f1ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), ORB_CAP);
+var orbHaloMesh = makeInst(
+  new THREE.SphereGeometry(2.4, 8, 6),
+  new THREE.MeshBasicMaterial({ color: 0x9fd4ff, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }), ORB_CAP);
+var orbs = [];
+for (var oi = 0; oi < ORB_CAP; oi++) orbs.push({ x: 0, y: 0, z: 0, phase: Math.random() * 6.28 });
+function placeOrb(o, initial, idx) {
+  var fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  var ahead = initial ? 120 + idx * 70 : 150 + Math.random() * 300;
+  o.x = flyer.position.x + fx * ahead + (Math.random() - 0.5) * 320;
+  o.z = flyer.position.z + fz * ahead + (Math.random() - 0.5) * 180;
+  o.y = clamp(flyer.position.y + (Math.random() - 0.5) * 120, 20, 280);
+  avoidPeaksFor(o);
 }
 
 /* ============================================================
-   low-poly clouds
+   林间雾气（体积感薄雾）
 ============================================================ */
-const clouds = [];
-const cloudMat = new THREE.MeshLambertMaterial({ color: 0xfdf3f0, flatShading: true, transparent: true, opacity: 0.92 });
-for (let i = 0; i < 12; i++) {
-  const g = new THREE.Group();
-  const n = 3 + Math.floor(Math.random() * 3);
-  for (let j = 0; j < n; j++) {
-    const r = 6 + Math.random() * 9;
-    const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), cloudMat);
-    puff.position.set((j - n / 2) * r * 1.1 + Math.random() * 4, Math.random() * 2.5, (Math.random() - 0.5) * 8);
-    puff.scale.y = 0.55;
-    g.add(puff);
-  }
-  g.position.set((Math.random() * 2 - 1) * 1600, 170 + Math.random() * 100, (Math.random() * 2 - 1) * 1600);
-  g.userData.vx = 2 + Math.random() * 3;
-  scene.add(g);
-  clouds.push(g);
+var mists = [];
+for (var mi = 0; mi < 30; mi++) {
+  var ms = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: mistTex, color: 0xf6d7e0, transparent: true, opacity: 0.06 + Math.random() * 0.08, depthWrite: false
+  }));
+  var sc = 160 + Math.random() * 190;
+  ms.scale.set(sc, sc * 0.55, 1);
+  scene.add(ms);
+  mists.push(ms);
+}
+function placeMist(m, initial) {
+  m.position.set(
+    flyer.position.x + (Math.random() - 0.5) * 700,
+    terrainH(flyer.position.x, flyer.position.z) + 22 + Math.random() * 48,
+    flyer.position.z - 100 - Math.random() * 480
+  );
 }
 
-/* ============================================================
-   falling leaves
+/* =============================================a===============
+   落叶粒子（大、密、橙黄）
 ============================================================ */
-const LEAF_COUNT = 380;
-const leafPos = new Float32Array(LEAF_COUNT * 3);
-const leafCol = new Float32Array(LEAF_COUNT * 3);
-const leafFall = new Float32Array(LEAF_COUNT);
-const leafSeed = new Float32Array(LEAF_COUNT);
-{
-  const c = new THREE.Color();
-  for (let i = 0; i < LEAF_COUNT; i++) {
-    leafPos[i * 3] = (Math.random() * 2 - 1) * 400;
-    leafPos[i * 3 + 1] = Math.random() * 160;
-    leafPos[i * 3 + 2] = (Math.random() * 2 - 1) * 400;
-    c.setHSL(0.06 + Math.random() * 0.05, 0.75, 0.52 + Math.random() * 0.14);
-    leafCol[i * 3] = c.r; leafCol[i * 3 + 1] = c.g; leafCol[i * 3 + 2] = c.b;
-    leafFall[i] = 0.7 + Math.random() * 0.8;
-    leafSeed[i] = Math.random() * 100;
-  }
-}
-const leafGeo = new THREE.BufferGeometry();
-leafGeo.setAttribute('position', new THREE.BufferAttribute(leafPos, 3));
-leafGeo.setAttribute('color', new THREE.BufferAttribute(leafCol, 3));
-const leaves = new THREE.Points(leafGeo, new THREE.PointsMaterial({
-  size: 1.7, map: leafTex, transparent: true, depthWrite: false,
-  vertexColors: true, sizeAttenuation: true
-}));
+var LEAF_N = 2200;
+var leafPos = new Float32Array(LEAF_N * 3);
+var leafVel = new Float32Array(LEAF_N * 3);
+var leafSize = new Float32Array(LEAF_N);
+var leafAngle = new Float32Array(LEAF_N);
+var leafPhase = new Float32Array(LEAF_N);
+var leafCol = new Float32Array(LEAF_N * 3);
+(function () {
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var x = c.getContext('2d');
+  x.translate(32, 32);
+  var grd = x.createLinearGradient(0, -26, 0, 26);
+  grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#dedede');
+  x.fillStyle = grd;
+  x.beginPath();
+  x.moveTo(0, -26);
+  x.quadraticCurveTo(15, -6, 7, 20);
+  x.quadraticCurveTo(3, 27, 0, 27);
+  x.quadraticCurveTo(-3, 27, -7, 20);
+  x.quadraticCurveTo(-15, -6, 0, -26);
+  x.fill();
+  x.strokeStyle = 'rgba(140,90,40,0.55)'; x.lineWidth = 1.5;
+  x.beginPath(); x.moveTo(0, -24); x.lineTo(0, 26); x.stroke();
+  window.__leafTex = new THREE.CanvasTexture(c);
+})();
+var leafPalette = [0xf6b34a, 0xef8f3c, 0xf8cf6a, 0xe07b39, 0xf2a25c].map(function (h) { return new THREE.Color(h); });
+var leafGeo = new THREE.BufferGeometry();
+leafGeo.setAttribute('position', new THREE.BufferAttribute(leafPos, 3).setUsage(THREE.DynamicDrawUsage));
+leafGeo.setAttribute('aSize', new THREE.BufferAttribute(leafSize, 1));
+leafGeo.setAttribute('aAngle', new THREE.BufferAttribute(leafAngle, 1).setUsage(THREE.DynamicDrawUsage));
+leafGeo.setAttribute('aColor', new THREE.BufferAttribute(leafCol, 3));
+var leafMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTex: { value: window.__leafTex },
+    uFogColor: { value: new THREE.Color(0xdca3ba) },
+    uFogDensity: { value: 0.0016 }
+  },
+  vertexShader: [
+    'attribute float aSize; attribute float aAngle; attribute vec3 aColor;',
+    'varying float vAngle; varying vec3 vColor; varying float vFogDepth;',
+    'void main(){',
+    '  vAngle = aAngle; vColor = aColor;',
+    '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+    '  vFogDepth = -mv.z;',
+    '  gl_PointSize = min(aSize * (300.0 / max(1.0, -mv.z)), 240.0);',
+    '  gl_Position = projectionMatrix * mv;',
+    '}'
+  ].join('\n'),
+  fragmentShader: [
+    'uniform sampler2D uTex; uniform vec3 uFogColor; uniform float uFogDensity;',
+    'varying float vAngle; varying vec3 vColor; varying float vFogDepth;',
+    'void main(){',
+    '  vec2 uv = gl_PointCoord - 0.5;',
+    '  float ca = cos(vAngle), sa = sin(vAngle);',
+    '  vec2 r = mat2(ca, -sa, sa, ca) * uv + 0.5;',
+    '  vec4 t = texture2D(uTex, r);',
+    '  if (t.a < 0.25) discard;',
+    '  float f = 1.0 - exp(-uFogDensity * uFogDensity * vFogDepth * vFogDepth);',
+    '  vec3 col = mix(vColor, uFogColor, f);',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n'),
+  alphaTest: 0.2
+});
+var leaves = new THREE.Points(leafGeo, leafMat);
 leaves.frustumCulled = false;
 scene.add(leaves);
 
-/* ============================================================
-   soul orbs (collectible) + collect burst particles
-============================================================ */
-const ORB_COUNT = 34;
-const orbs = [];
-const orbGeo = new THREE.IcosahedronGeometry(0.9, 1);
-const orbMat = new THREE.MeshBasicMaterial({ color: 0xeaf8ff });
-for (let i = 0; i < ORB_COUNT; i++) {
-  const grp = new THREE.Group();
-  const core = new THREE.Mesh(orbGeo, orbMat);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTex, color: 0x8fd0ff, transparent: true, opacity: 0.85,
-    blending: THREE.AdditiveBlending, depthWrite: false
-  }));
-  glow.scale.set(7, 7, 1);
-  grp.add(core, glow);
-  scene.add(grp);
-  orbs.push({ grp, glow, core, seed: Math.random() * 100, baseY: 0 });
-}
-function placeOrb(o) {
-  const a = S.yaw + (Math.random() - 0.5) * 1.5;
-  const d = 130 + Math.random() * 260;
-  const tx = plane.position.x + Math.sin(a) * d;
-  const tz = plane.position.z + Math.cos(a) * d;
-  o.baseY = clamp(terrainHeight(tx, tz) + 18 + Math.random() * 70, 14, 170);
-  o.grp.position.set(tx, o.baseY, tz);
-}
-
-const BURST_MAX = 240;
-const burstPos = new Float32Array(BURST_MAX * 3);
-const burstCol = new Float32Array(BURST_MAX * 3);
-const burstBase = new Float32Array(BURST_MAX * 3);
-const burstVel = new Float32Array(BURST_MAX * 3);
-const burstLife = new Float32Array(BURST_MAX);
-for (let i = 0; i < BURST_MAX; i++) burstPos[i * 3 + 1] = -9999;
-const burstGeo = new THREE.BufferGeometry();
-burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
-burstGeo.setAttribute('color', new THREE.BufferAttribute(burstCol, 3));
-const bursts = new THREE.Points(burstGeo, new THREE.PointsMaterial({
-  size: 1.5, map: glowTex, transparent: true, depthWrite: false,
-  vertexColors: true, blending: THREE.AdditiveBlending
-}));
-bursts.frustumCulled = false;
-scene.add(bursts);
-let burstIdx = 0;
-function spawnBurst(p, hex) {
-  const c = new THREE.Color(hex);
-  for (let n = 0; n < 14; n++) {
-    const i = burstIdx = (burstIdx + 1) % BURST_MAX;
-    burstPos[i * 3] = p.x; burstPos[i * 3 + 1] = p.y; burstPos[i * 3 + 2] = p.z;
-    const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-    const sp = 4 + Math.random() * 8;
-    burstVel[i * 3] = Math.sin(ph) * Math.cos(th) * sp;
-    burstVel[i * 3 + 1] = Math.cos(ph) * sp * 0.8 + 2;
-    burstVel[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * sp;
-    burstBase[i * 3] = c.r; burstBase[i * 3 + 1] = c.g; burstBase[i * 3 + 2] = c.b;
-    burstLife[i] = 1;
-  }
+function leafRespawn(i, scatter) {
+  var p = flyer.position;
+  leafPos[i*3]   = p.x + (Math.random() - 0.5) * 280;
+  leafPos[i*3+1] = scatter ? p.y - 20 + Math.random() * 130 : p.y + 40 + Math.random() * 80;
+  leafPos[i*3+2] = p.z - 40 - Math.random() * 230;
+  leafVel[i*3]   = 1.2 + Math.random() * 2.2;
+  leafVel[i*3+1] = -(3 + Math.random() * 5);
+  leafVel[i*3+2] = (Math.random() - 0.5) * 2 - 1;
+  leafSize[i] = 1.8 + Math.random() * 1.9;
+  leafAngle[i] = Math.random() * 6.283;
+  leafPhase[i] = Math.random() * 6.283;
+  var c = leafPalette[(Math.random() * leafPalette.length) | 0];
+  leafCol[i*3] = c.r; leafCol[i*3+1] = c.g; leafCol[i*3+2] = c.b;
 }
 
 /* ============================================================
-   the 1903 wright-style biplane
+   输入（键盘 + 触屏拖拽）
 ============================================================ */
-const plane = new THREE.Group();
-plane.rotation.order = 'YXZ';
-{
-  const fabric = new THREE.MeshLambertMaterial({ color: 0xece1c8, flatShading: true });
-  const fabricD = new THREE.MeshLambertMaterial({ color: 0xdccfb2, flatShading: true });
-  const wood = new THREE.MeshLambertMaterial({ color: 0x6f5138, flatShading: true });
-  const dark = new THREE.MeshLambertMaterial({ color: 0x3a3a40, flatShading: true });
-  for (const wy of [0.55, -0.55]) {
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.14, 1.7), fabric);
-    wing.position.y = wy; plane.add(wing);
-  }
-  for (const sx of [-2.7, 2.7]) for (const sz of [-0.55, 0.55]) {
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.15, 0.12), wood);
-    strut.position.set(sx, 0, sz); plane.add(strut);
-  }
-  for (const rx of [-0.55, 0.55]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 4.8), wood);
-    rail.position.set(rx, -0.55, 0); plane.add(rail);
-  }
-  const canard = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.08, 1.0), fabricD);
-  canard.position.set(0, -0.15, 2.5); plane.add(canard);
-  for (const rx of [-0.9, 0.9]) {
-    const rudder = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, 1.0), fabricD);
-    rudder.position.set(rx, 0.35, -2.1); plane.add(rudder);
-  }
-  const engine = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), dark);
-  engine.position.set(0, -0.55, -1.5); plane.add(engine);
-  for (const sx of [-0.85, 0.85]) {
-    const skid = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 3.4), wood);
-    skid.position.set(sx, -1.15, 0.2); plane.add(skid);
-    for (const sz of [-1.1, 1.1]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.75, 0.08), wood);
-      leg.position.set(sx, -0.78, sz); plane.add(leg);
-    }
-  }
-  const pilot = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.9), dark);
-  pilot.position.set(0, -0.28, 0.55); plane.add(pilot);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), new THREE.MeshLambertMaterial({ color: 0xc9a184 }));
-  head.position.set(0, -0.1, 1.0); plane.add(head);
-}
-const propL = new THREE.Group(), propR = new THREE.Group();
-for (const [grp, px] of [[propL, -1.15], [propR, 1.15]]) {
-  const bladeMat = new THREE.MeshLambertMaterial({ color: 0x8a6a48 });
-  const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.0, 0.08), bladeMat);
-  const b2 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.08), bladeMat);
-  grp.add(b1, b2);
-  grp.position.set(px, -0.55, -1.95);
-  plane.add(grp);
-}
-scene.add(plane);
-
-/* ============================================================
-   game state & input
-============================================================ */
-const STALL_SPEED = 15;
-const S = {
-  started: false, yaw: Math.PI, pitch: 0, roll: 0, v: 30,
-  stalled: false, souls: 0, gates: 0, dist: 0
-};
-const SPAWN = new THREE.Vector3(0, terrainHeight(0, 320) + 70, 320);
-plane.position.copy(SPAWN);
-plane.rotation.set(0, Math.PI, 0);
-orbs.forEach(placeOrb); // scatter initial souls once plane & state exist
-
-const keys = {};
-addEventListener('keydown', e => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+var keys = {};
+window.addEventListener('keydown', function (e) {
+  if (e.code === 'Space' || e.code.indexOf('Arrow') === 0) e.preventDefault();
   keys[e.code] = true;
-  if (e.code === 'KeyM') toggleMute();
+  if (state === 'title' && (e.code === 'Enter' || e.code === 'Space')) startGame();
 });
-addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+window.addEventListener('blur', function () { keys = {}; });
+var touchState = null;
+canvas.addEventListener('touchstart', function (e) {
+  var t = e.changedTouches[0];
+  touchState = { sx: t.clientX, sy: t.clientY, pitch: 0, roll: 0 };
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', function (e) {
+  if (!touchState) return;
+  var t = e.changedTouches[0];
+  var dx = t.clientX - touchState.sx, dy = t.clientY - touchState.sy;
+  touchState.pitch = clamp(-dy / 110, -0.55, 0.6);
+  touchState.roll = clamp(dx / 140, -0.95, 0.95);
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', function (e) { touchState = null; e.preventDefault(); }, { passive: false });
 
 /* ============================================================
-   audio — wind noise + soft chimes (starts on Take flight)
+   游戏状态 / UI
 ============================================================ */
-let AC = null, master = null, windGain = null, windFilter = null, muted = false, chimeIdx = 0;
-function initAudio() {
-  if (AC) return;
-  AC = new (window.AudioContext || window.webkitAudioContext)();
-  master = AC.createGain(); master.gain.value = 0.9; master.connect(AC.destination);
-  const len = AC.sampleRate * 2;
-  const buf = AC.createBuffer(1, len, AC.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
-  windFilter = AC.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 380; windFilter.Q.value = 0.8;
-  windGain = AC.createGain(); windGain.gain.value = 0;
-  src.connect(windFilter).connect(windGain).connect(master);
-  src.start();
+var state = 'title';
+var S = { souls: 0, gates: 0, dist: 0 };
+var toastTimer = null;
+function toast(msg, dur) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.classList.remove('show'); }, dur || 1600);
 }
-function chime(freqs, vol = 0.16, dur = 1.3) {
-  if (!AC || muted) return;
-  const t = AC.currentTime;
-  for (const f of freqs) {
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'sine'; o.frequency.value = f;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(master);
-    o.start(t); o.stop(t + dur + 0.1);
+var hudEl = document.getElementById('hud');
+var hudAir = document.getElementById('hud-airspeed');
+var hudGnd = document.getElementById('hud-groundspeed');
+var hudAlt = document.getElementById('hud-altitude');
+var hudSouls = document.getElementById('hud-souls');
+var hudGates = document.getElementById('hud-gates');
+var hudDist = document.getElementById('hud-dist');
+var titleEl = document.getElementById('title-screen');
+var chapterEl = document.getElementById('chapter');
+document.getElementById('start-btn').addEventListener('click', startGame);
+function startGame() {
+  if (state !== 'title') return;
+  state = 'chapter';
+  titleEl.classList.add('hidden');
+  chapterEl.classList.add('show');
+  hudEl.classList.add('show');
+  setTimeout(function () { state = 'play'; }, 1800);
+  setTimeout(function () { chapterEl.classList.remove('show'); }, 4300);
+}
+
+/* ============================================================
+   飞行物理
+============================================================ */
+var P = { yaw: 0, pitch: 0, roll: 0, speed: 36, stalled: false };
+var curF = new THREE.Vector3(0, 0, -1);
+var tPitch = 0, tRoll = 0;
+var warnedBrush = false;
+
+function readControls(dt) {
+  var up = keys.KeyW || keys.ArrowUp, dn = keys.KeyS || keys.ArrowDown;
+  var lf = keys.KeyA || keys.ArrowLeft, rt = keys.KeyD || keys.ArrowRight;
+  if (up) tPitch = Math.min(0.55, tPitch + 1.9 * dt);
+  if (dn) tPitch = Math.max(-0.55, tPitch - 1.9 * dt);
+  if (lf) tRoll = Math.max(-0.95, tRoll - 2.3 * dt);
+  if (rt) tRoll = Math.min(0.95, tRoll + 2.3 * dt);
+  if (keys.Space) {
+    tPitch += (0 - tPitch) * Math.min(1, dt * 7);
+    tRoll += (0 - tRoll) * Math.min(1, dt * 7);
   }
+  if (touchState) { tPitch = touchState.pitch; tRoll = touchState.roll; }
+  if (!lf && !rt && !touchState) tRoll += (0 - tRoll) * Math.min(1, dt * 2.0);
 }
-const PENTA = [523.25, 587.33, 698.46, 783.99, 880.0];
-function orbChime() { const f = PENTA[chimeIdx++ % PENTA.length]; chime([f, f * 2], 0.13, 1.4); }
-function gateChime() { chime([392, 587.33], 0.15, 1.6); }
-function crashThud() { chime([98, 65], 0.2, 0.8); }
-function toggleMute() {
-  muted = !muted;
-  if (master) master.gain.value = muted ? 0 : 0.9;
-  showMsg(muted ? '声音 OFF' : '声音 ON', 1000);
+function autopilot() {
+  tPitch = 0.10 * Math.sin(T * 0.13) + 0.05 * Math.sin(T * 0.041);
+  tRoll = 0.42 * Math.sin(T * 0.077);
+  var dy = (86 + 12 * Math.sin(T * 0.05) - flyer.position.y);
+  tPitch += clamp(dy * 0.004, -0.15, 0.2);
+}
+function stepPhysics(dt) {
+  if (state === 'play') readControls(dt); else autopilot();
+
+  if (!P.stalled) P.pitch += (tPitch - P.pitch) * Math.min(1, dt * 2.6);
+  else P.pitch += (-0.5 - P.pitch) * Math.min(1, dt * 3);
+  P.roll += (tRoll - P.roll) * Math.min(1, dt * 3.2);
+  P.pitch = clamp(P.pitch, -1.0, 1.0);
+  P.roll = clamp(P.roll, -1.05, 1.05);
+
+  var boost = !!(keys.ShiftLeft || keys.ShiftRight);
+  var brake = !!(keys.ControlLeft || keys.ControlRight);
+  var target = state !== 'play' ? 36 : (boost ? 66 : (brake ? 15 : 36));
+  P.speed += (target - P.speed) * Math.min(1, dt * 0.55);
+  P.speed -= Math.sin(P.pitch) * 20 * dt;
+  P.speed = clamp(P.speed, 6, 95);
+
+  if (!P.stalled && P.speed < 13.5) {
+    P.stalled = true;
+    toast('失速！俯冲增速改出 Stall — dive to recover', 2400);
+  }
+  if (P.stalled) {
+    P.speed += 1.5 * dt;
+    if (P.speed > 17) { P.stalled = false; toast('改出成功 Recovered', 1200); }
+  }
+
+  P.yaw -= P.roll * 0.42 * clamp(P.speed / 36, 0.5, 1.8) * dt;
+
+  var cp = Math.cos(P.pitch);
+  var fx = -Math.sin(P.yaw) * cp, fy = Math.sin(P.pitch), fz = -Math.cos(P.yaw) * cp;
+  curF.set(fx, fy, fz);
+  flyer.position.x += fx * P.speed * dt;
+  flyer.position.y += fy * P.speed * dt + (P.stalled ? -7 * dt : 0);
+  flyer.position.z += fz * P.speed * dt;
+
+  // 地面 / 山顶碰撞（柔和抬升）
+  var floor = terrainH(flyer.position.x, flyer.position.z) + 23;
+  for (var i = 0; i < peaksList.length; i++) {
+    var pk = peaksList[i];
+    var dx = flyer.position.x - pk.x, dz = flyer.position.z - pk.z;
+    if (dx * dx + dz * dz < pk.r * pk.r) {
+      var top = pk.h + 5;
+      if (top > floor) floor = top;
+    }
+  }
+  if (flyer.position.y < floor) {
+    flyer.position.y = floor;
+    P.speed = Math.max(10, P.speed * 0.985);
+    if (!warnedBrush && P.speed > 20) { toast('擦过树梢！', 1200); warnedBrush = true; }
+  } else if (flyer.position.y > floor + 8) warnedBrush = false;
+  if (flyer.position.y > 400) {
+    flyer.position.y = 400;
+    if (P.pitch > 0) P.pitch *= (1 - dt * 2);
+  }
+
+  flyer.rotation.set(P.pitch, P.yaw, -P.roll);
+  S.dist += P.speed * dt;
+  propL.rotation.z += dt * (8 + P.speed * 0.45);
+  propR.rotation.z -= dt * (8 + P.speed * 0.45);
 }
 
 /* ============================================================
-   HUD & messages
+   环境窗口重建（确定性哈希，无限延伸）
 ============================================================ */
-const el = id => document.getElementById(id);
-const ui = { spd: el('v-spd'), gspd: el('v-gspd'), alt: el('v-alt'), souls: el('v-souls'), gates: el('v-gates'), dist: el('v-dist'), msg: el('msg'), flash: el('flash') };
-let msgTimer = null;
-function showMsg(text, dur = 2200) {
-  ui.msg.textContent = text;
-  ui.msg.style.opacity = 1;
-  clearTimeout(msgTimer);
-  msgTimer = setTimeout(() => { ui.msg.style.opacity = 0; }, dur);
-}
-function pulse(elm) { elm.classList.remove('pulse'); void elm.offsetWidth; elm.classList.add('pulse'); }
-function doFlash() { ui.flash.style.opacity = 1; setTimeout(() => { ui.flash.style.opacity = 0; }, 130); }
+var peaksList = [], houseSpots = [];
+var lastEnvX = 1e9, lastEnvZ = 1e9;
 
-/* ============================================================
-   crash — the forest gently catches you
-============================================================ */
-function crash() {
-  doFlash();
-  crashThud();
-  showMsg('森が優しく受け止めた — the forest gently catches you', 2600);
-  plane.position.y = terrainHeight(plane.position.x, plane.position.z) + 95;
-  S.pitch = 0; S.roll = 0; S.v = 26; S.stalled = false;
-}
+function rebuildEnvironment() {
+  peaksList.length = 0; houseSpots.length = 0;
+  var px = flyer.position.x, pz = flyer.position.z;
+  lastEnvX = px; lastEnvZ = pz;
+  var i, ix, iz, h, k;
 
-/* ============================================================
-   main loop
-============================================================ */
-const clock = new THREE.Clock();
-const fwd = new THREE.Vector3();
-const camPos = SPAWN.clone().add(new THREE.Vector3(0, 5, 15.5));
-const tmpV = new THREE.Vector3();
-let hudTimer = 0;
+  // ---- 山峰 ----
+  var PC = 380;
+  var pix0 = Math.floor((px - 700) / PC), pix1 = Math.floor((px + 700) / PC);
+  var piz0 = Math.floor((pz - 180) / PC), piz1 = Math.floor((pz + 820) / PC);
+  for (ix = pix0; ix <= pix1; ix++) for (iz = piz0; iz <= piz1; iz++) {
+    h = hash2(ix * 1.31 + 0.7, iz * 2.17 + 3.1);
+    if (h > 0.55) continue;
+    var jx = hash2(ix + 13.7, iz - 7.3), jz = hash2(ix - 5.1, iz + 19.9);
+    var mx = (ix + 0.22 + jx * 0.56) * PC, mz = (iz + 0.22 + jz * 0.56) * PC;
+    var pr = 120 + hash2(ix * 3.17, iz * 1.71) * 130;
+    var ph = 150 + hash2(ix * 0.97 + 8.8, iz * 4.43 + 1.2) * 190;
+    var my0 = terrainH(mx, mz);
+    peaksList.push({ x: mx, z: mz, r: pr, h: my0 + ph, ix: ix, iz: iz });
+  }
 
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
-
-  /* ----- flight model ----- */
-  if (S.started) {
-    const pitchIn = ((keys.KeyW || keys.ArrowUp) ? 1 : 0) - ((keys.KeyS || keys.ArrowDown) ? 1 : 0);
-    const rollIn = ((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0);
-    const leveling = !!keys.Space;
-    const boosting = !!(keys.ShiftLeft || keys.ShiftRight);
-    const braking = !!(keys.ControlLeft || keys.ControlRight);
-
-    if (leveling) {
-      S.pitch += (0 - S.pitch) * Math.min(1, 2.2 * dt);
-      S.roll += (0 - S.roll) * Math.min(1, 3.5 * dt);
-    } else {
-      S.pitch += pitchIn * 1.15 * dt;
-      S.roll += rollIn * 2.0 * dt;
-    }
-    S.pitch = clamp(S.pitch, -1.05, 1.05);
-    S.roll = clamp(S.roll, -1.35, 1.35);
-
-    /* stall: too slow → nose drops until speed returns */
-    if (!S.stalled && S.v < STALL_SPEED) {
-      S.stalled = true;
-      showMsg('失速！ 俯冲增速 — dive to recover', 1800);
-    }
-    if (S.stalled) {
-      S.pitch += (-0.45 - S.pitch) * Math.min(1, 2.5 * dt);
-      if (S.v > STALL_SPEED * 1.3) S.stalled = false;
-    }
-
-    /* speed: thrust − drag − gravity along flight path */
-    const thrust = 3.4 + (boosting ? 9.5 : 0);
-    const k = 0.0034 * (braking ? 3.2 : 1);
-    S.v += (thrust - k * S.v * S.v - 11 * Math.sin(S.pitch)) * dt;
-    S.v = clamp(S.v, 0, 85);
-
-    /* banked turn */
-    const sf = clamp(S.v / 28, 0.45, 1.6);
-    S.yaw += -Math.sin(S.roll) * 1.05 * sf * dt;
-
-    /* integrate */
-    plane.rotation.set(-S.pitch, S.yaw, S.roll);
-    fwd.set(0, 0, 1).applyQuaternion(plane.quaternion);
-    plane.position.addScaledVector(fwd, S.v * dt);
-    if (S.stalled) plane.position.y -= 6 * dt;
-    S.dist += S.v * dt;
-
-    const gh = terrainHeight(plane.position.x, plane.position.z);
-    if (plane.position.y < gh + 1.6) crash();
-
-    /* torii gates */
-    for (const g of gates) {
-      tmpV.copy(plane.position).sub(g.pos);
-      const along = tmpV.dot(g.fwd);
-      if (g.prev < 0 && along >= 0 && !g.passed) {
-        const lat = tmpV.dot(g.right);
-        const h = tmpV.y;
-        if (Math.abs(lat) < 4.8 && h > 0 && h < 7.2) {
-          g.passed = true;
-          S.gates++;
-          gateChime();
-          pulse(ui.gates);
-        }
+  // ---- 房子 ----
+  var HC = 200;
+  var hix0 = Math.floor((px - 620) / HC), hix1 = Math.floor((px + 620) / HC);
+  var hiz0 = Math.floor((pz - 140) / HC), hiz1 = Math.floor((pz + 640) / HC);
+  var hi = 0;
+  for (ix = hix0; ix <= hix1 && hi < HOUSE_CAP; ix++) for (iz = hiz0; iz <= hiz1 && hi < HOUSE_CAP; iz++) {
+    h = hash2(ix * 0.61 + 2.2, iz * 1.71 + 8.8);
+    if (h > 0.72) continue;
+    var hn = 1 + (hash2(ix + 41.3, iz + 9.1) < 0.35 ? 1 : 0);
+    for (k = 0; k < hn && hi < HOUSE_CAP; k++) {
+      var hjx = hash2(ix * 3.7 + k * 7.7 + 1.1, iz * 1.3 + k * 3.9 + 0.3);
+      var hjz = hash2(ix * 1.9 + k * 5.1 + 2.7, iz * 4.3 + k * 9.3 + 1.9);
+      var hx = (ix + 0.2 + hjx * 0.6) * HC, hz = (iz + 0.2 + hjz * 0.6) * HC;
+      var skip = false;
+      for (i = 0; i < peaksList.length; i++) {
+        var pk2 = peaksList[i];
+        var ddx = hx - pk2.x, ddz = hz - pk2.z;
+        if (ddx * ddx + ddz * ddz < (pk2.r + 25) * (pk2.r + 25)) { skip = true; break; }
       }
-      g.prev = along;
+      if (skip) continue;
+      var hy = terrainH(hx, hz);
+      var hrot = hash2(hx * 0.07, hz * 0.11) * 6.283;
+      var hs = 0.9 + hash2(hx * 0.05, hz * 0.09) * 0.5;
+      houseSpots.push({ x: hx, z: hz });
+      setInst(houseMesh, hi, hx, hy, hz, hrot, hs, hs, hs);
+      tmpM2.makeTranslation(0, 1.5, 2.56 * hs);
+      houseMesh.getMatrixAt(hi, tmpM3);
+      tmpM3.multiply(tmpM2);
+      houseGlowMesh.setMatrixAt(hi, tmpM3);
+      hi++;
     }
+  }
+  houseMesh.count = hi; houseGlowMesh.count = hi;
+  houseMesh.instanceMatrix.needsUpdate = true;
+  houseGlowMesh.instanceMatrix.needsUpdate = true;
+  if (houseMesh.instanceColor) houseMesh.instanceColor.needsUpdate = true;
+  if (houseGlowMesh.instanceColor) houseGlowMesh.instanceColor.needsUpdate = true;
 
-    /* soul orbs: magnet + collect */
-    for (const o of orbs) {
-      const d = o.grp.position.distanceTo(plane.position);
-      if (d < 20) o.grp.position.lerp(plane.position, Math.min(1, 7 * dt));
-      if (d < 7) {
+  // ---- 石灯笼 ----
+  var LC = 150;
+  var lix0 = Math.floor((px - 580) / LC), lix1 = Math.floor((px + 580) / LC);
+  var liz0 = Math.floor((pz - 130) / LC), liz1 = Math.floor((pz + 600) / LC);
+  var li = 0;
+  for (ix = lix0; ix <= lix1 && li < LANTERN_CAP; ix++) for (iz = liz0; iz <= liz1 && li < LANTERN_CAP; iz++) {
+    h = hash2(ix * 2.13 + 5.5, iz * 0.71 + 1.3);
+    if (h > 0.8) continue;
+    var ln = 1 + (hash2(ix + 3.9, iz + 27.7) < 0.3 ? 1 : 0);
+    for (k = 0; k < ln && li < LANTERN_CAP; k++) {
+      var ljx = hash2(ix * 5.9 + k * 11.3 + 4.1, iz * 2.7 + k * 6.1 + 3.3);
+      var ljz = hash2(ix * 3.3 + k * 13.7 + 2.9, iz * 7.1 + k * 4.9 + 5.7);
+      var lx = (ix + 0.25 + ljx * 0.5) * LC, lz = (iz + 0.25 + ljz * 0.5) * LC;
+      var skipL = false;
+      for (i = 0; i < peaksList.length; i++) {
+        var pk3 = peaksList[i];
+        var ddx2 = lx - pk3.x, ddz2 = lz - pk3.z;
+        if (ddx2 * ddx2 + ddz2 * ddz2 < (pk3.r + 12) * (pk3.r + 12)) { skipL = true; break; }
+      }
+      if (!skipL) for (i = 0; i < houseSpots.length; i++) {
+        var ddx3 = lx - houseSpots[i].x, ddz3 = lz - houseSpots[i].z;
+        if (ddx3 * ddx3 + ddz3 * ddz3 < 81) { skipL = true; break; }
+      }
+      if (skipL) continue;
+      var ly = terrainH(lx, lz);
+      var ls = 0.85 + hash2(lx * 0.13, lz * 0.17) * 0.5;
+      var lrot = hash2(lx * 0.03, lz * 0.07) * 6.283;
+      setInst(lanternMesh, li, lx, ly, lz, lrot, ls, ls, ls);
+      if (hash2(lx * 0.02, lz * 0.05) < 0.45) {
+        tmpM2.makeTranslation(0, 0, 0);
+        lanternMesh.getMatrixAt(li, tmpM3);
+        lanternGlowMesh.setMatrixAt(li, tmpM3);
+      }
+      li++;
+    }
+  }
+  lanternMesh.count = li; lanternGlowMesh.count = li;
+  lanternMesh.instanceMatrix.needsUpdate = true;
+  lanternGlowMesh.instanceMatrix.needsUpdate = true;
+
+  // ---- 杉树海 ----
+  var TC = 16;
+  var tix0 = Math.floor((px - 560) / TC), tix1 = Math.floor((px + 560) / TC);
+  var tiz0 = Math.floor((pz - 120) / TC), tiz1 = Math.floor((pz + 560) / TC);
+  var ti = 0;
+  for (ix = tix0; ix <= tix1 && ti < TREE_CAP; ix++) for (iz = tiz0; iz <= tiz1 && ti < TREE_CAP; iz++) {
+    h = hash2(ix * 0.77 + 3.3, iz * 1.13 + 9.1);
+    if (h < 0.06) continue;
+    var tn = 1 + (hash2(ix + 31.7, iz + 17.3) < 0.7 ? 1 : 0) + (hash2(ix - 11.1, iz + 5.9) < 0.3 ? 1 : 0);
+    for (k = 0; k < tn && ti < TREE_CAP; k++) {
+      var tjx = hash2(ix * 7.13 + k * 13.7 + 1.3, iz * 3.71 + k * 5.3 + 2.9);
+      var tjz = hash2(ix * 5.31 + k * 17.9 + 3.1, iz * 11.17 + k * 7.7 + 4.7);
+      var tx = (ix + tjx) * TC, tz = (iz + tjz) * TC;
+      var skipT = false;
+      for (i = 0; i < peaksList.length; i++) {
+        var pk4 = peaksList[i];
+        var ddx4 = tx - pk4.x, ddz4 = tz - pk4.z;
+        if (ddx4 * ddx4 + ddz4 * ddz4 < (pk4.r + 6) * (pk4.r + 6)) { skipT = true; break; }
+      }
+      if (!skipT) for (i = 0; i < houseSpots.length; i++) {
+        var ddx5 = tx - houseSpots[i].x, ddz5 = tz - houseSpots[i].z;
+        if (ddx5 * ddx5 + ddz5 * ddz5 < 169) { skipT = true; break; }
+      }
+      if (skipT) continue;
+      var ty = terrainH(tx, tz);
+      var ts = 0.85 + 0.8 * hash2(tx * 0.37, tz * 0.53);
+      var trot = hash2(tx * 0.11, tz * 0.23) * 6.283;
+      setInst(treeMesh, ti, tx, ty, tz, trot, ts, ts, ts);
+      treeMesh.setColorAt(ti, treeTints[(hash2(tx * 0.05, tz * 0.07) * 4) | 0]);
+      ti++;
+    }
+  }
+  treeMesh.count = ti;
+  treeMesh.instanceMatrix.needsUpdate = true;
+  if (treeMesh.instanceColor) treeMesh.instanceColor.needsUpdate = true;
+
+  // ---- 山顶鸟居 + 山峰实例 ----
+  var pai = 0, pbi = 0;
+  for (i = 0; i < peaksList.length; i++) {
+    var pk = peaksList[i];
+    var ph2 = hash2(pk.ix * 0.53 + 7.7, pk.iz * 1.91 + 2.2);
+    var variant = ph2 < 0.5 ? peakMeshA : peakMeshB;
+    var idx = variant === peakMeshA ? pai : pbi;
+    if (idx < 12) {
+      var pscale = 0.9 + ph2 * 0.4;
+      setInst(variant, idx, pk.x, pk.base !== undefined ? pk.base : terrainH(pk.x, pk.z), pk.z,
+        hash2(pk.ix, pk.iz) * 6.283, pk.r * pscale, pk.h * pscale, pk.r * pscale);
+      variant.setColorAt(idx, peakTints[(hash2(pk.iz, pk.ix) * 3) | 0]);
+      if (variant === peakMeshA) pai++; else pbi++;
+    }
+    if (hash2(pk.ix * 7.7 + 1.1, pk.iz * 3.3 - 2.2) < 0.5) {
+      tmpQ.setFromEuler(tmpE.set(0, hash2(pk.ix * 3.1, pk.iz * 1.3) * 6.283, 0));
+      tmpM.compose(tmpV.set(pk.x, pk.h - 0.4, pk.z), tmpQ, tmpS.set(0.42 + 0.3 * hash2(pk.ix * 2.9, pk.iz * 4.7), 0.42 + 0.3 * hash2(pk.ix * 2.9, pk.iz * 4.7), 0.42 + 0.3 * hash2(pk.ix * 2.9, pk.iz * 4.7)));
+      toriiPeakMesh.setMatrixAt(i % 12, tmpM);
+    }
+  }
+  peakMeshA.count = pai; peakMeshB.count = pbi;
+  peakMeshA.instanceMatrix.needsUpdate = true;
+  peakMeshB.instanceMatrix.needsUpdate = true;
+  if (peakMeshA.instanceColor) peakMeshA.instanceColor.needsUpdate = true;
+  if (peakMeshB.instanceColor) peakMeshB.instanceColor.needsUpdate = true;
+  toriiPeakMesh.count = Math.min(peaksList.length, 12);
+  toriiPeakMesh.instanceMatrix.needsUpdate = true;
+
+  // ---- 云 ----
+  var CC = 350;
+  var cix0 = Math.floor((px - 750) / CC), cix1 = Math.floor((px + 750) / CC);
+  var ciz0 = Math.floor((pz - 250) / CC), ciz1 = Math.floor((pz + 900) / CC);
+  var ci = 0;
+  for (ix = cix0; ix <= cix1 && ci < 16; ix++) for (iz = ciz0; iz <= ciz1 && ci < 16; iz++) {
+    h = hash2(ix * 1.57 + 9.1, iz * 0.43 + 4.7);
+    if (h > 0.55) continue;
+    var cx2 = (ix + 0.2 + hash2(ix + 3.3, iz + 8.1) * 0.6) * CC;
+    var cz2 = (iz + 0.2 + hash2(ix + 6.7, iz + 2.2) * 0.6) * CC;
+    var csx = 60 + hash2(ix * 1.1, iz * 1.7) * 80;
+    setInst(cloudMesh, ci, cx2, 250 + hash2(ix * 0.9, iz * 2.3) * 140, cz2,
+      hash2(ix, iz * 1.3) * 6.283, csx, 16 + hash2(ix * 1.9, iz) * 14, 50 + hash2(ix, iz * 0.7) * 50);
+    ci++;
+  }
+  cloudMesh.count = ci;
+  cloudMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* ============================================================
+   地面吸附更新
+============================================================ */
+function updateGround() {
+  var px = flyer.position.x, pz = flyer.position.z;
+  var gx = Math.round(px / 30) * 30, gz = Math.round(pz / 30) * 30;
+  if (gx === ground.position.x && gz === ground.position.z) return;
+  ground.position.x = gx; ground.position.z = gz;
+  var gp = groundGeo.attributes.position;
+  for (var i = 0; i < gp.count; i++) {
+    var lx = gp.getX(i), ly = gp.getY(i);
+    gp.setY(i, terrainH(gx + lx, gz - ly));
+  }
+  gp.needsUpdate = true;
+  groundGeo.computeVertexNormals();
+}
+
+/* ============================================================
+   每帧更新：鸟居 / 灵魂 / 雾 / 落叶 / 天空 / 相机 / HUD
+============================================================ */
+function updateGates(dt, t) {
+  for (var i = 0; i < GATE_CAP; i++) {
+    var g = gates[i];
+    var bobY = g.baseY + Math.sin(t * 0.9 + i * 1.7) * 1.6;
+    g.y = bobY;
+    tmpQ.setFromEuler(tmpE.set(0, g.rot + Math.sin(t * 0.4 + i) * 0.06, 0));
+    tmpM.compose(tmpV.set(g.x, bobY, g.z), tmpQ, tmpS.set(1.1, 1.1, 1.1));
+    gateMesh.setMatrixAt(i, tmpM);
+    gateHalos[i].position.set(g.x, bobY + 11, g.z);
+    var hp = 26 + 4 * Math.sin(t * 2 + i);
+    gateHalos[i].scale.set(hp, hp, 1);
+
+    if (state === 'play') {
+      var dx = flyer.position.x - g.x, dz = flyer.position.z - g.z;
+      var d2 = dx * dx + dz * dz;
+      if (d2 < 13 * 13 && Math.abs(flyer.position.y - bobY) < 13) {
+        S.gates++;
+        P.speed = Math.min(P.speed + 5, 70);
+        toast('穿过鸟居！Torii +1', 1200);
+        placeGate(g, false, i);
+      } else if (dz > 50 || d2 > 900 * 900) {
+        placeGate(g, false, i);
+      }
+    }
+  }
+  gateMesh.instanceMatrix.needsUpdate = true;
+}
+
+function updateOrbs(dt, t) {
+  for (var i = 0; i < ORB_CAP; i++) {
+    var o = orbs[i];
+    if (state === 'play') {
+      var dx = flyer.position.x - o.x, dy = flyer.position.y - o.y, dz = flyer.position.z - o.z;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < 8) {
         S.souls++;
-        orbChime();
-        spawnBurst(o.grp.position, 0x9fd8ff);
-        pulse(ui.souls);
-        placeOrb(o);
+        toast('✦ +1 灵魂光点', 900);
+        placeOrb(o, false, i);
+      } else if (d < 20 && d > 0.01) {
+        var pull = 5 * dt / d;
+        o.x += dx * pull; o.y += dy * pull; o.z += dz * pull;
+      } else if (dz > 60) {
+        placeOrb(o, false, i);
       }
     }
-
-    /* wind audio follows speed */
-    if (windGain) {
-      windGain.gain.value = Math.min(0.16, S.v * 0.0042) * (boosting ? 1.6 : 1);
-      windFilter.frequency.value = 320 + S.v * 9;
-    }
-    /* boost widens fov slightly */
-    const targetFov = boosting ? 69 : 62;
-    if (Math.abs(camera.fov - targetFov) > 0.05) {
-      camera.fov += (targetFov - camera.fov) * Math.min(1, 3 * dt);
-      camera.updateProjectionMatrix();
-    }
+    var pulse = 0.9 + 0.3 * Math.sin(t * 2.6 + o.phase);
+    var oy = o.y + Math.sin(t * 1.2 + o.phase) * 2;
+    tmpQ.identity();
+    tmpM.compose(tmpV.set(o.x, oy, o.z), tmpQ, tmpS.set(pulse, pulse, pulse));
+    orbMesh.setMatrixAt(i, tmpM);
+    tmpM.compose(tmpV.set(o.x, oy, o.z), tmpQ, tmpS.set(pulse * 2.4, pulse * 2.4, pulse * 2.4));
+    orbHaloMesh.setMatrixAt(i, tmpM);
   }
+  orbMesh.instanceMatrix.needsUpdate = true;
+  orbHaloMesh.instanceMatrix.needsUpdate = true;
+}
 
-  /* ----- camera ----- */
-  if (S.started) {
-    tmpV.copy(plane.position).addScaledVector(fwd, -15.5);
-    tmpV.y += 5;
-    const gy = terrainHeight(tmpV.x, tmpV.z) + 2.2;
-    if (tmpV.y < gy) tmpV.y = gy;
-    camPos.lerp(tmpV, 1 - Math.exp(-3.2 * dt));
-    camera.position.copy(camPos);
-    tmpV.copy(plane.position).addScaledVector(fwd, 16);
-    tmpV.y += 1.2;
-    if (S.stalled) {
-      tmpV.x += (Math.random() - 0.5) * 0.35;
-      tmpV.y += (Math.random() - 0.5) * 0.35;
-    }
-    camera.lookAt(tmpV);
-  } else {
-    camera.position.copy(camPos);
-    camera.lookAt(plane.position.x, plane.position.y + 1, plane.position.z);
+function updateMist(dt) {
+  var px = flyer.position.x, pz = flyer.position.z;
+  for (var i = 0; i < mists.length; i++) {
+    var m = mists[i];
+    m.position.x += dt * 1.5;
+    var dx = m.position.x - px, dz = m.position.z - pz;
+    if (dz > 120 || dx > 460 || dx < -460) placeMist(m, false);
   }
+}
 
-  /* ----- world life ----- */
-  for (const c of clouds) {
-    c.position.x += c.userData.vx * dt;
-    if (c.position.x > 1700) c.position.x = -1700;
-  }
-  for (let i = 0; i < LEAF_COUNT; i++) {
-    const ix = i * 3;
-    leafPos[ix + 1] -= (2.5 + leafFall[i] * (1 + S.v * 0.02)) * dt;
-    leafPos[ix] += Math.sin(t * 1.2 + leafSeed[i]) * 2.2 * dt;
-    leafPos[ix + 2] += Math.cos(t * 0.9 + leafSeed[i] * 1.7) * 2.2 * dt;
-    const gy = terrainHeight(leafPos[ix], leafPos[ix + 2]);
-    const dx = leafPos[ix] - plane.position.x, dz = leafPos[ix + 2] - plane.position.z;
-    if (leafPos[ix + 1] < gy + 1.5 || (dx * dx + dz * dz > 260 * 260 && leafPos[ix + 1] < plane.position.y - 30)) {
-      leafPos[ix] = plane.position.x + (Math.random() * 2 - 1) * 200;
-      leafPos[ix + 1] = plane.position.y + 25 + Math.random() * 70;
-      leafPos[ix + 2] = plane.position.z + (Math.random() * 2 - 1) * 200;
+function updateLeaves(dt, t) {
+  var px = flyer.position.x, pz = flyer.position.z;
+  for (var i = 0; i < LEAF_N; i++) {
+    var ix = i * 3;
+    leafPos[ix]   += (leafVel[ix] + Math.sin(t * 1.3 + leafPhase[i]) * 2.2) * dt;
+    leafPos[ix+1] += leafVel[ix+1] * dt;
+    leafPos[ix+2] += (leafVel[ix+2] - 1.0) * dt;
+    leafAngle[i] += dt * (1.5 + Math.sin(leafPhase[i]) * 1.5);
+    if (leafPos[ix+1] < terrainH(leafPos[ix], leafPos[ix+2]) + 1 ||
+        leafPos[ix+2] < pz - 270 || Math.abs(leafPos[ix] - px) > 170) {
+      leafRespawn(i, false);
     }
   }
   leafGeo.attributes.position.needsUpdate = true;
-
-  for (const o of orbs) {
-    o.grp.position.y = o.baseY + Math.sin(t * 1.3 + o.seed) * 1.6;
-    o.grp.rotation.y += dt * 0.8;
-    const s = 7 * (1 + 0.12 * Math.sin(t * 2 + o.seed));
-    o.glow.scale.set(s, s, 1);
-  }
-  for (let i = 0; i < BURST_MAX; i++) {
-    if (burstLife[i] <= 0) continue;
-    burstLife[i] -= dt * 1.3;
-    const ix = i * 3;
-    burstPos[ix] += burstVel[ix] * dt;
-    burstPos[ix + 1] += burstVel[ix + 1] * dt;
-    burstPos[ix + 2] += burstVel[ix + 2] * dt;
-    burstVel[ix + 1] -= 3 * dt;
-    const l = Math.max(burstLife[i], 0);
-    burstCol[ix] = burstBase[ix] * l;
-    burstCol[ix + 1] = burstBase[ix + 1] * l;
-    burstCol[ix + 2] = burstBase[ix + 2] * l;
-    if (burstLife[i] <= 0) burstPos[ix + 1] = -9999;
-  }
-  burstGeo.attributes.position.needsUpdate = true;
-  burstGeo.attributes.color.needsUpdate = true;
-
-  const spin = (4 + S.v * 0.55) * dt;
-  propL.rotation.z += spin;
-  propR.rotation.z -= spin;
-  plane.rotation.x += Math.sin(t * 37) * 0.0018 * (S.v / 30); // engine tremor
-
-  /* ----- HUD (throttled) ----- */
-  hudTimer += dt;
-  if (hudTimer > 0.12) {
-    hudTimer = 0;
-    const groundSpeed = S.v * Math.sqrt(Math.max(0, 1 - fwd.y * fwd.y));
-    ui.spd.textContent = Math.round(S.v * 3.6);
-    ui.gspd.textContent = Math.round(groundSpeed * 3.6);
-    ui.alt.textContent = Math.max(0, Math.round(plane.position.y - terrainHeight(plane.position.x, plane.position.z)));
-    ui.souls.textContent = S.souls;
-    ui.gates.innerHTML = S.gates + '<span class="dim">/13</span>';
-    ui.dist.textContent = (S.dist / 1000).toFixed(1);
-  }
-
-  renderer.render(scene, camera);
+  leafGeo.attributes.aAngle.needsUpdate = true;
 }
-animate();
+
+var camPos = new THREE.Vector3(21, 85, 0);
+var camLook = new THREE.Vector3(0, 82, 0);
+var curFwd = new THREE.Vector3(0, 0, -1);
+var UP = new THREE.Vector3(0, 1, 0);
+
+function updateCamera(dt) {
+  var p = flyer.position;
+  var k;
+  if (state === 'play') {
+    tmpV.copy(p).addScaledVector(curF, -14).addScaledVector(UP, 4.8);   // chase
+    tmpV2.copy(p).addScaledVector(curF, 13);
+    k = 3.6;
+  } else {
+    var rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+    tmpV.set(p.x + rx * 21, p.y + 3.4, p.z + rz * 21);              // 侧面跟拍
+    tmpV2.set(p.x - curF.x * 7, p.y + 1.2, p.z - curF.z * 7);
+    k = 2.6;
+  }
+  camPos.lerp(tmpV, 1 - Math.exp(-k * dt));
+  camLook.lerp(tmpV2, 1 - Math.exp(-5 * dt));
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+  var targetFov = (state === 'play' && (keys.ShiftLeft || keys.ShiftRight)) ? 66 : 60;
+  if (Math.abs(camera.fov - targetFov) > 0.05) {
+    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4);
+    camera.updateProjectionMatrix();
+  }
+}
+
+function updateHUD() {
+  if (state === 'title') return;
+  hudAir.textContent = Math.round(P.speed * 3.6);
+  hudGnd.textContent = Math.round(P.speed * Math.cos(P.pitch) * 3.6);
+  hudAlt.textContent = Math.max(0, Math.round(flyer.position.y - terrainH(flyer.position.x, flyer.position.z)));
+  hudSouls.textContent = S.souls;
+  hudGates.textContent = S.gates;
+  hudDist.textContent = (S.dist / 1000).toFixed(1);
+}
 
 /* ============================================================
-   start & resize
+   主循环
 ============================================================ */
-el('takeFlight').addEventListener('click', () => {
-  initAudio();
-  el('start').classList.add('hidden');
-  S.started = true;
-  camPos.copy(plane.position).add(new THREE.Vector3(0, 5, 15.5));
-  showMsg('風に乗れ — ride the wind · W/S 俯仰 · A/D 转向 · Shift 乘风', 5000);
-});
+var T = 0;
+var last = performance.now();
+window.__fw = { frames: 0, trees: 0, flyerY: 0, camX: 0, camY: 0, state: 'boot' };
+function animate(now) {
+  requestAnimationFrame(animate);
+  var dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  T += dt;
+  window.__fw.frames++;
 
-addEventListener('resize', () => {
+  stepPhysics(dt);
+  if (Math.abs(flyer.position.x - lastEnvX) > 8 || Math.abs(flyer.position.z - lastEnvZ) > 8) rebuildEnvironment();
+  updateGround();
+  updateRings();
+  updateGates(dt, T);
+  updateOrbs(dt, T);
+  updateMist(dt);
+  updateLeaves(dt, T);
+
+  sky.position.copy(camera.position);
+  sunSpr.position.copy(camera.position).addScaledVector(sunDir, 2200);
+  dirLight.position.copy(flyer.position).addScaledVector(sunDir, 500);
+  dirLight.target.position.copy(flyer.position);
+
+  updateCamera(dt);
+  updateHUD();
+  renderer.render(scene, camera);
+  window.__fw.trees = treeMesh.count;
+  window.__fw.flyerY = Math.round(flyer.position.y * 10) / 10;
+  window.__fw.camX = Math.round(camera.position.x * 10) / 10;
+  window.__fw.camY = Math.round(camera.position.y * 10) / 10;
+  window.__fw.state = state;
+}
+
+window.addEventListener('resize', function () {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+/* ============================================================
+   启动
+============================================================ */
+for (var bi = 0; bi < LEAF_N; bi++) leafRespawn(bi, true);
+rebuildEnvironment();
+for (var gi2 = 0; gi2 < GATE_CAP; gi2++) placeGate(gates[gi2], true, gi2);
+for (var oi2 = 0; oi2 < ORB_CAP; oi2++) placeOrb(orbs[oi2], true, oi2);
+for (var mi2 = 0; mi2 < mists.length; mi2++) placeMist(mists[mi2], true);
+updateGround();
+camPos.set(flyer.position.x + 21, flyer.position.y + 3.4, flyer.position.z);
+requestAnimationFrame(animate);
+
+})();
 </script>
 </body>
 </html>

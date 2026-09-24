@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沙尘行动 · 3D 团队竞技 FPS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0b08; }
+  body { font-family: "Arial Black", "Microsoft YaHei", "PingFang SC", Arial, sans-serif; user-select: none; }
+  #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+
+  /* ============ 主菜单 ============ */
+  #menu {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(20,16,8,0.55) 0%, rgba(10,8,4,0.88) 100%);
+    color: #f0e6d0; text-align: center;
+  }
+  #menu .tag {
+    font-size: 14px; letter-spacing: 10px; color: #d8a844; margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  #menu h1 {
+    font-size: 72px; letter-spacing: 14px; color: #f5e9c8;
+    text-shadow: 0 0 24px rgba(216,168,68,0.45), 0 4px 0 #5a4418, 0 6px 18px rgba(0,0,0,0.8);
+    margin-bottom: 6px;
+  }
+  #menu h2 { font-size: 18px; letter-spacing: 6px; color: #b8a06a; font-weight: normal; margin-bottom: 30px; }
+  .brief {
+    background: rgba(30,24,14,0.85); border: 1px solid #6b5a34; border-radius: 8px;
+    padding: 18px 26px; max-width: 560px; margin-bottom: 26px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+  .brief p { font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; font-size: 14px; line-height: 1.9; color: #d8c9a0; }
+  .brief .teams { display: flex; justify-content: space-around; margin: 10px 0 4px; font-size: 15px; }
+  .brief .teams .b { color: #6fa8ff; } .brief .teams .r { color: #ff7a6f; }
+  .controls-grid {
+    display: grid; grid-template-columns: repeat(3, auto); gap: 8px 26px;
+    font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+    font-size: 13px; color: #bfae87; margin-top: 12px; text-align: left;
+  }
+  .controls-grid b { color: #f0dfae; background: #3a3220; border: 1px solid #6b5a34; border-radius: 4px; padding: 1px 8px; margin-right: 8px; font-family: inherit; }
+  #btn-start {
+    font-family: inherit; font-size: 26px; letter-spacing: 12px; cursor: pointer;
+    color: #1a1408; background: linear-gradient(180deg, #f0c860, #c89830);
+    border: 2px solid #8a6a20; border-radius: 6px; padding: 14px 64px 14px 76px;
+    box-shadow: 0 0 30px rgba(240,200,96,0.35), 0 6px 0 #6b5218;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  #btn-start:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 0 44px rgba(240,200,96,0.6), 0 8px 0 #6b5218; }
+  #menu .foot { margin-top: 22px; font-family: "Microsoft YaHei", sans-serif; font-size: 12px; color: #8a7a58; letter-spacing: 2px; }
+
+  /* ============ HUD ============ */
+  #hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+
+  /* 准星 */
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  #crosshair .c { position: absolute; background: rgba(240,255,230,0.92); box-shadow: 0 0 3px rgba(0,0,0,0.9); }
+  #crosshair .h { width: 9px; height: 2px; top: -1px; }
+  #crosshair .v { width: 2px; height: 9px; left: -1px; }
+  #crosshair .l { left: -14px; } #crosshair .r { left: 5px; }
+  #crosshair .u { top: -14px; } #crosshair .d { top: 5px; }
+  #crosshair .dot { width: 2px; height: 2px; left: -1px; top: -1px; border-radius: 50%; }
+  #crosshair.ads .h { width: 6px; } #crosshair.ads .v { height: 6px; }
+
+  /* 命中标记 */
+  #hitmarker { position: absolute; left: 50%; top: 50%; opacity: 0; }
+  #hitmarker span { position: absolute; width: 12px; height: 2px; background: #fff; box-shadow: 0 0 4px #000; }
+  #hitmarker span:nth-child(1) { transform: translate(-14px,-9px) rotate(45deg); }
+  #hitmarker span:nth-child(2) { transform: translate(3px,-9px) rotate(-45deg); }
+  #hitmarker span:nth-child(3) { transform: translate(-14px,7px) rotate(-45deg); }
+  #hitmarker span:nth-child(4) { transform: translate(3px,7px) rotate(45deg); }
+  #hitmarker.head span { background: #ff4a3c; }
+  #hitmarker.show { animation: hm 0.22s ease-out; }
+  @keyframes hm { 0% { opacity: 1; transform: scale(1.4); } 100% { opacity: 0; transform: scale(0.9); } }
+
+  /* 比分与计时 */
+  #scorebar {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(12,10,6,0.72); border: 1px solid rgba(160,130,70,0.5); border-radius: 6px;
+    padding: 8px 18px;
+  }
+  #scorebar .team { font-size: 12px; letter-spacing: 2px; }
+  #scorebar .team.blue { color: #6fa8ff; } #scorebar .team.red { color: #ff7a6f; }
+  #scorebar .num { font-size: 30px; color: #f5e9c8; min-width: 44px; text-align: center; }
+  #match-timer { font-size: 18px; color: #d8c9a0; border-left: 1px solid rgba(160,130,70,0.5); padding-left: 14px; }
+
+  /* 击杀播报 */
+  #killfeed { position: absolute; top: 16px; right: 18px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .kf-row {
+    background: rgba(12,10,6,0.78); border: 1px solid rgba(160,130,70,0.4); border-radius: 4px;
+    padding: 5px 12px; font-size: 13px; font-family: "Microsoft YaHei", sans-serif; color: #e8dcc0;
+    transition: opacity 0.6s;
+  }
+  .kf-row .kf-weapon { color: #b8a06a; margin: 0 10px; font-size: 12px; }
+  .kf-row.fade { opacity: 0; }
+
+  /* 生命 */
+  #hp-wrap { position: absolute; left: 26px; bottom: 24px; width: 240px; }
+  #hp-wrap .label { font-size: 11px; letter-spacing: 3px; color: #bfae87; margin-bottom: 5px; }
+  #hp-bar { height: 16px; background: rgba(10,8,4,0.75); border: 1px solid rgba(160,130,70,0.6); border-radius: 3px; overflow: hidden; }
+  #hp-fill { height: 100%; width: 100%; background: #7fd069; transition: width 0.15s; }
+  #hp-text { position: absolute; right: -34px; top: 16px; font-size: 26px; color: #f5e9c8; text-shadow: 0 2px 4px #000; }
+
+  /* 弹药 */
+  #ammo-wrap { position: absolute; right: 26px; bottom: 24px; text-align: right; }
+  #ammo-wrap .label { font-size: 11px; letter-spacing: 3px; color: #bfae87; margin-bottom: 4px; }
+  #ammo-mag { font-size: 44px; color: #f5e9c8; text-shadow: 0 2px 6px #000; line-height: 1; }
+  #ammo-reserve { font-size: 18px; color: #b8a06a; }
+  #ammo-wrap .wpn { font-size: 12px; color: #d8a844; letter-spacing: 2px; margin-top: 4px; }
+
+  /* 中央消息 */
+  #center-msg {
+    position: absolute; left: 50%; top: 24%; transform: translateX(-50%);
+    font-size: 26px; letter-spacing: 6px; color: #f5e9c8; text-shadow: 0 2px 8px #000;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  #center-msg.show { opacity: 1; }
+
+  /* 受击红晕 */
+  #dmg-vignette {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 42%, rgba(190,20,10,0.55) 100%);
+  }
+
+  /* 死亡遮罩 */
+  #death-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(60,8,4,0.45), rgba(20,2,0,0.85));
+  }
+  #death-overlay .title { font-size: 44px; letter-spacing: 16px; color: #ff5a4c; text-shadow: 0 4px 16px #000; margin-bottom: 12px; }
+  #death-info { font-size: 17px; color: #e8d9c0; font-family: "Microsoft YaHei", sans-serif; }
+  #respawn-t { font-size: 60px; color: #f5e9c8; margin-top: 18px; text-shadow: 0 4px 12px #000; }
+  #respawn-t::after { content: ' 秒后重生'; font-size: 16px; color: #b8a06a; letter-spacing: 3px; }
+
+  /* 记分板 */
+  #scoreboard {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    background: rgba(12,10,6,0.92); border: 1px solid #6b5a34; border-radius: 8px;
+    padding: 20px 26px; color: #e8dcc0; font-family: "Microsoft YaHei", sans-serif; min-width: 420px;
+  }
+  #scoreboard h3 { font-size: 15px; letter-spacing: 6px; color: #d8a844; margin-bottom: 12px; text-align: center; }
+  #scoreboard table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #scoreboard th { color: #8a7a58; font-size: 11px; letter-spacing: 2px; padding: 4px 10px; border-bottom: 1px solid #4a3d22; text-align: left; }
+  #scoreboard td { padding: 4px 10px; border-bottom: 1px solid rgba(90,74,40,0.3); }
+  #scoreboard tr.me td { color: #ffd870; font-weight: bold; }
+  #scoreboard .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+
+  /* 暂停 */
+  #pause {
+    position: fixed; inset: 0; z-index: 35; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: rgba(8,6,3,0.82); color: #f0e6d0;
+  }
+  #pause h2 { font-size: 40px; letter-spacing: 12px; margin-bottom: 26px; color: #d8a844; }
+  #btn-resume {
+    font-family: inherit; font-size: 18px; letter-spacing: 6px; cursor: pointer;
+    color: #1a1408; background: linear-gradient(180deg, #f0c860, #c89830);
+    border: 2px solid #8a6a20; border-radius: 6px; padding: 12px 46px;
+  }
+
+  /* 结算 */
+  #end-screen {
+    position: fixed; inset: 0; z-index: 38; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: rgba(8,6,3,0.9); color: #f0e6d0;
+  }
+  #end-title { font-size: 76px; letter-spacing: 30px; margin-bottom: 8px; text-shadow: 0 6px 24px #000; }
+  #end-title.win { color: #ffd870; } #end-title.lose { color: #ff5a4c; }
+  #end-stats { margin: 18px 0 26px; }
+  #end-stats p { text-align: center; color: #bfae87; font-family: "Microsoft YaHei", sans-serif; margin-bottom: 8px; }
+  #btn-restart {
+    font-family: inherit; font-size: 20px; letter-spacing: 8px; cursor: pointer;
+    color: #f5e9c8; background: transparent; border: 2px solid #b8a06a; border-radius: 6px; padding: 12px 50px;
+  }
+  #btn-restart:hover { background: rgba(184,160,106,0.15); }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="dmg-vignette"></div>
+  <div id="crosshair">
+    <span class="c h l"></span><span class="c h r"></span>
+    <span class="c v u"></span><span class="c v d"></span><span class="c dot"></span>
+  </div>
+  <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+  <div id="scorebar">
+    <span class="team blue">蓝方</span>
+    <span class="num" id="score-blue">0</span>
+    <span class="num" id="score-red">0</span>
+    <span class="team red">红方</span>
+    <span id="match-timer">5:00</span>
+  </div>
+  <div id="killfeed"></div>
+  <div id="hp-wrap">
+    <div class="label">生命值</div>
+    <div id="hp-bar"><div id="hp-fill"></div></div>
+    <div id="hp-text">100</div>
+  </div>
+  <div id="ammo-wrap">
+    <div class="label">弹药</div>
+    <span id="ammo-mag">30</span> <span id="ammo-reserve">/ 120</span>
+    <div class="wpn">MK-4 突击步枪</div>
+  </div>
+  <div id="center-msg"></div>
+  <div id="scoreboard" class="hidden"></div>
+  <div id="death-overlay" class="hidden">
+    <div class="title">阵 亡</div>
+    <div id="death-info"></div>
+    <div id="respawn-t">4</div>
+  </div>
+</div>
+
+<!-- ============ 主菜单 ============ -->
+<div id="menu">
+  <div class="tag">DESERT OPERATION</div>
+  <h1>沙尘行动</h1>
+  <h2>3D 团队竞技 · 沙漠军事基地</h2>
+  <div class="brief">
+    <p>原创地图「沙尘基地」：A 区、B 区、中路、长廊、隧道与双方出生点。<br>率领蓝方「沙漠之狐」对抗红方「沙暴突击队」。</p>
+    <div class="teams"><span class="b">蓝方：你 + 4 名队友</span><span class="r">红方：5 名敌人</span></div>
+    <p>率先取得 <b style="color:#ffd870">35</b> 次击杀，或在 5 分钟结束时领先即获胜。</p>
+    <div class="controls-grid">
+      <span><b>W A S D</b>移动</span><span><b>Shift</b>疾跑</span><span><b>空格</b>跳跃</span>
+      <span><b>鼠标左键</b>射击</span><span><b>鼠标右键</b>瞄准</span><span><b>R</b>换弹</span>
+      <span><b>Tab</b>记分板</span><span><b>Esc</b>暂停</span><span></span>
+    </div>
+  </div>
+  <button id="btn-start">开 始 行 动</button>
+  <div class="foot">点击开始后将锁定鼠标进入战斗 · 建议使用 Chrome / Edge 浏览器</div>
+</div>
+
+<!-- ============ 暂停 ============ -->
+<div id="pause" class="hidden">
+  <h2>已 暂 停</h2>
+  <button id="btn-resume">继续战斗</button>
+</div>
+
+<!-- ============ 结算 ============ -->
+<div id="end-screen" class="hidden">
+  <div id="end-title"></div>
+  <div id="end-stats"></div>
+  <button id="btn-restart">再 来 一 局</button>
+</div>
+
+<script type="module">
+<!--GAME_JS-->
+</script>
+</body>
+</html>
