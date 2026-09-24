@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>藻井之舞 · The Dance of the Caisson Ceiling</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#04050a;
+    font-family:"Songti SC","Noto Serif CJK SC","STSong","SimSun",serif; }
+  #scene { position:fixed; inset:0; display:block; }
+  #vignette { position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.6) 100%); }
+  #ui { position:fixed; inset:0; pointer-events:none; color:#e8c26a; z-index:5; }
+  header { position:absolute; top:30px; left:34px; }
+  h1 { font-size:34px; letter-spacing:14px; font-weight:600; color:#e8c26a;
+    text-shadow:0 0 20px rgba(232,194,106,.35); }
+  .sub { margin-top:9px; font-size:13px; letter-spacing:6px; color:#b99a55; }
+  .en { margin-top:5px; font-size:10px; letter-spacing:3px; color:#7a6a45; font-family:Georgia,serif; }
+  #shapeDesc { margin-top:16px; font-size:14px; letter-spacing:4px; color:#d8b25c; opacity:.9;
+    transition:opacity .3s; text-shadow:0 0 12px rgba(216,178,92,.3); }
+  #hint { position:absolute; top:34px; right:34px; font-size:12px; letter-spacing:3px; color:#8a7a52; }
+  #bottombar { position:absolute; left:0; right:0; bottom:26px; display:flex;
+    justify-content:space-between; align-items:flex-end; padding:0 34px; gap:16px; flex-wrap:wrap; }
+  #shapes { display:flex; gap:10px; pointer-events:auto; flex-wrap:wrap; }
+  #shapes button { font-family:inherit; font-size:14px; letter-spacing:4px; padding:9px 16px 9px 20px;
+    color:#d8b25c; background:rgba(10,10,16,.45); border:1px solid rgba(216,178,92,.35);
+    border-radius:999px; cursor:pointer; backdrop-filter:blur(6px); transition:all .25s; }
+  #shapes button:hover { border-color:#e8c26a; box-shadow:0 0 14px rgba(232,194,106,.25); }
+  #shapes button.active { background:linear-gradient(180deg,#e8c26a,#c9962e); color:#1a1206;
+    border-color:transparent; font-weight:600; }
+  #explodeCtl { display:flex; align-items:center; gap:14px; pointer-events:auto;
+    background:rgba(10,10,16,.45); border:1px solid rgba(216,178,92,.35);
+    padding:10px 18px; border-radius:999px; backdrop-filter:blur(6px); }
+  #explodeCtl label { font-size:13px; letter-spacing:3px; color:#d8b25c; white-space:nowrap; }
+  #explodeRange { width:130px; accent-color:#d8b25c; cursor:pointer; }
+  #explodeBtn { font-family:inherit; font-size:13px; letter-spacing:3px; padding:7px 14px 7px 17px;
+    color:#1a1206; background:linear-gradient(180deg,#e8c26a,#c9962e); border:none;
+    border-radius:999px; cursor:pointer; white-space:nowrap; }
+  #loading { position:fixed; inset:0; background:#04050a; z-index:10; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:20px;
+    transition:opacity .9s; color:#e8c26a; }
+  #loading .ring { width:46px; height:46px; border:1px solid rgba(216,178,92,.25);
+    border-top-color:#e8c26a; border-radius:50%; animation:spin 1s linear infinite; }
+  #loading h2 { font-size:26px; letter-spacing:12px; font-weight:600; }
+  #loading p { font-size:10px; letter-spacing:4px; color:#7a6a45; font-family:Georgia,serif; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (max-width:760px) {
+    h1 { font-size:24px; letter-spacing:8px; }
+    #hint { display:none; }
+    #bottombar { justify-content:center; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+
+<div id="ui">
+  <header>
+    <h1>藻井之舞</h1>
+    <p class="sub">数字艺术 × 非遗藻井</p>
+    <p class="en">THE DANCE OF THE CAISSON CEILING</p>
+    <p id="shapeDesc">天圆地方 · 辐辏明镜</p>
+  </header>
+  <div id="hint">拖动旋转 · 滚轮缩放 · 静置自动环绕</div>
+  <div id="bottombar">
+    <div id="shapes">
+      <button data-shape="circle" class="active">圆形穹顶</button>
+      <button data-shape="square">方形井格</button>
+      <button data-shape="hex">六角形制</button>
+      <button data-shape="oct">八角形制</button>
+    </div>
+    <div id="explodeCtl">
+      <label>分层拆解</label>
+      <input type="range" id="explodeRange" min="0" max="100" value="0">
+      <button id="explodeBtn">拆解</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="ring"></div>
+  <h2>藻井之舞</h2>
+  <p>THE DANCE OF THE CAISSON CEILING</p>
+</div>
+
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ================= 基础 ================= */
+const canvas = document.getElementById('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+} catch(e) {
+  document.getElementById('loading').innerHTML = '<p>当前环境不支持 WebGL</p>';
+  return;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04050a);
+scene.fog = new THREE.FogExp2(0x04050a, 0.02);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+camera.position.set(16, 10, 16);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 4.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 3.5;
+controls.maxDistance = 22;
+controls.minPolarAngle = 0.1;
+controls.maxPolarAngle = 1.65;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.55;
+controls.enabled = false;
+
+let idleTimer = null;
+controls.addEventListener('start', ()=>{ controls.autoRotate = false; clearTimeout(idleTimer); });
+controls.addEventListener('end', ()=>{ idleTimer = setTimeout(()=>{ controls.autoRotate = true; }, 5000); });
+
+/* ================= 形制配置 ================= */
+const SHAPES = {
+  circle: { sides:0, domeH:1.50, accent:0x8f2a22, panel:0x6e1d18, domeName:'圆形穹顶', desc:'天圆地方 · 辐辏明镜' },
+  square: { sides:4, domeH:0.80, accent:0x1d3a7a, panel:0x27406e, domeName:'方井穹顶', desc:'井口方正 · 格井层叠', domeOffset:Math.PI/4 },
+  hex:    { sides:6, domeH:1.15, accent:0x2f5d46, panel:0x27493a, domeName:'六角穹顶', desc:'六隅攒尖 · 如莲初绽' },
+  oct:    { sides:8, domeH:1.30, accent:0x8f2a22, panel:0x1d3a7a, domeName:'八角穹顶', desc:'八面玲珑 · 方圆过渡' },
+};
+const BASE_Y = 3.2;   // 井口高度（藻井悬于殿堂顶部）
+
+const state = { shape:'circle', switching:false, explode:0, explodeTarget:0, root:null, layers:[], guide:null };
+
+/* ================= 补间 ================= */
+const tweens = [];
+const easeOutCubic = k => 1 - Math.pow(1-k, 3);
+const easeInCubic  = k => k*k*k;
+const easeOutBack  = k => { const c=1.70158; return 1 + (c+1)*Math.pow(k-1,3) + c*Math.pow(k-1,2); };
+function addTween(tw){ tw.t0 = clock.elapsedTime + (tw.delay||0); tweens.push(tw); }
+function updateTweens(now){
+  for (let i=tweens.length-1; i>=0; i--){
+    const tw = tweens[i];
+    let k = (now - tw.t0) / tw.dur;
+    if (k < 0) continue;
+    if (k > 1) k = 1;
+    tw.onUpdate(tw.ease(k));
+    if (k === 1){ tweens.splice(i,1); if (tw.onDone) tw.onDone(); }
+  }
+}
+
+/* ================= 材质 ================= */
+function makeMaterials(cfg){
+  return {
+    gold:  new THREE.MeshStandardMaterial({ color:0xd9a844, metalness:0.85, roughness:0.32, emissive:0x2a1a05 }),
+    red:   new THREE.MeshStandardMaterial({ color:cfg.accent, metalness:0.2, roughness:0.5, emissive:0x140404 }),
+    panel: new THREE.MeshStandardMaterial({ color:cfg.panel, metalness:0.3, roughness:0.45, emissive:0x05070f }),
+  };
+}
+
+/* ================= 构件 ================= */
+function beamBetween(a, b, w, h, M){
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), M);
+  m.position.copy(a).addScaledVector(dir, 0.5);
+  m.lookAt(b);
+  return m;
+}
+function squareFrame(size, y, w, h, M){
+  const g = new THREE.Group();
+  const s = size/2;
+  const cs = [[s,-s],[s,s],[-s,s],[-s,-s]];
+  for (let i=0;i<4;i++){
+    g.add(beamBetween(
+      new THREE.Vector3(cs[i][0], y, cs[i][1]),
+      new THREE.Vector3(cs[(i+1)%4][0], y, cs[(i+1)%4][1]), w, h, M));
+  }
+  return g;
+}
+function ringBeam(r, y, tube, M){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 10, 72), M);
+  m.rotation.x = Math.PI/2;
+  m.position.y = y;
+  return m;
+}
+function bracketStack(x, y, z, s, M){
+  const g = new THREE.Group();
+  const sizes = [[0.5,0.14],[0.36,0.12],[0.24,0.12],[0.15,0.1]];
+  let yy = y;
+  sizes.forEach(([w,h], i)=>{
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w*s, h, w*s), i%2 ? M.gold : M.red);
+    m.position.set(x, yy + h/2, z);
+    yy += h;
+    g.add(m);
+  });
+  return g;
+}
+function goldMedallion(r, M){
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.05, 24), M);
+  disc.rotation.x = Math.PI/2;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r*0.72, Math.max(r*0.16, 0.02), 8, 24), M);
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(r*0.3, 12, 10), M);
+  boss.position.z = 0.045;
+  g.add(disc, ring, boss);
+  return g;
+}
+
+/* 蟠龙（螺旋龙身 + 龙头），面向 +Z */
+function buildDragon(M){
+  const g = new THREE.Group();
+  class Spiral extends THREE.Curve {
+    getPoint(t){
+      const ang = t*Math.PI*2*2.3 + Math.PI/2;
+      const r = 0.46*(1 - t*0.72);
+      return new THREE.Vector3(Math.cos(ang)*r, t*0.22, Math.sin(ang)*r);
+    }
+  }
+  const curve = new Spiral();
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 140, 0.045, 8, false), M));
+  const head = new THREE.Group();
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), M);
+  skull.scale.set(1, 0.8, 1.3);
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 8), M);
+  snout.rotation.x = Math.PI/2;
+  snout.position.z = 0.14;
+  const h1 = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.14, 6), M);
+  h1.position.set(0, 0.09, 0.05); h1.rotation.x = 0.5;
+  const h2 = h1.clone(); h2.position.z = -0.05; h2.rotation.x = -0.5;
+  head.add(skull, snout, h1, h2);
+  head.position.copy(curve.getPoint(0));
+  g.add(head);
+  return g;
+}
+
+/* ================= 藻井装配 ================= */
+function makeLabel(text){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const x = c.getContext('2d');
+  x.font = '46px "Songti SC","Noto Serif CJK SC",serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.shadowColor = 'rgba(232,194,106,0.9)'; x.shadowBlur = 14;
+  x.fillStyle = '#e8c26a';
+  x.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, opacity:0, depthTest:false }));
+  sp.scale.set(2.4, 0.6, 1);
+  sp.renderOrder = 99;
+  return sp;
+}
+
+function buildCaisson(key){
+  const cfg = SHAPES[key];
+  const M = makeMaterials(cfg);
+  const root = new THREE.Group();
+  const layers = [];
+  const newLayer = (dy, name, midY)=>{
+    const g = new THREE.Group();
+    const label = makeLabel(name);
+    label.position.set(4.1, midY, 0);
+    g.add(label);
+    root.add(g);
+    layers.push({ g, dy, label });
+    return g;
+  };
+
+  /* ---- L0 井口枋 · 立柱 ---- */
+  const L0 = newLayer(0, '井口枋 · 立柱', BASE_Y + 0.3);
+  [[2.9,2.9],[2.9,-2.9],[-2.9,2.9],[-2.9,-2.9]].forEach(([cx,cz])=>{
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, BASE_Y, 12), M.red);
+    col.position.set(cx, BASE_Y/2, cz);
+    L0.add(col);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.14, 12), M.gold);
+    base.position.set(cx, 0.07, cz);
+    L0.add(base);
+  });
+  L0.add(squareFrame(5.6, BASE_Y + 0.15, 0.3, 0.3, M.red));
+  L0.add(squareFrame(4.6, BASE_Y + 0.15, 0.16, 0.24, M.gold));
+  [[2.8,2.8],[2.8,-2.8],[-2.8,2.8],[-2.8,-2.8]].forEach(([cx,cz])=>{
+    L0.add(bracketStack(cx, BASE_Y + 0.3, cz, 1.0, M));
+  });
+
+  /* ---- L1 方井 · 井格 ---- */
+  const L1 = newLayer(1.1, '方井 · 井格', 3.95);
+  const tiers = cfg.sides === 4 ? 2 : 1;
+  for (let t=0; t<tiers; t++){
+    const y = 3.72 + t*0.4;
+    const S = 5.6 - t*0.4;
+    L1.add(squareFrame(S, y, 0.18, 0.24, M.red));
+    const N = 4, cell = S/N;
+    for (let i=1; i<N; i++){
+      const off = -S/2 + i*cell;
+      const b1 = new THREE.Mesh(new THREE.BoxGeometry(S, 0.2, 0.14), M.red);
+      b1.position.set(0, y, off);
+      const b2 = b1.clone(); b2.rotation.y = Math.PI/2; b2.position.set(off, y, 0);
+      L1.add(b1, b2);
+    }
+    for (let i=0; i<N; i++) for (let j=0; j<N; j++){
+      const px = -S/2 + (i+0.5)*cell, pz = -S/2 + (j+0.5)*cell;
+      const p = new THREE.Mesh(new THREE.BoxGeometry(cell-0.16, 0.05, cell-0.16), M.panel);
+      p.position.set(px, y-0.13, pz);
+      L1.add(p);
+      const med = goldMedallion(0.2, M.gold);
+      med.position.set(px, y-0.17, pz);
+      med.rotation.x = Math.PI/2;
+      L1.add(med);
+    }
+  }
+
+  /* ---- L2 抹角梁 · 方转圆过渡 ---- */
+  const L2 = newLayer(2.2, '抹角梁 · 过渡', 4.55);
+  const y2 = 4.42, d = 2.8, e = 0.9;
+  const verts = [[d,e],[e,d],[-e,d],[-d,e],[-d,-e],[-e,-d],[e,-d],[d,-e]];
+  for (let i=0; i<8; i++){
+    L2.add(beamBetween(
+      new THREE.Vector3(verts[i][0], y2, verts[i][1]),
+      new THREE.Vector3(verts[(i+1)%8][0], y2, verts[(i+1)%8][1]), 0.16, 0.2, M.red));
+  }
+  verts.forEach(([vx,vz])=> L2.add(bracketStack(vx, y2+0.1, vz, 0.55, M)));
+  const y2b = y2 + 0.3, s2 = 0.8;
+  for (let i=0; i<8; i++){
+    L2.add(beamBetween(
+      new THREE.Vector3(verts[i][0]*s2, y2b, verts[i][1]*s2),
+      new THREE.Vector3(verts[(i+1)%8][0]*s2, y2b, verts[(i+1)%8][1]*s2), 0.12, 0.14, M.gold));
+  }
+
+  /* ---- L3 穹顶 ---- */
+  const L3 = newLayer(3.4, cfg.domeName, 5.4);
+  const y3 = 4.78, R = 2.0, H = cfg.domeH;
+  if (cfg.sides === 0){
+    /* 圆形穹顶：红底穹窿 + 辐射棂条 + 三重金环 */
+    const redBack = M.red.clone(); redBack.side = THREE.BackSide;
+    const Rs = 2.6, theta = Math.asin(R/Rs);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(Rs, 48, 24, 0, Math.PI*2, 0, theta), redBack);
+    cap.position.y = y3 - Rs*Math.cos(theta);
+    L3.add(cap);
+    L3.add(ringBeam(R, y3, 0.07, M.gold));
+    L3.add(ringBeam(R*0.66, y3 + H*0.55, 0.055, M.gold));
+    L3.add(ringBeam(R*0.24, y3 + H, 0.05, M.gold));
+    const N = 40;
+    for (let i=0; i<N; i++){
+      const a = i/N*Math.PI*2;
+      const p0 = new THREE.Vector3(Math.cos(a)*R, y3, Math.sin(a)*R);
+      const p1 = new THREE.Vector3(Math.cos(a)*R*0.66, y3 + H*0.55, Math.sin(a)*R*0.66);
+      const p2 = new THREE.Vector3(Math.cos(a)*R*0.24, y3 + H, Math.sin(a)*R*0.24);
+      L3.add(beamBetween(p0, p1, 0.05, 0.05, M.gold));
+      L3.add(beamBetween(p1, p2, 0.04, 0.04, M.gold));
+      if (i % 2 === 0){
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.gold);
+        ball.position.copy(p0);
+        L3.add(ball);
+      }
+    }
+  } else {
+    /* 六角 / 八角 / 方形穹顶：环枋 + 辐射梁 + 镶板 */
+    const n = cfg.sides, off = cfg.domeOffset || 0;
+    const vAt = (i, r, y)=> new THREE.Vector3(
+      Math.cos(off + i/n*Math.PI*2)*r, y, Math.sin(off + i/n*Math.PI*2)*r);
+    const Rm = R*0.66, ym = y3 + H*0.55, Rt = R*0.24, yt = y3 + H;
+    for (let i=0; i<n; i++){
+      L3.add(beamBetween(vAt(i,R,y3), vAt(i+1,R,y3), 0.15, 0.2, M.red));
+      L3.add(beamBetween(vAt(i,Rm,ym), vAt(i+1,Rm,ym), 0.1, 0.12, M.gold));
+      L3.add(beamBetween(vAt(i,Rt,yt), vAt(i+1,Rt,yt), 0.09, 0.1, M.gold));
+      L3.add(beamBetween(vAt(i,R,y3), vAt(i,Rm,ym), 0.12, 0.14, M.red));
+      L3.add(beamBetween(vAt(i,Rm,ym), vAt(i,Rt,yt), 0.08, 0.1, M.gold));
+      const am = off + (i+0.5)/n*Math.PI*2;
+      const p0 = new THREE.Vector3(Math.cos(am)*R, y3, Math.sin(am)*R);
+      const p1 = new THREE.Vector3(Math.cos(am)*Rm, ym, Math.sin(am)*Rm);
+      const chord = 2*(R+Rm)/2*Math.sin(Math.PI/n)*0.94;
+      L3.add(beamBetween(p0, p1, chord, 0.05, M.panel));
+      const mid = p0.clone().lerp(p1, 0.5);
+      const out = new THREE.Vector3(mid.x, 0, mid.z).normalize();
+      const med = goldMedallion(0.17, M.gold);
+      med.position.copy(mid).addScaledVector(out, 0.05);
+      med.lookAt(mid.clone().addScaledVector(out, 2));
+      L3.add(med);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), M.gold);
+      ball.position.copy(vAt(i, R, y3));
+      L3.add(ball);
+    }
+  }
+
+  /* ---- L4 明镜 · 蟠龙 ---- */
+  const L4 = newLayer(4.8, '明镜 · 蟠龙', y3 + H + 0.3);
+  const y4 = y3 + H + 0.12;
+  const med = new THREE.Group();
+  med.add(new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.12, 48), M.gold));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.05, 10, 48), M.gold);
+  rim.rotation.x = Math.PI/2;
+  med.add(rim);
+  const rim2 = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.025, 8, 40), M.gold);
+  rim2.rotation.x = Math.PI/2; rim2.position.y = -0.06;
+  med.add(rim2);
+  const dragon = buildDragon(M.gold);
+  dragon.rotation.x = Math.PI;
+  dragon.position.y = -0.08;
+  med.add(dragon);
+  const pearl = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 20, 16),
+    new THREE.MeshStandardMaterial({ color:0xffe2ae, emissive:0xffc86e, emissiveIntensity:2.2, roughness:0.2, metalness:0.1 }));
+  pearl.position.y = -0.34;
+  med.add(pearl);
+  const fin = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.3, 12), M.gold);
+  fin.position.y = 0.2;
+  const finBall = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.gold);
+  finBall.position.y = 0.38;
+  med.add(fin, finBall);
+  med.position.y = y4;
+  L4.add(med);
+
+  /* ---- 中轴引导线（拆解时可见） ---- */
+  const topY = y4 + 0.5;
+  const guideGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 2.6, 0), new THREE.Vector3(0, topY + 1.0, 0)]);
+  const guide = new THREE.Line(guideGeo, new THREE.LineDashedMaterial({
+    color:0xd8b25c, dashSize:0.18, gapSize:0.12, transparent:true, opacity:0 }));
+  guide.computeLineDistances();
+  root.add(guide);
+
+  scene.add(root);
+  state.root = root;
+  state.layers = layers;
+  state.guide = guide;
+  state.topY = topY;
+
+  /* 灯光与光柱跟随明镜高度 */
+  topLight.position.y = y4 - 0.5;
+  upSpot.target.position.y = y4 - 1.0;
+  shaft.scale.y = y4;
+  shaft.position.y = y4/2;
+}
+
+/* ================= 灯光 ================= */
+scene.add(new THREE.AmbientLight(0x2a3450, 0.55));
+scene.add(new THREE.HemisphereLight(0x2a3450, 0x0b0805, 0.5));
+const topLight = new THREE.PointLight(0xffc27a, 1.6, 16, 1.6);
+topLight.position.set(0, 5.6, 0);
+scene.add(topLight);
+const upSpot = new THREE.SpotLight(0xffd9a0, 1.1, 30, 0.62, 0.7, 1.2);
+upSpot.position.set(0, 0.15, 0);
+upSpot.target.position.set(0, 5.2, 0);
+scene.add(upSpot, upSpot.target);
+const rim = new THREE.DirectionalLight(0x3a5a9a, 0.5);
+rim.position.set(-6, 9, -7);
+scene.add(rim);
+
+/* ================= 地面 ================= */
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(45, 48),
+  new THREE.MeshStandardMaterial({ color:0x05060a, roughness:0.95, metalness:0 }));
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+function radialGlowTexture(inner, outer){
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(256, 256, 0, 256, 256, 256);
+  g.addColorStop(0, inner);
+  g.addColorStop(1, outer);
+  x.fillStyle = g;
+  x.fillRect(0, 0, 512, 512);
+  return new THREE.CanvasTexture(c);
+}
+const glow1 = new THREE.Mesh(
+  new THREE.PlaneGeometry(18, 18),
+  new THREE.MeshBasicMaterial({ map:radialGlowTexture('rgba(255,190,90,0.5)','rgba(255,190,90,0)'),
+    transparent:true, opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false }));
+glow1.rotation.x = -Math.PI/2; glow1.position.y = 0.02;
+scene.add(glow1);
+const glow2 = new THREE.Mesh(
+  new THREE.PlaneGeometry(34, 34),
+  new THREE.MeshBasicMaterial({ map:radialGlowTexture('rgba(70,110,200,0.35)','rgba(70,110,200,0)'),
+    transparent:true, opacity:0.14, blending:THREE.AdditiveBlending, depthWrite:false }));
+glow2.rotation.x = -Math.PI/2; glow2.position.y = 0.015;
+scene.add(glow2);
+
+/* 顶部洒下的光柱 */
+const shaftTex = (()=>{
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, 'rgba(255,220,150,0.9)');
+  g.addColorStop(1, 'rgba(255,220,150,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 16, 256);
+  return new THREE.CanvasTexture(c);
+})();
+const shaft = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.75, 3.8, 1, 32, 1, true),
+  new THREE.MeshBasicMaterial({ map:shaftTex, transparent:true, opacity:0.05,
+    blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false }));
+shaft.position.y = 3;
+scene.add(shaft);
+
+/* ================= 人物剪影 ================= */
+function capsule(x, ax, ay, bx, by, w){
+  x.lineWidth = w; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke();
+}
+function makePersonTexture(){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 1024;
+  const x = c.getContext('2d');
+  x.fillStyle = '#000';
+  x.beginPath(); x.ellipse(256, 150, 46, 56, 0, 0, Math.PI*2); x.fill();       // 头
+  capsule(x, 256, 190, 256, 238, 40);                                            // 颈
+  x.beginPath();                                                                  // 躯干
+  x.moveTo(172, 250);
+  x.quadraticCurveTo(158, 330, 168, 430);
+  x.quadraticCurveTo(174, 500, 192, 548);
+  x.lineTo(320, 548);
+  x.quadraticCurveTo(338, 500, 344, 430);
+  x.quadraticCurveTo(354, 330, 340, 250);
+  x.quadraticCurveTo(300, 228, 256, 228);
+  x.quadraticCurveTo(212, 228, 172, 250);
+  x.fill();
+  capsule(x, 178, 262, 168, 600, 30);                                            // 左臂
+  capsule(x, 334, 262, 344, 600, 30);                                            // 右臂
+  x.beginPath(); x.arc(166, 612, 14, 0, Math.PI*2); x.fill();
+  x.beginPath(); x.arc(346, 612, 14, 0, Math.PI*2); x.fill();
+  capsule(x, 222, 545, 214, 905, 42);                                            // 左腿
+  capsule(x, 290, 545, 298, 905, 42);                                            // 右腿
+  x.beginPath(); x.ellipse(206, 925, 36, 15, 0, 0, Math.PI*2); x.fill();
+  x.beginPath(); x.ellipse(316, 925, 36, 15, 0, 0, Math.PI*2); x.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+const person = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.875, 1.75),
+  new THREE.MeshBasicMaterial({ map:makePersonTexture(), transparent:true, alphaTest:0.05, side:THREE.DoubleSide }));
+person.position.set(0, 0.875, 0.9);
+scene.add(person);
+const shadowTex = radialGlowTexture('rgba(0,0,0,0.85)','rgba(0,0,0,0)');
+const pShadow = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.7, 1.7),
+  new THREE.MeshBasicMaterial({ map:shadowTex, transparent:true, opacity:0.6, depthWrite:false }));
+pShadow.rotation.x = -Math.PI/2;
+pShadow.position.set(0, 0.01, 0.9);
+scene.add(pShadow);
+
+/* ================= 金色粒子 ================= */
+function makeParticles(count, rMin, rMax, yMax, sizeMin, sizeMax, color){
+  const pos = new Float32Array(count*3);
+  const seed = new Float32Array(count);
+  const size = new Float32Array(count);
+  for (let i=0; i<count; i++){
+    const r = rMin + Math.random()*(rMax - rMin);
+    const a = Math.random()*Math.PI*2;
+    pos[i*3]   = Math.cos(a)*r;
+    pos[i*3+1] = Math.random()*yMax;
+    pos[i*3+2] = Math.sin(a)*r;
+    seed[i] = Math.random();
+    size[i] = sizeMin + Math.random()*(sizeMax - sizeMin);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{ value:0 }, uColor:{ value:new THREE.Color(color) } },
+    vertexShader:[
+      'attribute float aSeed;',
+      'attribute float aSize;',
+      'uniform float uTime;',
+      'varying float vA;',
+      'void main(){',
+      '  vec3 p = position;',
+      '  float ang = uTime*(0.05 + aSeed*0.08) + aSeed*6.2831;',
+      '  float c = cos(ang), s = sin(ang);',
+      '  p.xz = mat2(c,-s,s,c)*p.xz;',
+      '  p.y = mod(p.y + uTime*(0.1 + aSeed*0.3), 10.0);',
+      '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+      '  gl_Position = projectionMatrix * mv;',
+      '  gl_PointSize = aSize * (120.0 / -mv.z);',
+      '  vA = 0.25 + 0.75*fract(aSeed*7.31);',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'uniform vec3 uColor;',
+      'varying float vA;',
+      'void main(){',
+      '  float d = length(gl_PointCoord - 0.5);',
+      '  float a = smoothstep(0.5, 0.05, d);',
+      '  gl_FragColor = vec4(uColor, a*a*vA*0.8);',
+      '}'
+    ].join('\n'),
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+  });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  return pts;
+}
+const dust   = makeParticles(3000, 1.0, 9.0, 10.0, 0.5, 1.6, 0xffc86e);
+const sparks = makeParticles(400, 0.5, 3.5,  8.0, 1.2, 2.6, 0xffe6a8);
+
+/* ================= 形制切换 ================= */
+function disposeObject(obj){
+  obj.traverse(o=>{
+    if (o.geometry) o.geometry.dispose();
+    if (o.material){
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>{
+        if (m.map) m.map.dispose();
+        m.dispose();
+      });
+    }
+  });
+}
+function setShape(key){
+  if (key === state.shape || state.switching) return;
+  state.switching = true;
+  state.shape = key;
+  document.querySelectorAll('#shapes button').forEach(b=>
+    b.classList.toggle('active', b.dataset.shape === key));
+  const desc = document.getElementById('shapeDesc');
+  desc.style.opacity = 0;
+  setTimeout(()=>{ desc.textContent = SHAPES[key].desc; desc.style.opacity = 0.9; }, 250);
+  const old = state.root;
+  addTween({ dur:0.3, ease:easeInCubic,
+    onUpdate:k=>old.scale.setScalar(Math.max(1-k, 0.001)),
+    onDone:()=>{
+      scene.remove(old);
+      disposeObject(old);
+      buildCaisson(key);
+      addTween({ dur:0.6, ease:easeOutBack,
+        onUpdate:k=>state.root.scale.setScalar(Math.max(k, 0.001)),
+        onDone:()=>{ state.switching = false; } });
+    } });
+}
+document.querySelectorAll('#shapes button').forEach(b=>
+  b.addEventListener('click', ()=>setShape(b.dataset.shape)));
+
+/* ================= 分层拆解 ================= */
+const explodeRange = document.getElementById('explodeRange');
+const explodeBtn = document.getElementById('explodeBtn');
+function setExplodeTarget(v){
+  state.explodeTarget = v;
+  explodeRange.value = Math.round(v*100);
+  explodeBtn.textContent = v > 0.5 ? '合拢' : '拆解';
+}
+explodeBtn.addEventListener('click', ()=> setExplodeTarget(state.explodeTarget > 0.5 ? 0 : 1));
+explodeRange.addEventListener('input', e=> setExplodeTarget(e.target.value/100));
+
+/* ================= 主循环 ================= */
+const clock = new THREE.Clock();
+const camFrom = new THREE.Vector3(16, 10, 16);
+const camTo = new THREE.Vector3(4.6, 1.35, 6.3);
+addTween({ dur:2.6, ease:easeOutCubic,
+  onUpdate:k=>camera.position.lerpVectors(camFrom, camTo, k),
+  onDone:()=>{ controls.enabled = true; } });
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  updateTweens(t);
+  dust.material.uniforms.uTime.value = t;
+  sparks.material.uniforms.uTime.value = t;
+
+  state.explode += (state.explodeTarget - state.explode) * Math.min(1, dt*3.5);
+  if (Math.abs(state.explodeTarget - state.explode) < 0.001) state.explode = state.explodeTarget;
+  for (const L of state.layers){
+    L.g.position.y = L.dy * state.explode;
+    L.label.material.opacity = state.explode * 0.95;
+  }
+  if (state.guide) state.guide.material.opacity = state.explode * 0.4;
+
+  person.rotation.y = Math.atan2(camera.position.x, camera.position.z - 0.9);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ================= 启动 ================= */
+buildCaisson('circle');
+animate();
+requestAnimationFrame(()=>{
+  const l = document.getElementById('loading');
+  l.style.opacity = 0;
+  setTimeout(()=>l.remove(), 900);
+});
+})();
+</script>
+</body>
+</html>
