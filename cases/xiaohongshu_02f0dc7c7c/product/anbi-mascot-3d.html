@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>安比 · 安慕希整颗蓝莓</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(ellipse 130% 95% at 50% 32%, #f4fbff 0%, #d2ebfa 42%, #aed6f2 72%, #8fc3e9 100%);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  canvas { display: block; }
+  #banner {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: linear-gradient(180deg, #f72c40 0%, #e11226 55%, #c90d20 100%);
+    color: #fff; font-weight: 800; letter-spacing: 3px; white-space: nowrap;
+    font-size: clamp(17px, 2.8vw, 28px);
+    padding: 13px 40px; border-radius: 10px;
+    box-shadow: 0 5px 0 rgba(122, 4, 16, .4), 0 14px 28px rgba(20, 40, 70, .22);
+    text-shadow: 0 1px 2px rgba(120, 0, 10, .35);
+    z-index: 10; user-select: none;
+  }
+  #hint {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    color: #3f6385; font-size: 13px; letter-spacing: 2px;
+    opacity: .7; transition: opacity 1.6s ease; pointer-events: none; z-index: 10;
+  }
+  #hint.hide { opacity: 0; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hint">鼠标拖拽旋转 · 滚轮缩放</div>
+<div id="banner">你的胆子真是肥嘟嘟的</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+
+/* ---------------- renderer / scene / camera ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(4.8, 4.6, 8.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.55, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 5;
+controls.maxDistance = 16;
+controls.minPolarAngle = 0.25;
+controls.maxPolarAngle = 1.48;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.8;
+
+/* ---------------- lights ---------------- */
+scene.add(new THREE.HemisphereLight(0xeaf6ff, 0xa8c4d8, 0.8));
+const key = new THREE.DirectionalLight(0xffffff, 1.8);
+key.position.set(5, 9, 6);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -7;
+key.shadow.camera.right = 7;
+key.shadow.camera.top = 8;
+key.shadow.camera.bottom = -4;
+key.shadow.camera.near = 2;
+key.shadow.camera.far = 25;
+key.shadow.bias = -0.0004;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xcfe4ff, 0.5);
+fill.position.set(-6, 4, 3);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.45);
+rim.position.set(-3, 6, -7);
+scene.add(rim);
+
+/* ---------------- clay materials ---------------- */
+function clay(color, opt = {}) {
+  return new THREE.MeshPhysicalMaterial(Object.assign({
+    color, roughness: 0.52, metalness: 0,
+    sheen: 0.45, sheenRoughness: 0.7, sheenColor: 0xfff6da
+  }, opt));
+}
+const M = {
+  yellow: clay(0xffbf10),                       // 身体黄
+  shirt:  clay(0x74a9d8),                       // 浅蓝上衣
+  shorts: clay(0x33419b),                       // 深蓝短裤
+  belt:   clay(0xf2a007, { roughness: 0.45 }),  // 黄色腰带
+  white:  clay(0xf6f9f9),                       // 眼白
+  collar: clay(0xf6f9f9),                       // 白色翻领
+  nose:   clay(0x6b3a1f, { roughness: 0.35, sheen: 0.2 }),
+  pupil:  clay(0x38220f, { roughness: 0.3, sheen: 0.1 }),
+  mouth:  clay(0x4a2c18),
+  cap:    clay(0x2b5cb8, { roughness: 0.4 }),   // 瓶盖蓝
+  bottle: clay(0xf7fafa, { roughness: 0.4, sheen: 0.15 }),
+};
+
+/* ---------------- helpers ---------------- */
+function ball(r, mat, sx = 1, sy = 1, sz = 1, ws = 32, hs = 24) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, ws, hs), mat);
+  m.scale.set(sx, sy, sz);
+  m.castShadow = true;
+  return m;
+}
+function capsuleBetween(a, b, r, mat) {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 20), mat);
+  m.position.copy(a).lerp(b, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  m.castShadow = true;
+  return m;
+}
+function roundRectPath(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+function drawBlueberry(g, x, y, r) {
+  g.fillStyle = '#2c3f95';
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#4658b4';
+  g.beginPath(); g.arc(x - r * 0.22, y - r * 0.22, r * 0.62, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#93a3e2';
+  g.beginPath(); g.arc(x - r * 0.38, y - r * 0.38, r * 0.22, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1e2c66';
+  g.beginPath(); g.arc(x, y, r * 0.3, 0, Math.PI * 2); g.fill();
+}
+
+/* ---------------- 安比 ---------------- */
+const char = new THREE.Group();
+scene.add(char);
+
+/* 头（大头占约一半比例，带轻微倾斜） */
+const head = new THREE.Group();
+head.position.set(0, 4.535, 0);
+head.rotation.z = 0.045;
+char.add(head);
+
+const skull = ball(1.15, M.yellow, 1.06, 0.97, 0.97);
+head.add(skull);
+
+/* 两只长耳朵向上竖起，右耳外张更明显 */
+const earGeo = new THREE.CapsuleGeometry(0.27, 0.75, 6, 20);
+const earL = new THREE.Mesh(earGeo, M.yellow);
+earL.position.set(-0.44, 0.75, -0.03);
+earL.scale.set(1, 1, 0.72);
+earL.rotation.set(-0.12, 0, 0.16);
+earL.castShadow = true;
+const earR = earL.clone();
+earR.position.x = 0.44;
+earR.rotation.z = -0.38;
+head.add(earL, earR);
+
+/* 白色眼白 + 棕色瞳孔的小圆眼（望向斜上方） */
+const eyeGeo = new THREE.SphereGeometry(0.21, 24, 18);
+const pupGeo = new THREE.SphereGeometry(0.105, 18, 14);
+const hlGeo  = new THREE.SphereGeometry(0.042, 10, 8);
+const eyeL = new THREE.Mesh(eyeGeo, M.white); eyeL.position.set(-0.42, 0.215, 1.02);
+const eyeR = eyeL.clone(); eyeR.position.x = 0.42;
+const pupL = new THREE.Mesh(pupGeo, M.pupil); pupL.position.set(-0.455, 0.26, 1.155);
+const pupR = pupL.clone(); pupR.position.x = 0.385;
+const hlL = new THREE.Mesh(hlGeo, M.white); hlL.position.set(-0.41, 0.315, 1.23);
+const hlR = hlL.clone(); hlR.position.x = 0.43;
+head.add(eyeL, eyeR, pupL, pupR, hlL, hlR);
+
+/* 棕色椭圆形大鼻子 */
+const nose = ball(1, M.nose, 0.36, 0.27, 0.26);
+nose.position.set(0, -0.215, 1.06);
+head.add(nose);
+
+/* 微笑嘴（小巧贴合脸部） */
+const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.026, 10, 24, Math.PI), M.mouth);
+mouth.position.set(0, -0.56, 1.02);
+mouth.rotation.set(-0.35, 0, Math.PI);
+head.add(mouth);
+
+/* 脖子 + 白色翻领 */
+const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 20), M.yellow);
+neck.position.set(0, 3.4, 0);
+neck.castShadow = true;
+char.add(neck);
+const collar = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.12, 12, 28), M.collar);
+collar.position.set(0, 3.36, 0);
+collar.rotation.x = Math.PI / 2;
+collar.castShadow = true;
+char.add(collar);
+
+/* 浅蓝上衣（胶囊躯干） */
+const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.85, 0.35, 8, 28), M.shirt);
+torso.scale.set(1, 1, 0.82);
+torso.position.set(0, 2.25, 0);
+torso.castShadow = true;
+char.add(torso);
+
+/* 短袖袖口（小巧贴合肩部） */
+const sleeveL = ball(0.28, M.shirt, 1, 0.85, 1); sleeveL.position.set(-0.72, 2.82, 0.05);
+const sleeveR = ball(0.28, M.shirt, 1, 0.85, 1); sleeveR.position.set(0.72, 2.82, 0.05);
+char.add(sleeveL, sleeveR);
+
+/* 深蓝短裤 */
+const shorts = ball(1, M.shorts, 1.045, 0.7125, 0.95);
+shorts.position.set(0, 0.98, 0);
+char.add(shorts);
+
+/* 黄色腰带 */
+const belt = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.12, 12, 32), M.belt);
+belt.position.set(0, 1.48, 0);
+belt.rotation.x = Math.PI / 2;
+belt.scale.set(1, 1, 0.85);
+belt.castShadow = true;
+char.add(belt);
+
+/* 双臂捧瓶：上臂下垂贴身体，前臂搭在腹部前方合拢捧住瓶子 */
+const armL1 = capsuleBetween(new THREE.Vector3(-0.72, 2.85, 0.05), new THREE.Vector3(-0.95, 2.25, 0.3), 0.29, M.yellow);
+const armL2 = capsuleBetween(new THREE.Vector3(-0.95, 2.25, 0.3), new THREE.Vector3(-0.56, 1.85, 1.12), 0.26, M.yellow);
+const armR1 = capsuleBetween(new THREE.Vector3(0.72, 2.85, 0.05), new THREE.Vector3(0.95, 2.22, 0.28), 0.29, M.yellow);
+const armR2 = capsuleBetween(new THREE.Vector3(0.95, 2.22, 0.28), new THREE.Vector3(0.06, 1.88, 1.16), 0.26, M.yellow);
+const handL = ball(1, M.yellow, 0.3, 0.27, 0.32); handL.position.set(-0.62, 1.95, 1.15);
+const handR = ball(1, M.yellow, 0.3, 0.27, 0.32); handR.position.set(0.12, 2.0, 1.2);
+char.add(armL1, armL2, armR1, armR2, handL, handR);
+
+/* 坐姿双腿向前张开 */
+const legL1 = capsuleBetween(new THREE.Vector3(-0.48, 1.0, 0), new THREE.Vector3(-1.02, 0.62, 0.55), 0.33, M.yellow);
+const legL2 = capsuleBetween(new THREE.Vector3(-1.02, 0.62, 0.55), new THREE.Vector3(-0.98, 0.32, 0.7), 0.27, M.yellow);
+const legR1 = capsuleBetween(new THREE.Vector3(0.48, 1.0, 0), new THREE.Vector3(1.02, 0.62, 0.55), 0.33, M.yellow);
+const legR2 = capsuleBetween(new THREE.Vector3(1.02, 0.62, 0.55), new THREE.Vector3(0.98, 0.32, 0.7), 0.27, M.yellow);
+const footL = ball(1, M.yellow, 0.52, 0.27, 0.65); footL.position.set(-0.98, 0.27, 0.9); footL.rotation.y = 0.12;
+const footR = ball(1, M.yellow, 0.52, 0.27, 0.65); footR.position.set(0.98, 0.27, 0.9); footR.rotation.y = -0.12;
+char.add(legL1, legL2, legR1, legR2, footL, footR);
+
+/* 黄色尾巴（身后拖到右侧地面） */
+const tailCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0.25, 0.8, -0.8),
+  new THREE.Vector3(0.5, 0.42, -1.35),
+  new THREE.Vector3(0.62, 0.18, -1.8),
+  new THREE.Vector3(0.95, 0.1, -2.05),
+  new THREE.Vector3(1.25, 0.15, -2.12)
+]);
+const tail = new THREE.Mesh(new THREE.TubeGeometry(tailCurve, 40, 0.19, 14), M.yellow);
+tail.scale.y = 0.85;
+tail.castShadow = true;
+char.add(tail);
+
+/* 上衣胸前「安慕希」印花 */
+function makeBadgeTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 512, 256);
+  g.fillStyle = '#1e3f92';
+  g.font = `800 150px ${FONT}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('安慕希', 256, 132);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+const badge = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.95, 0.95, 0.55, 32, 1, true, -0.45, 0.9),
+  new THREE.MeshStandardMaterial({ map: makeBadgeTexture(), transparent: true, roughness: 0.55, side: THREE.DoubleSide })
+);
+badge.position.set(0, 2.5, 0);
+badge.scale.set(1, 1, 0.82);
+char.add(badge);
+
+/* ---------------- 安慕希整颗蓝莓酸奶瓶 ---------------- */
+function makeBottleTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 1024;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f7fafb';
+  g.fillRect(0, 0, 2048, 1024);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+
+  // 顶部白底蓝字品牌
+  g.fillStyle = '#2b5cb8';
+  g.font = `800 104px ${FONT}`;
+  g.fillText('安慕希', 1024, 92);
+
+  // 产品名
+  g.font = `800 188px ${FONT}`;
+  g.fillText('整颗蓝莓', 1024, 330);
+
+  // 24小时米色标
+  roundRectPath(g, 812, 500, 424, 124, 26);
+  g.fillStyle = '#ecd9a4';
+  g.fill();
+  g.fillStyle = '#8a6420';
+  g.font = `700 74px ${FONT}`;
+  g.fillText('24小时', 1024, 564);
+
+  // 蓝莓图案
+  drawBlueberry(g, 900, 730, 66);
+  drawBlueberry(g, 1030, 756, 84);
+  drawBlueberry(g, 1156, 726, 62);
+  drawBlueberry(g, 968, 656, 40);
+  drawBlueberry(g, 1092, 668, 44);
+  drawBlueberry(g, 330, 420, 60);
+  drawBlueberry(g, 430, 500, 44);
+  drawBlueberry(g, 1700, 430, 60);
+  drawBlueberry(g, 1600, 510, 44);
+
+  // 底部深蓝色带
+  g.fillStyle = '#22337e';
+  g.fillRect(0, 800, 2048, 224);
+  g.fillStyle = '#ffffff';
+  g.font = `600 56px ${FONT}`;
+  g.fillText('净含量：200g · 风味酸乳', 1024, 916);
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+const bottle = new THREE.Group();
+const bBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.72, 8, 28), M.bottle);
+bBody.castShadow = true;
+const bCap = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.32, 28), M.cap);
+bCap.position.y = 0.8;
+bCap.castShadow = true;
+const bLabel = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.335, 0.335, 0.98, 48, 1, true),
+  new THREE.MeshStandardMaterial({ map: makeBottleTexture(), roughness: 0.45 })
+);
+bLabel.position.y = -0.1;
+bottle.add(bBody, bCap, bLabel);
+bottle.scale.set(1.45, 1.45, 1.45); // 瓶子较大，瓶盖举到下巴高度
+bottle.position.set(-0.3, 2.15, 1.2);
+bottle.rotation.set(0, Math.PI, -0.13); // 标签正面朝前，瓶盖微向左倾
+char.add(bottle);
+
+/* ---------------- 地面（只承接阴影，透出背景渐变） ---------------- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 40),
+  new THREE.ShadowMaterial({ color: 0x2a4a6a, opacity: 0.22 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---------------- loop / resize / hint ---------------- */
+renderer.setAnimationLoop(() => {
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const hint = document.getElementById('hint');
+setTimeout(() => hint.classList.add('hide'), 6000);
+renderer.domElement.addEventListener('pointerdown', () => hint.classList.add('hide'), { once: true });
+</script>
+</body>
+</html>
