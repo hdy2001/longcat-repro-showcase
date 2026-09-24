@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>应县木塔 · 佛宫寺释迦塔 — 3D 结构拆解</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#f0ebdf;color:#3b3428;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+#app{position:fixed;inset:0}
+canvas{display:block}
+header{position:fixed;top:18px;left:22px;z-index:10;pointer-events:none}
+header h1{font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;font-size:32px;font-weight:700;letter-spacing:8px;color:#33291c}
+header .sub{margin-top:5px;font-size:13px;letter-spacing:3px;color:#6d6350}
+header .stats{margin-top:9px;font-size:12px;letter-spacing:1px;color:#93876c}
+.panel{position:fixed;z-index:10;background:rgba(252,249,243,.93);border:1px solid rgba(90,75,50,.18);border-radius:12px;box-shadow:0 8px 28px rgba(60,45,20,.14);backdrop-filter:blur(8px)}
+#panel{top:18px;right:18px;width:268px;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
+.p-head{padding:13px 16px 9px;font-family:"Noto Serif SC","Songti SC","SimSun",serif;font-size:16px;font-weight:700;letter-spacing:3px;color:#4a3d28;border-bottom:1px solid rgba(90,75,50,.15)}
+#layerList{overflow-y:auto;padding:6px 8px;flex:1}
+.lrow{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;font-size:13px;transition:background .15s}
+.lrow:hover{background:rgba(156,61,46,.08)}
+.lrow.sel{background:rgba(156,61,46,.13);box-shadow:inset 3px 0 0 #9c3d2e}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.lrow .h{margin-left:auto;color:#93876c;font-size:12px;font-variant-numeric:tabular-nums}
+#infoBox{padding:11px 14px 12px;border-top:1px dashed rgba(90,75,50,.25)}
+#infoBox h3{font-size:14.5px;color:#4a3d28;letter-spacing:1px}
+#infoBox .tag{display:inline-block;margin:5px 0 6px;padding:1px 8px;border-radius:20px;background:rgba(156,61,46,.12);color:#9c3d2e;font-size:11.5px}
+#infoBox p{font-size:12.5px;line-height:1.75;color:#5d5340}
+#infoBox .note{margin-top:8px;font-size:11px;color:#a3987d;line-height:1.6}
+#ctrl{left:18px;bottom:18px;padding:13px 15px;display:flex;flex-direction:column;gap:10px;min-width:330px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+button{font-family:inherit;font-size:12.5px;padding:5px 12px;border-radius:8px;border:1px solid rgba(90,75,50,.3);background:rgba(255,255,255,.55);color:#4a3d28;cursor:pointer;transition:all .15s}
+button:hover{background:#9c3d2e;color:#fff;border-color:#9c3d2e}
+.lbl2{font-size:12.5px;color:#6d6350;flex:none}
+input[type=range]{flex:1;accent-color:#9c3d2e;min-width:100px}
+#explodeVal{font-size:12.5px;width:38px;text-align:right;font-variant-numeric:tabular-nums}
+label{font-size:12.5px;color:#5d5340;display:flex;align-items:center;gap:4px;cursor:pointer}
+.presets button{padding:4px 9px;font-size:12px}
+.lbl{position:fixed;left:0;top:0;z-index:6;pointer-events:auto;cursor:pointer;transition:opacity .25s;will-change:transform}
+.lbl .in{display:flex;flex-direction:column;align-items:center;background:rgba(252,249,243,.93);border:1px solid rgba(90,75,50,.28);border-left:3px solid #999;border-radius:6px;padding:3px 9px;font-size:11.5px;white-space:nowrap;box-shadow:0 2px 10px rgba(60,45,20,.18)}
+.lbl b{font-weight:600;color:#3b3428}
+.lbl span{color:#93876c;font-size:10.5px}
+.lbl:hover .in{background:#fff}
+.lbl.sel .in{outline:2px solid #9c3d2e}
+#tips{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);font-size:11.5px;color:#93876c;z-index:9;letter-spacing:1px;pointer-events:none;white-space:nowrap}
+#err{position:fixed;left:0;right:0;bottom:0;background:#a33;color:#fff;padding:8px 12px;font:12px/1.4 monospace;display:none;z-index:99;white-space:pre-wrap}
+@media (max-width:900px){
+  #panel{width:226px}
+  header h1{font-size:24px;letter-spacing:5px}
+  #ctrl{min-width:0;right:18px}
+  #tips{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<header>
+  <h1>应县木塔</h1>
+  <div class="sub">佛宫寺释迦塔 · 辽 · 清宁二年（1056）</div>
+  <div class="stats">高 67.31 m ｜ 明层 5 · 暗层 4 ｜ 斗拱约 480 攒 ｜ 纯木榫卯 · 无钉</div>
+</header>
+
+<aside id="panel" class="panel">
+  <div class="p-head">层级导览</div>
+  <div id="layerList"></div>
+  <div id="infoBox">
+    <h3 id="infoTitle"></h3>
+    <div><span class="tag" id="infoH"></span></div>
+    <p id="infoDesc"></p>
+    <p class="note">注：各层高度与比例为示意近似；总高 67.31 m、底层直径约 30.3 m 为公开资料数据。</p>
+  </div>
+</aside>
+
+<div id="ctrl" class="panel">
+  <div class="row">
+    <button id="btnAssemble">合拢</button>
+    <button id="btnExplode">逐层拆解</button>
+  </div>
+  <div class="row">
+    <span class="lbl2">拆解程度</span>
+    <input type="range" id="explode" min="0" max="100" value="0"/>
+    <b id="explodeVal">0%</b>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="chkLabels" checked/> 标注</label>
+    <label><input type="checkbox" id="chkRotate"/> 自动旋转</label>
+  </div>
+  <div class="row presets">
+    <span class="lbl2">视角</span>
+    <button data-preset="home">全景</button>
+    <button data-preset="m1">首层</button>
+    <button data-preset="dg">斗拱</button>
+    <button data-preset="an">暗层</button>
+    <button data-preset="fin">塔刹</button>
+  </div>
+</div>
+
+<div id="tips">左键拖拽旋转 · 滚轮缩放 · 右键平移 · 点击塔身或标注查看层级</div>
+<div id="err"></div>
+
+<!--@THREE-->
+<!--@ORBIT-->
+<script>
+(function(){
+'use strict';
+window.__errs=[];
+window.addEventListener('error',function(e){
+  window.__errs.push(e.message);
+  var d=document.getElementById('err');
+  if(d){d.style.display='block';d.textContent='Error: '+e.message;}
+});
+
+/* ================= 基础场景 ================= */
+var container=document.getElementById('app');
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0xf0ebdf);
+scene.fog=new THREE.Fog(0xf0ebdf,210,470);
+
+var camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,1500);
+camera.position.set(80,48,80);
+
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+container.appendChild(renderer.domElement);
+renderer.domElement.addEventListener('contextmenu',function(e){e.preventDefault();});
+
+var hemi=new THREE.HemisphereLight(0xfff6e6,0x8a8272,0.8);scene.add(hemi);
+var sun=new THREE.DirectionalLight(0xffedd0,1.15);
+sun.position.set(70,130,45);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-80;sun.shadow.camera.right=80;
+sun.shadow.camera.top=160;sun.shadow.camera.bottom=-20;
+sun.shadow.camera.far=520;sun.shadow.bias=-0.0003;sun.shadow.normalBias=0.03;
+scene.add(sun);
+var fill=new THREE.DirectionalLight(0xcfe0ff,0.3);fill.position.set(-60,50,-70);scene.add(fill);
+
+var ground=new THREE.Mesh(new THREE.CircleGeometry(260,64),new THREE.MeshStandardMaterial({color:0xe4ddcc,roughness:1}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+var grid=new THREE.PolarGridHelper(70,16,10,72,0xc6bda6,0xd6cebb);
+grid.position.y=0.02;grid.material.transparent=true;grid.material.opacity=0.4;scene.add(grid);
+
+var controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.06;
+controls.target.set(0,30,0);
+controls.minDistance=8;controls.maxDistance=380;
+controls.maxPolarAngle=Math.PI*0.495;
+controls.autoRotateSpeed=0.7;
+
+/* ================= 材质与工具 ================= */
+function std(c,r,m){return new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m||0.03});}
+function matsFactory(){return{
+  column:std(0x74352a,0.8), arch:std(0x51685c,0.8), bracket:std(0x71836f,0.85),
+  wall:std(0x9c4a32,0.9), lattice:std(0xd8c49a,0.85), dark:std(0x38220f,0.9),
+  tile:std(0x5d6872,0.85), tileEdge:std(0x6d7985,0.85), ridge:std(0x49535d,0.85),
+  stone:std(0xb3aa97,0.95), stoneDark:std(0x9d9482,0.95),
+  brace:std(0xd9a45b,0.7), anWall:std(0xbfae8e,0.95),
+  iron:std(0x3d434b,0.5,0.6), gold:std(0xb0883c,0.35,0.7), rail:std(0x8a5a3b,0.8)
+};}
+
+function bx(w,h,d,mat){var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.castShadow=true;m.receiveShadow=true;return m;}
+function cylY(rt,rb,h,mat,seg,open){
+  var g=new THREE.CylinderGeometry(rt,rb,h,seg||8,1,!!open);
+  g.rotateY(Math.PI/8);
+  var m=new THREE.Mesh(g,mat);m.castShadow=true;m.receiveShadow=true;return m;
+}
+function apothem(r){return r*Math.cos(Math.PI/8);}
+function chord(r){return 2*r*Math.sin(Math.PI/8);}
+function ring(r,n,off){
+  var a=[];
+  for(var i=0;i<n;i++){var t=(off===undefined?Math.PI/8:off)+i*2*Math.PI/n;
+    a.push({x:Math.sin(t)*r,z:Math.cos(t)*r,t:t});}
+  return a;
+}
+function ridge(p1,p2,mat){
+  var dir=new THREE.Vector3().subVectors(p2,p1);
+  var len=dir.length();
+  var m=bx(0.18,0.18,len,mat);
+  m.position.copy(p1).add(p2).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),dir.normalize());
+  return m;
+}
+
+/* 斗拱（简化：栌斗 + 双跳横拱 + 散斗） */
+function dougong(m,s){
+  var g=new THREE.Group();
+  var cap=bx(0.6*s,0.42*s,0.6*s,m.bracket);cap.position.y=0.21*s;g.add(cap);
+  var a1=bx(1.5*s,0.26*s,0.3*s,m.bracket);a1.position.y=0.55*s;g.add(a1);
+  var a2=bx(0.3*s,0.26*s,1.5*s,m.bracket);a2.position.y=0.55*s;g.add(a2);
+  var a3=bx(2.1*s,0.3*s,0.34*s,m.bracket);a3.position.y=0.92*s;g.add(a3);
+  var a4=bx(0.34*s,0.3*s,2.1*s,m.bracket);a4.position.y=0.92*s;g.add(a4);
+  [[-0.62,0.78],[0.62,0.78]].forEach(function(p){var b=bx(0.26*s,0.24*s,0.26*s,m.bracket);b.position.set(p[0]*s,0.78*s,0);g.add(b);});
+  [[-0.78,1.12],[0.78,1.12]].forEach(function(p){var b=bx(0.28*s,0.26*s,0.28*s,m.bracket);b.position.set(p[0]*s,1.12*s,0);g.add(b);});
+  return g;
+}
+
+/* 平座栏杆 */
+function balustrade(m,r){
+  var g=new THREE.Group();
+  var pts=ring(r,16);
+  pts.forEach(function(p){var post=bx(0.14,0.62,0.14,m.rail);post.position.set(p.x,0.31,p.z);g.add(post);});
+  for(var i=0;i<16;i++){
+    var p1=pts[i],p2=pts[(i+1)%16];
+    var mx=(p1.x+p2.x)/2,mz=(p1.z+p2.z)/2;
+    var am=Math.atan2(mx,mz),rr=Math.hypot(mx,mz);
+    var len=Math.hypot(p2.x-p1.x,p2.z-p1.z);
+    [0.5,0.22].forEach(function(h){
+      var rail=bx(len,0.08,0.08,m.rail);
+      rail.position.set(Math.sin(am)*rr,h,Math.cos(am)*rr);
+      rail.rotation.y=am;g.add(rail);
+    });
+  }
+  return g;
+}
+
+/* 墙面（门 / 格子门 / 直棂窗） */
+function wallFace(m,k,r,h,floorY,opts){
+  var th=k*Math.PI/4;
+  var w=chord(r)-0.6;
+  var g=new THREE.Group();
+  var nx=Math.sin(th),nz=Math.cos(th),tx=Math.cos(th),tz=-Math.sin(th);
+  var ap=apothem(r);
+  var panel=bx(w,h,0.3,m.wall);
+  panel.position.set(nx*ap,floorY+h/2,nz*ap);panel.rotation.y=th;g.add(panel);
+  if(opts.door){
+    var dw=Math.min(2.4,w*0.42),dh=h*0.7;
+    var d=bx(dw,dh,0.36,m.dark);d.position.set(nx*ap,floorY+dh/2,nz*ap);d.rotation.y=th;g.add(d);
+    var li=bx(dw+0.6,0.4,0.42,m.arch);li.position.set(nx*ap,floorY+dh+0.2,nz*ap);li.rotation.y=th;g.add(li);
+  }else if(opts.lattice){
+    var fw=w*0.74,fh=h*0.84;
+    var fr=bx(fw,fh,0.34,m.dark);fr.position.set(nx*ap,floorY+h*0.47,nz*ap);fr.rotation.y=th;g.add(fr);
+    var lz=bx(fw*0.82,fh*0.8,0.38,m.lattice);lz.position.set(nx*ap,floorY+h*0.47,nz*ap);lz.rotation.y=th;g.add(lz);
+    for(var i=-1;i<=1;i++){
+      var vb=bx(0.07,fh*0.8,0.42,m.dark);
+      vb.position.set(nx*ap+tx*i*fw*0.27,floorY+h*0.47,nz*ap+tz*i*fw*0.27);
+      vb.rotation.y=th;g.add(vb);
+    }
+    for(var j=0;j<2;j++){
+      var hb=bx(fw*0.82,0.07,0.42,m.dark);
+      hb.position.set(nx*ap,floorY+h*(0.32+j*0.3),nz*ap);hb.rotation.y=th;g.add(hb);
+    }
+  }else if(opts.window){
+    var ww=Math.min(2.6,w*0.5),wh=h*0.45;
+    var wf=bx(ww,wh,0.36,m.lattice);wf.position.set(nx*ap,floorY+h*0.55,nz*ap);wf.rotation.y=th;g.add(wf);
+    for(var i2=-1;i2<=1;i2++){
+      var b2=bx(0.07,wh,0.4,m.dark);
+      b2.position.set(nx*ap+tx*i2*ww/3,floorY+h*0.55,nz*ap+tz*i2*ww/3);
+      b2.rotation.y=th;g.add(b2);
+    }
+    var h2=bx(ww,0.07,0.4,m.dark);h2.position.set(nx*ap,floorY+h*0.55,nz*ap);h2.rotation.y=th;g.add(h2);
+  }
+  return g;
+}
+
+/* ================= 各层构建 ================= */
+function buildPlatform(d,m){
+  var g=new THREE.Group();
+  var t1=cylY(16.8,17.4,2.0,m.stone);t1.position.y=1.0;g.add(t1);
+  var t2=cylY(15.4,15.9,1.9,m.stoneDark);t2.position.y=2.0+0.95;g.add(t2);
+  for(var i=0;i<4;i++){
+    var top=0.5*(i+1);
+    var s=bx(4.6,top,1.4,m.stoneDark);
+    s.position.set(0,top/2,16.8+(3-i)*1.4+0.7);g.add(s);
+  }
+  return g;
+}
+
+function buildPorch(d,m){
+  var g=new THREE.Group();
+  var colH=d.h*0.42,archH=d.h*0.08,brkH=d.h*0.18,slabH=d.h*0.07,coneH=d.h*0.25;
+  ring(d.rP,16).forEach(function(p){
+    var c=cylY(0.24,0.28,colH,m.column,10);c.position.set(p.x,colH/2,p.z);g.add(c);
+  });
+  var arch=cylY(d.rP+0.15,d.rP+0.15,archH,m.arch,8,true);arch.position.y=colH+archH/2;g.add(arch);
+  ring(d.rP,16).forEach(function(p){
+    var b=dougong(m,0.9);b.position.set(p.x,colH+archH,p.z);b.rotation.y=p.t;g.add(b);
+  });
+  var eaveR=d.eaveR;
+  var slab=cylY(eaveR+0.5,eaveR+0.9,slabH,m.tileEdge);slab.position.y=colH+archH+brkH+slabH/2;g.add(slab);
+  var cone=cylY(1.0,eaveR+0.3,coneH,m.tile);cone.position.y=colH+archH+brkH+slabH+coneH/2;g.add(cone);
+  var y0=colH+archH+brkH+slabH,y1=y0+coneH;
+  for(var k=0;k<8;k++){
+    var a=Math.PI/8+k*Math.PI/4;
+    g.add(ridge(new THREE.Vector3(Math.sin(a)*eaveR,y0,Math.cos(a)*eaveR),new THREE.Vector3(0,y1,0),m.ridge));
+  }
+  return g;
+}
+
+function buildMing(d,m){
+  var g=new THREE.Group();
+  var wallH=d.h*0.55,archH=d.h*0.05,brkH=d.h*0.16,roofH=d.h*0.24;
+  var baseY=0;
+  if(d.id!=='m1'){
+    var plat=cylY(d.rOut+1.3,d.rOut+1.5,0.5,m.stone);plat.position.y=0.25;g.add(plat);
+    var bal=balustrade(m,d.rOut+1.15);bal.position.y=0.5;g.add(bal);
+    baseY=0.5;
+  }
+  var top0=baseY+wallH;
+  ring(d.rOut,16).forEach(function(p){
+    var c=cylY(0.22,0.27,top0-baseY,m.column,10);c.position.set(p.x,(top0+baseY)/2,p.z);g.add(c);
+  });
+  ring(d.rIn,8).forEach(function(p){
+    var c=cylY(0.2,0.24,top0-baseY,m.column,10);c.position.set(p.x,(top0+baseY)/2,p.z);g.add(c);
+  });
+  var arch=cylY(d.rOut+0.15,d.rOut+0.15,archH,m.arch,8,true);arch.position.y=top0+archH/2;g.add(arch);
+  var archIn=cylY(d.rIn+0.12,d.rIn+0.12,archH,m.arch,8,true);archIn.position.y=top0+archH/2;g.add(archIn);
+  var brkY=top0+archH;
+  ring(d.rOut,16).forEach(function(p){
+    var b=dougong(m,d.id==='m1'?1.25:0.95);
+    b.position.set(p.x,brkY,p.z);b.rotation.y=p.t;g.add(b);
+  });
+  for(var k=0;k<8;k++){
+    var opts=d.id==='m1'?{door:k%2===0,window:k%2===1}:{lattice:true};
+    g.add(wallFace(m,k,d.rIn,wallH,baseY,opts));
+  }
+  if(d.id==='m1'){
+    for(var k2=0;k2<8;k2++){g.add(wallFace(m,k2,d.rIn-0.02,wallH,baseY,{door:k2%2===0}));}
+  }
+  var eaveR=d.eaveR;
+  var slab=cylY(eaveR+0.55,eaveR+0.95,0.4,m.tileEdge);slab.position.y=brkY+brkH+0.2;g.add(slab);
+  var cone=cylY(d.topR,eaveR+0.35,roofH,m.tile);cone.position.y=brkY+brkH+0.4+roofH/2;g.add(cone);
+  var y0=brkY+brkH+0.4,y1=y0+roofH;
+  for(var k3=0;k3<8;k3++){
+    var a=Math.PI/8+k3*Math.PI/4;
+    g.add(ridge(new THREE.Vector3(Math.sin(a)*eaveR,y0,Math.cos(a)*eaveR),new THREE.Vector3(0,y1,0),m.ridge));
+  }
+  var cap=cylY((d.topR||1)+0.15,(d.topR||1)+0.15,0.3,m.ridge);cap.position.y=y1+0.15;g.add(cap);
+  return g;
+}
+
+/* 暗层：斜撑桁架 */
+function buildAn(d,m){
+  var g=new THREE.Group();
+  var bandH=0.45,wallH=d.h-2*bandH;
+  ring(d.rOut,16).forEach(function(p){
+    var c=cylY(0.2,0.24,d.h,m.column,10);c.position.set(p.x,d.h/2,p.z);g.add(c);
+  });
+  ring(d.rIn,8).forEach(function(p){
+    var c=cylY(0.18,0.22,d.h,m.column,10);c.position.set(p.x,d.h/2,p.z);g.add(c);
+  });
+  for(var k=0;k<8;k++){
+    var a=Math.PI/8+k*Math.PI/4;
+    var len=d.rOut-d.rIn-0.4;
+    var f=bx(0.22,0.22,len,m.arch);
+    f.position.set(Math.sin(a)*(d.rIn+len/2+0.2),d.h-bandH-0.15,Math.cos(a)*(d.rIn+len/2+0.2));
+    f.rotation.y=a;g.add(f);
+  }
+  [bandH/2,d.h-bandH/2].forEach(function(y){
+    var b=cylY(d.rOut+0.12,d.rOut+0.12,bandH,m.arch,8,true);b.position.y=y;g.add(b);
+  });
+  for(var k2=0;k2<8;k2++){
+    var th=k2*Math.PI/4;
+    var w=chord(d.rOut)-0.8;
+    var p=bx(w,wallH,0.22,m.anWall);
+    p.position.set(Math.sin(th)*apothem(d.rOut),bandH+wallH/2,Math.cos(th)*apothem(d.rOut));
+    p.rotation.y=th;g.add(p);
+    /* 斜撑：浅 X 交叉 + 中竖杆 */
+    var span=w*0.72,len2=Math.sqrt(span*span+wallH*wallH);
+    [1,-1].forEach(function(s){
+      var st=bx(0.26,0.26,len2,m.brace);
+      st.position.set(Math.sin(th)*apothem(d.rOut),bandH+wallH/2,Math.cos(th)*apothem(d.rOut));
+      st.rotation.y=th;st.rotateZ(s*Math.atan2(wallH,span));g.add(st);
+    });
+    var mid=bx(0.24,wallH,0.24,m.brace);
+    mid.position.set(Math.sin(th)*apothem(d.rOut),bandH+wallH/2,Math.cos(th)*apothem(d.rOut));
+    mid.rotation.y=th;g.add(mid);
+  }
+  return g;
+}
+
+/* 塔刹 */
+function buildFinial(d,m){
+  var g=new THREE.Group();var h=d.h;
+  var base=cylY(1.5,1.9,0.9,m.iron);base.position.y=0.45;g.add(base);
+  var bowl=new THREE.Mesh(new THREE.SphereGeometry(1.3,14,10),m.iron);
+  bowl.scale.y=0.8;bowl.position.y=1.5;bowl.castShadow=true;g.add(bowl);
+  var poleH=h-4.6;
+  var pole=cylY(0.16,0.24,poleH,m.iron,8);pole.position.y=2.0+poleH/2;g.add(pole);
+  for(var i=0;i<5;i++){
+    var r=1.4-i*0.18,y=3.1+i*1.05;
+    var disc=cylY(r,r,0.2,m.iron,14);disc.position.y=y;g.add(disc);
+    var rg=new THREE.Mesh(new THREE.TorusGeometry(r,0.06,6,22),m.iron);
+    rg.rotation.x=Math.PI/2;rg.position.y=y;g.add(rg);
+  }
+  var capY=3.1+5*1.05+0.1;
+  var cap=cylY(0.95,0.55,0.5,m.iron,8);cap.position.y=capY;g.add(cap);
+  var orb=new THREE.Mesh(new THREE.SphereGeometry(0.55,14,10),m.gold);
+  orb.position.y=capY+0.75;orb.castShadow=true;g.add(orb);
+  var tip=cylY(0.03,0.14,0.8,m.gold,6);tip.position.y=capY+1.35;g.add(tip);
+  return g;
+}
+
+/* ================= 层定义（自下而上） ================= */
+var DEFS=[
+  {id:'platform', name:'月台 · 基座',        type:'base',   h:3.9,  r:15.4},
+  {id:'porch',    name:'副阶（首层外廊）',   type:'porch',  h:3.8,  rP:15.0, eaveR:17.6},
+  {id:'m1',       name:'一层 · 明层',        type:'ming',   h:11.2, rOut:13.2, rIn:9.4, eaveR:15.6, topR:1.2},
+  {id:'a1',       name:'暗层一',             type:'an',     h:3.4,  rOut:13.0, rIn:9.3},
+  {id:'m2',       name:'二层 · 明层',        type:'ming',   h:6.4,  rOut:12.3, rIn:8.7, eaveR:14.4, topR:1.1},
+  {id:'a2',       name:'暗层二',             type:'an',     h:3.3,  rOut:12.1, rIn:8.6},
+  {id:'m3',       name:'三层 · 明层',        type:'ming',   h:6.1,  rOut:11.4, rIn:8.1, eaveR:13.5, topR:1.0},
+  {id:'a3',       name:'暗层三',             type:'an',     h:3.3,  rOut:11.2, rIn:8.0},
+  {id:'m4',       name:'四层 · 明层',        type:'ming',   h:5.9,  rOut:10.5, rIn:7.5, eaveR:12.6, topR:0.95},
+  {id:'a4',       name:'暗层四',             type:'an',     h:3.2,  rOut:10.3, rIn:7.4},
+  {id:'m5',       name:'五层 · 明层',        type:'ming',   h:6.2,  rOut:9.6,  rIn:7.0, eaveR:11.6, topR:1.8},
+  {id:'finial',   name:'塔刹',               type:'finial', h:10.6}
+];
+var TYPE_COLOR={base:'#6b6558',porch:'#8a6d3b',ming:'#9c3d2e',an:'#b98a3c',finial:'#4a5560'};
+var GAP=5;
+
+var INFO={
+  platform:{t:'月台 · 基座',d:'双层八角形石砌台基，将全塔荷载均匀传至地基，并隔绝地气。台基高约 3.9 m（示意），正面设踏道。'},
+  porch:{t:'副阶（首层外廊）',d:'首层外廊，一周檐柱环绕塔身，形成重檐效果，既扩大底层礼佛空间，又保护塔身免受风雨侵蚀。'},
+  m1:{t:'一层 · 明层',d:'首层明层：外槽 16 檐柱、内槽 8 金柱，土红板门与直棂窗相间。柱头斗拱硕大，出跳深远，承托上层屋檐。'},
+  a1:{t:'暗层一',d:'暗层无门窗，内外柱之间以枋木、斜撑拉结成桁架筒体——这是木塔历经多次强震而不倒的关键结构。'},
+  m2:{t:'二层 · 明层',d:'二层明层：外檐设平座与栏杆，可供登临凭栏；八面格子门窗，斗拱承檐。'},
+  a2:{t:'暗层二',d:'暗层二：斜撑与上下明层柱网对齐，将上层荷载沿刚性筒体向下传递。'},
+  m3:{t:'三层 · 明层',d:'三层明层：塔身明显收分，檐口曲线平缓，斗拱形制与二层相近而尺度略小。'},
+  a3:{t:'暗层三',d:'暗层三：斜撑、阑额与内外柱构成"筒中筒"结构，抗侧移能力极强。'},
+  m4:{t:'四层 · 明层',d:'四层明层：继续收分，柱高递减，门窗、栏杆、斗拱一应俱全。'},
+  a4:{t:'暗层四',d:'暗层四：最上暗层，斜撑把荷载集中传至五层柱网。'},
+  m5:{t:'五层 · 明层',d:'顶层明层：上承八角攒尖顶，顶尖立铁制塔刹。'},
+  finial:{t:'塔刹',d:'铁制塔刹：覆钵、五重相轮、宝盖、宝珠依次叠置，高约 10 m，为全塔最高点，兼具避雷与标志意义。'},
+  overview:{t:'全塔概览',d:'应县木塔（佛宫寺释迦塔），辽清宁二年（1056）建，高 67.31 m，底层直径约 30.3 m。全塔 5 明层 + 4 暗层共 9 层结构，斗拱约 480 攒、54 种，纯木榫卯，无一根铁钉。拖动"拆解程度"滑杆可逐层拆开查看。'}
+};
+
+/* ================= 组装 ================= */
+var layers=[];var baseY=0;
+DEFS.forEach(function(d,i){
+  var m=matsFactory(),g;
+  if(d.type==='base')g=buildPlatform(d,m);
+  else if(d.type==='porch')g=buildPorch(d,m);
+  else if(d.type==='ming')g=buildMing(d,m);
+  else if(d.type==='an')g=buildAn(d,m);
+  else g=buildFinial(d,m);
+  g.position.y=baseY;
+  var mats=[];
+  g.traverse(function(o){if(o.isMesh){o.userData.layerId=d.id;if(mats.indexOf(o.material)<0)mats.push(o.material);}});
+  g.userData={layerId:d.id,def:d,baseY:baseY,mats:mats};
+  scene.add(g);
+  layers.push({def:d,g:g,baseY:baseY});
+  baseY+=d.h;
+});
+
+/* ================= 标注 ================= */
+var labelItems=[];
+layers.forEach(function(L){
+  var d=L.def;
+  var el=document.createElement('div');
+  el.className='lbl';
+  el.innerHTML='<div class="in" style="border-left-color:'+TYPE_COLOR[d.type]+'"><b>'+d.name+'</b><span>高 '+d.h.toFixed(1)+' m</span></div>';
+  document.body.appendChild(el);
+  var anchor=new THREE.Object3D();
+  var r=(d.rOut||d.rP||d.r||3.2)+2.4;
+  anchor.position.set(r,d.h*0.45,0);
+  L.g.add(anchor);
+  var item={el:el,obj:anchor,id:d.id};
+  el.addEventListener('click',function(){selectLayer(d.id);});
+  labelItems.push(item);
+});
+var showLabels=true;
+var _v=new THREE.Vector3();
+function updateLabels(){
+  labelItems.forEach(function(L){
+    L.obj.getWorldPosition(_v);
+    _v.project(camera);
+    var x=(_v.x*0.5+0.5)*innerWidth,y=(-_v.y*0.5+0.5)*innerHeight;
+    L.el.style.transform='translate(-50%,-130%) translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+    var vis=showLabels&&_v.z<1&&x>-90&&x<innerWidth+90&&y>-50&&y<innerHeight+50;
+    L.el.style.opacity=vis?'1':'0';
+    L.el.style.pointerEvents=vis?'auto':'none';
+  });
+}
+
+/* ================= 选中与高亮 ================= */
+var selectedMats=null;
+function selectLayer(id){
+  var L=null;
+  layers.forEach(function(x){if(x.def.id===id)L=x;});
+  layers.forEach(function(x){
+    var on=x.def.id===id;
+    x.g.userData.mats.forEach(function(mt){mt.emissive.setHex(on?0x5a3a10:0x000000);mt.emissiveIntensity=on?0.4:0;});
+  });
+  selectedMats=L?L.g.userData.mats:null;
+  document.querySelectorAll('.lrow').forEach(function(r){r.classList.toggle('sel',r.dataset.id===id);});
+  document.querySelectorAll('.lbl').forEach(function(elm){elm.classList.remove('sel');});
+  labelItems.forEach(function(it){if(it.id===id)it.el.classList.add('sel');});
+  var info=INFO[id]||INFO.overview;
+  document.getElementById('infoTitle').textContent=info.t;
+  document.getElementById('infoH').textContent=L?('层高 '+L.def.h.toFixed(1)+' m'):'';
+  document.getElementById('infoDesc').textContent=info.d;
+  var row=document.querySelector('.lrow[data-id="'+id+'"]');
+  if(row&&row.scrollIntoView)row.scrollIntoView({block:'nearest'});
+}
+
+/* 点击塔身选中 */
+var ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),downPos=null;
+renderer.domElement.addEventListener('pointerdown',function(e){downPos=[e.clientX,e.clientY];});
+renderer.domElement.addEventListener('pointerup',function(e){
+  if(!downPos)return;
+  var dx=e.clientX-downPos[0],dy=e.clientY-downPos[1];downPos=null;
+  if(dx*dx+dy*dy>36)return;
+  mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(mouse,camera);
+  var hits=ray.intersectObjects(scene.children,true);
+  for(var i=0;i<hits.length;i++){
+    var o=hits[i].object;
+    while(o&&!o.userData.layerId)o=o.parent;
+    if(o&&o.userData.layerId){selectLayer(o.userData.layerId);break;}
+  }
+});
+
+/* ================= 面板列表 ================= */
+var list=document.getElementById('layerList');
+layers.forEach(function(L){
+  var d=L.def;
+  var row=document.createElement('div');
+  row.className='lrow';row.dataset.id=d.id;
+  row.innerHTML='<span class="dot" style="background:'+TYPE_COLOR[d.type]+'"></span><span>'+d.name+'</span><span class="h">'+d.h.toFixed(1)+' m</span>';
+  row.onclick=function(){selectLayer(d.id);};
+  list.appendChild(row);
+});
+
+/* ================= 拆解控制 ================= */
+var slider=document.getElementById('explode'),explodeVal=document.getElementById('explodeVal');
+var tCur=0,tTarget=0;
+slider.addEventListener('input',function(){tTarget=slider.value/100;});
+document.getElementById('btnExplode').onclick=function(){tTarget=1;};
+document.getElementById('btnAssemble').onclick=function(){tTarget=0;};
+document.getElementById('chkLabels').addEventListener('change',function(e){showLabels=e.target.checked;});
+document.getElementById('chkRotate').addEventListener('change',function(e){controls.autoRotate=e.target.checked;});
+
+/* ================= 相机预设 ================= */
+var camAnim=null;
+controls.addEventListener('start',function(){camAnim=null;});
+function flyTo(p,t){
+  camAnim={p0:camera.position.clone(),p1:new THREE.Vector3(p[0],p[1],p[2]),
+           t0:controls.target.clone(),t1:new THREE.Vector3(t[0],t[1],t[2]),
+           s:performance.now(),d:1300};
+}
+document.querySelectorAll('[data-preset]').forEach(function(b){
+  b.onclick=function(){
+    var p=b.dataset.preset;
+    if(p==='home'){flyTo([80,48,80],[0,30,0]);}
+    else if(p==='m1'){flyTo([30,15,30],[0,11,0]);}
+    else if(p==='dg'){flyTo([16,19,22],[5,15.8,12.2]);}
+    else if(p==='an'){tTarget=0.55;slider.value=55;var y=28.7+5*GAP*0.55+1.65;flyTo([30,50,30],[0,y,0]);}
+    else if(p==='fin'){var y2=56.7+11*GAP*tCur+5.3;flyTo([20,y2+5,20],[0,y2,0]);}
+  };
+});
+
+/* ================= 主循环 ================= */
+var _lastT=performance.now();
+function animate(){
+  requestAnimationFrame(animate);
+  var now=performance.now();
+  var dt=Math.min((now-_lastT)/1000,0.1);_lastT=now;
+  tCur+=(tTarget-tCur)*(1-Math.exp(-dt*6));
+  if(Math.abs(tTarget-tCur)<0.0005)tCur=tTarget;
+  layers.forEach(function(L,i){L.g.position.y=L.baseY+i*GAP*tCur;});
+  if(document.activeElement!==slider)slider.value=Math.round(tCur*100);
+  explodeVal.textContent=Math.round(tCur*100)+'%';
+  if(camAnim){
+    var k=(now-camAnim.s)/camAnim.d;
+    if(k>1)k=1;
+    var e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    camera.position.lerpVectors(camAnim.p0,camAnim.p1,e);
+    controls.target.lerpVectors(camAnim.t0,camAnim.t1,e);
+    if(k===1)camAnim=null;
+  }
+  if(selectedMats){
+    var pu=0.35+0.25*Math.sin(now*0.005);
+    selectedMats.forEach(function(mt){mt.emissiveIntensity=pu;});
+  }
+  controls.update();
+  renderer.render(scene,camera);
+  updateLabels();
+}
+
+addEventListener('resize',function(){
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+selectLayer('m1');
+animate();
+window.__setExplode=function(v){tCur=tTarget=v;layers.forEach(function(L,i){L.g.position.y=L.baseY+i*GAP*v;});slider.value=Math.round(v*100);explodeVal.textContent=Math.round(v*100)+'%';};
+})();
+</script>
+</body>
+</html>
