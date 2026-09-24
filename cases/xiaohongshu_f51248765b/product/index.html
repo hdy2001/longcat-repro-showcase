@@ -3,159 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>古建数字图谱 · 从地图定位到构件级模型</title>
+<title>古建数字图谱 - 从地图定位到构件级模型</title>
 <link rel="stylesheet" href="css/style.css">
-<script type="importmap">
-{ "imports": { "three": "./vendor/three/three.module.js" } }
-</script>
 </head>
 <body>
 <div id="app">
-  <!-- ══════════ 顶栏 ══════════ -->
-  <header id="topbar">
-    <div class="brand" id="brandHome">
-      <div class="brand-seal">谱</div>
-      <div class="brand-text">
-        <h1>古建数字图谱</h1>
-        <span>ANCIENT ARCHITECTURE · DIGITAL ATLAS</span>
-      </div>
-    </div>
-    <nav id="breadcrumb" aria-label="breadcrumb"></nav>
-  </header>
 
-  <!-- ══════════ 视图 1：全国地图 ══════════ -->
-  <main id="view-map" class="view">
-    <div class="map-wrap">
-      <svg id="chinaSvg" viewBox="0 0 1040 860" preserveAspectRatio="xMidYMid meet" role="img" aria-label="中国古建分布图"></svg>
+  <!-- ============ 视图一：全国地图 ============ -->
+  <section id="view-map" class="view active">
+    <header class="map-header">
+      <div class="brand">
+        <span class="brand-seal">古建数字图谱</span>
+        <h1>古建可以<em>亲手拆开</em>了</h1>
+        <p class="brand-sub">从地图定位到构件级模型</p>
+      </div>
       <div class="map-legend">
-        <span class="lg lg-feat">本期重点 · 可拆解模型</span>
-        <span class="lg lg-dot">全国重点木构</span>
-        <span class="lg lg-dash">未定国界线</span>
+        <span class="legend-item"><i class="dot dot-featured"></i>本期展示</span>
+        <span class="legend-item"><i class="dot dot-normal"></i>经典古建</span>
+        <span class="legend-item"><i class="dot dot-province"></i>点击进入山西</span>
+      </div>
+    </header>
+    <div class="map-wrap">
+      <svg id="china-map" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 820" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="map-tooltip" class="map-tooltip" hidden></div>
+    </div>
+    <footer class="map-footer">
+      <p>点击地图中的金色点位或山西省域，进入三维拆解之旅</p>
+    </footer>
+  </section>
+
+  <!-- ============ 视图二：山西三维省域 ============ -->
+  <section id="view-province" class="view">
+    <div class="topbar">
+      <button class="btn-back" id="btn-back-map" type="button">&larr; 返回全国地图</button>
+      <div class="topbar-title">山西省 · 三维地形</div>
+      <div class="topbar-hint">拖拽旋转 · 滚轮缩放 · 点击建筑标记进入拆解</div>
+    </div>
+    <div id="province-canvas" class="canvas-host"></div>
+    <div id="province-labels" class="label-layer"></div>
+    <div class="province-panel">
+      <h3>本期展示建筑</h3>
+      <button class="building-card" id="card-yx" type="button">
+        <span class="card-name">应县木塔</span>
+        <span class="card-sub">辽代 · 1056年 · 世界现存最古最高的木塔</span>
+      </button>
+      <button class="building-card" id="card-nc" type="button">
+        <span class="card-name">南禅寺大殿</span>
+        <span class="card-sub">唐代 · 782年 · 中国现存最早的木构建筑</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 视图三：建筑分层拆解 ============ -->
+  <section id="view-building" class="view">
+    <div class="topbar">
+      <button class="btn-back" id="btn-back-province" type="button">&larr; 返回山西地形</button>
+      <div class="topbar-title" id="building-title">应县木塔</div>
+      <div class="topbar-actions">
+        <button class="btn-ghost" id="btn-switch-building" type="button">切换：南禅寺大殿</button>
+        <button class="btn-ghost" id="btn-building-info" type="button">建筑档案</button>
       </div>
     </div>
-    <aside class="map-side">
-      <section class="panel feat-panel">
-        <h2 class="panel-title"><i></i>本期拆解 · 两座国宝</h2>
-        <div id="featCards"></div>
-      </section>
-      <section class="panel list-panel">
-        <h2 class="panel-title"><i></i>全国古建名录 <em id="provName">（点击省份查看）</em></h2>
-        <div class="prov-chips" id="provChips"></div>
-        <div class="build-list" id="buildList"></div>
-      </section>
-    </aside>
-  </main>
 
-  <!-- ══════════ 视图 2：山西三维 ══════════ -->
-  <main id="view-province" class="view">
-    <div class="stage3d" id="provinceStage">
-      <canvas id="provinceCanvas"></canvas>
-      <div class="stage-tip">拖拽旋转 · 滚轮缩放 · 点击光柱进入建筑</div>
-    </div>
-    <aside class="prov-side">
-      <section class="panel">
-        <h2 class="panel-title"><i></i>山西省 · 三维地形</h2>
-        <p class="prov-desc" id="provDesc"></p>
-        <div class="prov-builds" id="provBuildings"></div>
-      </section>
-    </aside>
-  </main>
-
-  <!-- ══════════ 视图 3：建筑详情 ══════════ -->
-  <main id="view-building" class="view">
-    <section class="bld-head panel" id="bldHead"></section>
-    <nav class="bld-tabs" id="bldTabs">
-      <button data-tab="model"   class="on">结构模型</button>
-      <button data-tab="images">古建影像</button>
-      <button data-tab="pano">全景 VR</button>
-      <button data-tab="struct">特色结构</button>
-      <button data-tab="history">历史与传说</button>
-    </nav>
-
-    <!-- 结构模型（默认） -->
-    <section id="tab-model" class="bld-tab on">
-      <div class="stage3d tall" id="modelStage">
-        <canvas id="modelCanvas"></canvas>
-        <div class="stage-tip">左键旋转 · 右键平移 · 滚轮缩放 · 点击构件查看编号与名称</div>
-      </div>
-      <aside class="model-side">
-        <section class="panel">
-          <h2 class="panel-title"><i></i>拆解控制</h2>
-          <div class="explode-ctl">
-            <input type="range" id="explodeRange" min="0" max="100" value="0" step="1" aria-label="分层拆解程度">
-            <div class="explode-btns">
-              <button id="btnExplode" class="btn gold">逐层拆解</button>
-              <button id="btnAssemble" class="btn">合拢复原</button>
-            </div>
-          </div>
-          <div class="model-actions">
-            <button id="actHighlight" class="btn">红色高亮</button>
-            <button id="actHide" class="btn">隐藏所选</button>
-            <button id="actIsolate" class="btn">隔离所选</button>
-            <button id="actShowAll" class="btn">全部显示</button>
-            <button id="actSpin" class="btn">自动旋转</button>
-            <button id="actLabels" class="btn on">构件编号</button>
-          </div>
-          <p class="hint" id="modelHint">在模型上点击构件，查看其<b>构件编号</b>与<b>中文名称</b>。</p>
-        </section>
-        <section class="panel grow">
-          <h2 class="panel-title"><i></i>分层结构树</h2>
-          <div class="layer-tree" id="layerTree"></div>
-        </section>
-      </aside>
-      <div class="comp-card panel" id="compCard" hidden>
-        <button class="comp-close" id="compClose" aria-label="关闭">×</button>
-        <div class="comp-no" id="compNo"></div>
-        <h3 id="compName"></h3>
-        <p id="compDesc"></p>
-        <div class="comp-actions">
-          <button id="compHide" class="btn">隐藏</button>
-          <button id="compIsolate" class="btn">隔离</button>
-          <button id="compHighlight" class="btn gold">高亮</button>
+    <div class="building-main">
+      <!-- 左侧：分层结构树 -->
+      <aside class="layer-panel" id="layer-panel">
+        <h3>分层结构</h3>
+        <div id="layer-tree" class="layer-tree"></div>
+        <div class="layer-panel-foot">
+          <label class="switch-row">
+            <input type="checkbox" id="chk-labels" checked>
+            <span>显示构件编号与名称</span>
+          </label>
         </div>
-      </div>
-    </section>
+      </aside>
 
-    <!-- 影像 -->
-    <section id="tab-images" class="bld-tab">
-      <div class="gallery" id="gallery"></div>
-      <p class="footnote">示意测绘图由图谱程序依据公开资料绘制，概念渲染图为素材提供。</p>
-    </section>
+      <!-- 中间：3D 画布 -->
+      <div class="canvas-host" id="building-canvas"></div>
+      <div id="building-labels" class="label-layer"></div>
+      <div id="hover-tip" class="hover-tip" hidden></div>
 
-    <!-- 全景 VR -->
-    <section id="tab-pano" class="bld-tab">
-      <div class="stage3d tall" id="panoStage">
-        <canvas id="panoCanvas"></canvas>
-        <div class="stage-tip">按住拖动画面 · 360° 环视</div>
-        <div class="pano-badge">VR</div>
-      </div>
-      <p class="footnote center">依据史料意象生成的全景环境，非实景照片。</p>
-    </section>
+      <!-- 右侧：构件信息 -->
+      <aside class="info-panel" id="info-panel">
+        <h3>构件信息</h3>
+        <div id="info-empty" class="info-empty">点击模型或左侧列表中的构件<br>查看编号、名称与构造说明</div>
+        <div id="info-body" class="info-body" hidden>
+          <div class="info-id" id="info-id">--</div>
+          <div class="info-name" id="info-name">--</div>
+          <div class="info-layer" id="info-layer">--</div>
+          <p class="info-desc" id="info-desc">--</p>
+          <div class="info-actions">
+            <button class="btn-gold" id="btn-isolate" type="button">隔离选中</button>
+            <button class="btn-ghost" id="btn-hide" type="button">隐藏选中</button>
+            <button class="btn-ghost" id="btn-red" type="button">红色高亮</button>
+            <button class="btn-ghost" id="btn-unisolate" type="button" hidden>取消隔离</button>
+          </div>
+        </div>
+      </aside>
+    </div>
 
-    <!-- 特色结构 -->
-    <section id="tab-struct" class="bld-tab">
-      <div class="struct-grid" id="structGrid"></div>
-    </section>
+    <!-- 底部：拆解控制条 -->
+    <div class="explode-bar">
+      <span class="explode-label">拆解程度</span>
+      <input type="range" id="explode-range" min="0" max="100" value="0" step="1">
+      <span class="explode-value" id="explode-value">0%</span>
+      <button class="btn-ghost" id="btn-assemble" type="button">合拢</button>
+      <button class="btn-ghost" id="btn-explode" type="button">全拆解</button>
+      <button class="btn-ghost" id="btn-autorotate" type="button">自动旋转</button>
+      <button class="btn-ghost" id="btn-reset-view" type="button">复位视角</button>
+    </div>
+  </section>
 
-    <!-- 历史与传说 -->
-    <section id="tab-history" class="bld-tab">
-      <div class="history-wrap" id="historyWrap"></div>
-    </section>
-  </main>
-
-  <!-- 通用建筑信息弹窗 -->
-  <div class="modal-mask" id="modalMask" hidden>
-    <div class="modal panel" role="dialog" aria-modal="true">
-      <button class="comp-close" id="modalClose" aria-label="关闭">×</button>
-      <div class="modal-body" id="modalBody"></div>
+  <!-- ============ 模态框：建筑档案（默认隐藏） ============ -->
+  <div class="modal-mask" id="modal-info" hidden>
+    <div class="modal">
+      <button class="modal-close" id="btn-modal-close" type="button">&times;</button>
+      <h3 id="modal-title">建筑档案</h3>
+      <div id="modal-body" class="modal-body"></div>
     </div>
   </div>
 
-  <div class="toast" id="toast" hidden></div>
+  <!-- 加载遮罩 -->
+  <div id="loading" class="loading" hidden><div class="loading-text">正在加载数字图谱...</div></div>
+
 </div>
 
-<script src="js/china-geo.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/china.js"></script>
 <script src="js/data.js"></script>
-<script type="module" src="js/main.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/mapview.js"></script>
+<script src="js/provinceview.js"></script>
+<script src="js/buildingview.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

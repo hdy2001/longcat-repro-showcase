@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>藻井之舞 · The Dance of the Caisson Ceiling</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#000;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+  #stage{position:relative;background:#000;overflow:hidden;
+    width:min(100vw,calc(100vh*9/16));height:min(100vh,calc(100vw*16/9))}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;pointer-events:none;opacity:0;
+    transition:opacity .55s ease,transform 1s cubic-bezier(.22,.8,.3,1)}
+  .gold{background:linear-gradient(180deg,#f9ecb8 0%,#e8c96a 38%,#b8860b 72%,#f3d67c 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 14px rgba(232,201,106,.32)) drop-shadow(0 0 48px rgba(184,134,11,.20))}
+  .t-top{font-size:15px;letter-spacing:.55em;text-indent:.55em;opacity:.92}
+  .t-rule{width:130px;height:1px;margin:26px 0;
+    background:linear-gradient(90deg,transparent,#c9a227 30%,#c9a227 70%,transparent)}
+  .t-main{font-size:64px;letter-spacing:.16em;text-indent:.16em;font-weight:600}
+  .t-en{margin-top:24px;font-size:11px;letter-spacing:.42em;text-indent:.42em;opacity:.72}
+  .p-cn{font-size:30px;line-height:2;letter-spacing:.26em;text-indent:.26em}
+  .p-en{margin-top:34px;font-size:12px;line-height:1.9;letter-spacing:.12em;opacity:.68}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="overlay" id="titleOv">
+    <div class="t-top gold">数字艺术 × 非遗藻井</div>
+    <div class="t-rule"></div>
+    <div class="t-main gold">藻井之舞</div>
+    <div class="t-en gold">THE DANCE OF THE CAISSON CEILING</div>
+  </div>
+  <div class="overlay" id="poemOv">
+    <div class="p-cn gold">形制坍缩为序，<br>万象重生为诗。</div>
+    <div class="p-en gold">Form collapses into order,<br>all phenomena are reborn as poetry.</div>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+var B64="/*__PARTICLE_DATA__*/";
+var VW=540,VH=960,CYCLE=10,TITLE_T=1.5,POEM_T=7.9,FORM_T=1.6,CONV_T=0.85,HOLD_T=1.25;
+
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var titleOv=document.getElementById('titleOv'),poemOv=document.getElementById('poemOv');
+var DPR=1;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resize);resize();
+ctx.fillStyle='#000';ctx.fillRect(0,0,VW,VH);
+
+/* ---------- decode particle data ---------- */
+function decode(b64){
+  var bin=atob(b64),n=bin.length,buf=new Uint8Array(n);
+  for(var i=0;i<n;i++)buf[i]=bin.charCodeAt(i);
+  var dv=new DataView(buf.buffer),o=4,nF=dv.getUint8(3),forms=[];
+  for(var f=0;f<nF;f++){
+    var w=dv.getUint16(o,true);o+=2;
+    var h=dv.getUint16(o,true);o+=2;
+    var cnt=dv.getUint32(o,true);o+=4;
+    var pal=new Uint8Array(768);pal.set(buf.subarray(o,o+768));o+=768;
+    var xs=new Uint16Array(cnt),ys=new Uint16Array(cnt),cs=new Uint8Array(cnt);
+    for(var j=0;j<cnt;j++){xs[j]=dv.getUint16(o,true);o+=2;ys[j]=dv.getUint16(o,true);o+=2;cs[j]=dv.getUint8(o);o++;}
+    forms.push({w:w,h:h,n:cnt,pal:pal,xs:xs,ys:ys,cs:cs,parts:null,impulsed:false});
+  }
+  return forms;
+}
+var forms=decode(B64);
+forms.forEach(function(f){
+  f.palStr=[];
+  for(var i=0;i<256;i++)f.palStr.push('rgb('+f.pal[i*3]+','+f.pal[i*3+1]+','+f.pal[i*3+2]+')');
+  var scale=Math.min(0.86*VW/f.w,0.72*VH/f.h);
+  f.scale=scale;f.cx=VW/2;f.cy=VH*0.50;
+  f.parts=new Array(f.n);
+  for(var i=0;i<f.n;i++){
+    f.parts[i]={
+      hx:f.cx+(f.xs[i]-f.w/2)*scale,
+      hy:f.cy+(f.ys[i]-f.h/2)*scale,
+      x:Math.random()*VW,y:Math.random()*VH,
+      vx:(Math.random()-0.5)*120,vy:(Math.random()-0.5)*120,
+      c:f.cs[i],s:1.4+Math.random()*1.8,
+      ph:Math.random()*6.2832,ba:0.75+Math.random()*0.25,a:0
+    };
+  }
+});
+
+/* ---------- ambient dust ---------- */
+var dust=[];
+for(var i=0;i<240;i++)dust.push({x:Math.random()*VW,y:Math.random()*VH,
+  vx:(Math.random()-0.5)*6,vy:-(2+Math.random()*7),ph:Math.random()*6.28,s:0.8+Math.random()*1.4});
+
+/* ---------- timeline ---------- */
+function timeline(t){
+  if(t<TITLE_T)return{formIdx:-1,local:0,phase:'title'};
+  if(t<POEM_T){
+    var fi=Math.min(forms.length-1,Math.floor((t-TITLE_T)/FORM_T));
+    var lo=(t-TITLE_T)%FORM_T;
+    return{formIdx:fi,local:lo,phase:lo<CONV_T?'conv':(lo<HOLD_T?'hold':'coll')};
+  }
+  return{formIdx:-1,local:0,phase:'poem'};
+}
+
+var curForm=-1;
+function applyImpulse(f){
+  for(var i=0;i<f.n;i++){
+    var p=f.parts[i];
+    var dx=p.x-f.cx,dy=p.y-f.cy;
+    var d=Math.sqrt(dx*dx+dy*dy)||1;
+    var sp=250+Math.random()*420;
+    p.vx=dx/d*sp+(Math.random()-0.5)*80;
+    p.vy=dy/d*sp*0.7-50-Math.random()*80;
+  }
+}
+
+function updateForm(f,phase,local,dt){
+  var parts=f.parts,i,p;
+  if(phase==='conv'){
+    var ramp=Math.min(1,local/0.45);ramp=ramp*ramp*(3-2*ramp);
+    var k=26*ramp,damp=Math.pow(0.865,dt*60);
+    var swirl=(1-local/CONV_T)*620;
+    for(i=0;i<f.n;i++){
+      p=parts[i];
+      var dx=p.hx-p.x,dy=p.hy-p.y;
+      var d=Math.sqrt(dx*dx+dy*dy)||1;
+      p.vx=(p.vx+dx*k*dt+(-dy/d)*swirl*dt)*damp;
+      p.vy=(p.vy+dy*k*dt+(dx/d)*swirl*dt)*damp;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      var ta=p.ba*ramp;
+      p.a+=(ta-p.a)*Math.min(1,dt*4);
+    }
+  }else if(phase==='hold'){
+    var k2=7,damp2=Math.pow(0.90,dt*60);
+    for(i=0;i<f.n;i++){
+      p=parts[i];
+      p.vx=(p.vx+(p.hx-p.x)*k2*dt+(Math.random()-0.5)*36*dt)*damp2;
+      p.vy=(p.vy+(p.hy-p.y)*k2*dt+(Math.random()-0.5)*36*dt)*damp2;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.a+=(p.ba-p.a)*Math.min(1,dt*3);
+    }
+  }else if(phase==='coll'){
+    var damp3=Math.pow(0.94,dt*60);
+    for(i=0;i<f.n;i++){
+      p=parts[i];
+      p.vx*=damp3;p.vy*=damp3;
+      p.vy-=14*dt;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.a+=(0.16-p.a)*Math.min(1,dt*2.2);
+    }
+  }else{ /* drift: title / poem */
+    var damp4=Math.pow(0.95,dt*60);
+    for(i=0;i<f.n;i++){
+      p=parts[i];
+      p.vx*=damp4;p.vy=p.vy*damp4-5*dt;
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.a+=(0.05-p.a)*Math.min(1,dt*1.6);
+    }
+  }
+}
+
+function overlayFade(t,inS,inE,outS,outE){
+  if(t<inS||t>outE)return 0;
+  if(t<inE)return (t-inS)/(inE-inS);
+  if(t<outS)return 1;
+  return Math.max(0,1-(t-outS)/(outE-outS));
+}
+
+function step(t,dt){
+  var tl=timeline(t);
+  if(tl.formIdx!==curForm){
+    if(tl.formIdx>=0){
+      var nf=forms[tl.formIdx];
+      if(curForm>=0){
+        var op=forms[curForm].parts;
+        for(var i=0;i<nf.n;i++){
+          var np=nf.parts[i],pp=op[i];
+          np.x=pp.x;np.y=pp.y;np.vx=pp.vx;np.vy=pp.vy;
+        }
+      }
+      nf.impulsed=false;
+    }
+    curForm=tl.formIdx;
+  }
+  if(curForm>=0){
+    var f=forms[curForm];
+    var ph=tl.formIdx===curForm?tl.phase:'drift';
+    if(ph==='coll'&&!f.impulsed){applyImpulse(f);f.impulsed=true;}
+    updateForm(f,ph,tl.local,dt);
+  }
+  var ft=overlayFade(t,0.05,0.55,1.08,1.5);
+  titleOv.style.opacity=ft;
+  titleOv.style.transform='translateY('+((1-ft)*12).toFixed(1)+'px)';
+  var fp=overlayFade(t,7.95,8.6,9.45,9.97);
+  poemOv.style.opacity=fp;
+  poemOv.style.transform='translateY('+((1-fp)*12).toFixed(1)+'px)';
+  return tl;
+}
+
+/* ---------- render ---------- */
+function drawSilhouette(){
+  var cx=VW/2,hy=706,hr=36;
+  ctx.beginPath();
+  ctx.moveTo(cx-hr*0.52,750);
+  ctx.bezierCurveTo(cx-hr*0.9,744,cx-hr*1.05,730,cx-hr,hy);
+  ctx.arc(cx,hy,hr,Math.PI,0,false);
+  ctx.bezierCurveTo(cx+hr*1.05,730,cx+hr*0.9,744,cx+hr*0.52,750);
+  ctx.bezierCurveTo(cx-64,758,cx-94,768,cx-102,790);
+  ctx.lineTo(cx-110,VH+4);
+  ctx.lineTo(cx+110,VH+4);
+  ctx.lineTo(cx+102,790);
+  ctx.bezierCurveTo(cx+94,768,cx+64,758,cx+hr*0.52,750);
+  ctx.closePath();
+  ctx.fill();
+}
+
+var quality=1;
+function render(t,tl){
+  var trail=0.4;
+  if(tl.phase==='conv')trail=0.20;
+  else if(tl.phase==='hold')trail=0.12;
+  else if(tl.phase==='coll')trail=0.30;
+  ctx.globalCompositeOperation='source-over';
+  ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(0,0,0,'+trail+')';
+  ctx.fillRect(0,0,VW,VH);
+
+  ctx.globalCompositeOperation='lighter';
+  if(curForm>=0){
+    var f=forms[curForm];
+    var rot=0,br=1;
+    if(tl.phase==='hold'){
+      rot=0.045*Math.sin(tl.local*3.14159);
+      br=1+0.012*Math.sin(tl.local*6.2832);
+    }
+    var cosA=Math.cos(rot),sinA=Math.sin(rot),cx=f.cx,cy=f.cy;
+    var stride=quality>0.75?1:(quality>0.4?2:3);
+    var tt=t*2.6;
+    for(var i=0;i<f.n;i+=stride){
+      var p=f.parts[i];
+      var dx=p.hx-cx,dy=p.hy-cy;
+      var x=cx+(dx*cosA-dy*sinA)*br;
+      var y=cy+(dx*sinA+dy*cosA)*br;
+      var sh=0.85+0.15*Math.sin(tt+p.ph);
+      ctx.globalAlpha=p.a*sh;
+      ctx.fillStyle=f.palStr[p.c];
+      ctx.fillRect(x,y,p.s,p.s);
+    }
+  }
+  /* dust */
+  ctx.fillStyle='rgb(216,178,80)';
+  for(var i=0;i<dust.length;i++){
+    var d=dust[i];
+    ctx.globalAlpha=0.05+0.09*(0.5+0.5*Math.sin(t*1.7+d.ph));
+    ctx.fillRect(d.x,d.y,d.s,d.s);
+  }
+  /* viewer silhouette — always on top, pure black */
+  ctx.globalCompositeOperation='source-over';
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#000';
+  drawSilhouette();
+}
+
+/* ---------- main loop ---------- */
+var params=new URLSearchParams(location.search);
+var startT=parseFloat(params.get('t')||'0');
+var freeze=params.has('freeze');
+var T0=performance.now()-startT*1000;
+var prevNow=T0,ema=16,frames=0;
+
+function frame(now){
+  var dtms=now-prevNow;prevNow=now;
+  var dt=Math.min(dtms/1000,0.05);
+  var t=((now-T0)/1000)%CYCLE;
+  if(t<0)t+=CYCLE;
+  var tl=step(t,dt);
+  render(t,tl);
+  /* adaptive quality */
+  ema=ema*0.9+dtms*0.1;
+  if(++frames%60===0){
+    if(ema>30&&quality>0.34){quality*=0.67;ema=16;}
+    else if(ema<15&&quality<1){quality=Math.min(1,quality*1.5);ema=16;}
+  }
+  requestAnimationFrame(frame);
+}
+
+if(freeze){
+  /* deterministic still: simulate the timeline up to startT, then draw once */
+  var ts=0;
+  while(ts<startT){step(ts,1/60);ts+=1/60;}
+  var tl0=timeline(startT);
+  render(startT,tl0);
+}else{
+  requestAnimationFrame(frame);
+}
+})();
+</script>
+</body>
+</html>
