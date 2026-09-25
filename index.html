@@ -283,7 +283,7 @@ function renderProduct(c, r){
   if (!pr) return `<div class="pane"><h3>复现产出 · R${r.round}</h3>${shotsBlock(r)}</div>`;
   return `<div class="pane">
     <h3>复现产出 · R${r.round}${pr.open?` <a class="btn primary" href="${esc(pr.open)}" target="_blank" rel="noopener">新窗口打开 ↗</a>`:''}</h3>
-    ${pr.open?`<div class="frame" id="frame"><div class="cover" onclick="loadFrame('${esc(pr.open)}')">${shot?`<img src="${esc(shot)}" alt="">`:''}<span>▶ 在这里试玩</span></div></div>`:''}
+    ${pr.open?`<div class="frame" id="frame-${r.round}"><div class="cover" onclick="loadFrame('${esc(pr.open)}',${r.round})">${shot?`<img src="${esc(shot)}" alt="">`:''}<span>▶ 在这里试玩</span></div></div>`:''}
     <div style="margin-top:12px">${shotsBlock(r)}</div>
     ${pr.files.length>1?`<div class="files">${pr.files.map(f=>`<a href="${esc(f)}" target="_blank" rel="noopener">${esc(f.split('/product/')[1])}</a>`).join('')}</div>`:''}
   </div>`;
@@ -292,14 +292,15 @@ function shotsBlock(r){
   const s = r.shots||[];
   return s.length ? `<div class="label" style="margin-bottom:6px">自动截图</div><div class="thumbs">${s.map(u=>`<img src="${esc(u)}" alt="" loading="lazy" onclick="zoom(this.src)">`).join('')}</div>` : '<div class="small muted">无截图</div>';
 }
-function loadFrame(src){ $('#frame').innerHTML = `<iframe src="${esc(src)}" title="复现产出" allow="fullscreen; autoplay" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>`; }
+function loadFrame(src, k){ $('#frame-'+k).innerHTML = `<iframe src="${esc(src)}" title="复现产出" allow="fullscreen; autoplay" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>`; }
 
 function renderRound(c, r){
   const j = r.judge||{}, st = r.stats||{};
   const crit = j.criteria||[];
   return `
     <div class="query"><span class="qlabel">第 ${r.round} 轮 query</span><span class="qtext">${esc(r.query)}</span><button class="btn" onclick="copy(CUR.rounds.find(x=>x.round===${r.round}).query,this)">复制</button></div>
-    <div class="cols">
+    ${!r.judge ? `<div class="note" style="margin-top:18px">这一轮跑出了产出，但评审没有完成（评审模型调用失败），所以没有分数，也不参与最佳轮次的评选。</div>
+      <div style="margin-top:18px">${renderProduct(c, r)}</div>` : `<div class="cols">
       <div>
         <div class="label" style="margin-bottom:8px">评审 · ${esc(j.judge_model||'')}</div>
         <div class="big" style="margin-bottom:14px"><div class="tot"><b class="v-${esc(j.verdict)}">${fmt(j.total)}</b> <span class="muted">/ 10</span></div>${dims(j.scores)}</div>
@@ -312,7 +313,7 @@ function renderRound(c, r){
         ${j.fix_hint?`<div class="label" style="margin:16px 0 8px">下一轮改进方向</div><div class="note">${esc(j.fix_hint)}</div>`:''}
         ${r.round!==c.best_round?`<div style="margin-top:16px">${shotsBlock(r)}</div>`:''}
       </div>
-    </div>
+    </div>`}
     <div class="label" style="margin:28px 0 10px">执行轨迹 · Claude Code × ${esc(st.model||'LongCat')}</div>
     <div class="tstats">
       <span>工具调用 <b>${st.tool_calls??0}</b></span><span>模型消息 <b>${st.assistant_msgs??0}</b></span>
@@ -386,7 +387,7 @@ async function renderCase(id, roundNo){
       <div>
         <div class="label">${esc(c.platform)} · ${TYPE[c.task_type]||esc(c.task_type)} · <span class="mono">${esc(c.id)}</span></div>
         <h1 style="margin-top:8px">${esc(c.highlight)}</h1>
-        <div class="meta">${vchip(bj.verdict)}<span>最佳为第 ${c.best_round} 轮 / 共 ${c.rounds.length} 轮已评分</span></div>
+        <div class="meta">${vchip(bj.verdict)}<span>最佳为第 ${c.best_round} 轮 / 共 ${c.rounds.filter(x=>x.judge).length} 轮已评分${c.rounds.some(x=>!x.judge)?`，另有 ${c.rounds.filter(x=>!x.judge).length} 轮未评分`:''}</span></div>
       </div>
       <div class="big"><div class="tot"><div class="label">最佳分</div><b class="v-${esc(bj.verdict)}">${fmt(bj.total)}</b> <span class="muted">/ 10</span></div>${dims(bj.scores)}</div>
     </section>
@@ -394,7 +395,7 @@ async function renderCase(id, roundNo){
       <div class="vs">${renderPost(c)}${renderProduct(c, best)}</div>
     </section>
     <section class="sec" id="rounds"><h2>复现过程 <small>每轮根据评审意见改写 query 再跑一次</small></h2>
-      <div class="tabs" role="tablist">${c.rounds.map(x=>`<button class="tab" role="tab" aria-selected="${x.round===r.round}" onclick="location.hash='${esc(c.id)}~r${x.round}'">第 ${x.round} 轮 <span class="mono v-${esc((x.judge||{}).verdict)}">${fmt((x.judge||{}).total)}</span>${x.round===c.best_round?'<span class="small muted">最佳</span>':''}</button>`).join('')}</div>
+      <div class="tabs" role="tablist">${c.rounds.map(x=>`<button class="tab" role="tab" aria-selected="${x.round===r.round}" onclick="location.hash='${esc(c.id)}~r${x.round}'">第 ${x.round} 轮 ${x.judge?`<span class="mono v-${esc(x.judge.verdict)}">${fmt(x.judge.total)}</span>`:'<span class="small muted">未评分</span>'}${x.round===c.best_round?'<span class="small muted">最佳</span>':''}</button>`).join('')}</div>
       <div id="round">${renderRound(c, r)}</div>
     </section>
     <footer>数据由 longcat-repro 自动生成。原帖素材版权归原作者所有，仅作复现对照。轨迹中的本机路径与密钥已打码。</footer>
