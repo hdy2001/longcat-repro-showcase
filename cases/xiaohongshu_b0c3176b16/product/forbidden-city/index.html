@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>紫禁城 · 夜 — Vision-to-CAD 3D 游览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05070f; font-family: "PingFang SC", "Hiragino Sans GB", sans-serif; }
+  #view { width: 100vw; height: 100vh; display: block; cursor: pointer; }
+  .hud { position: fixed; z-index: 10; color: #e8e2d2; pointer-events: none; }
+  #cross { top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%;
+    background: rgba(255,240,210,0.85); box-shadow: 0 0 8px rgba(255,220,150,0.8); opacity: 0; transition: opacity .3s; }
+  body.locked #cross { opacity: 1; }
+  #loc { top: 28px; left: 34px; font-size: 19px; letter-spacing: 2px; color: #f0e6cc;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
+  #loc::before { content: '◆ '; color: #c9a227; }
+  #mode { top: 56px; left: 34px; font-size: 13px; letter-spacing: 1px; color: rgba(230,220,195,0.65); text-shadow: 0 1px 8px #000; }
+  #help { bottom: 26px; left: 50%; transform: translateX(-50%); font-size: 12.5px; letter-spacing: 1px;
+    color: rgba(235,228,205,0.75); background: rgba(6,10,20,0.55); padding: 9px 22px; border-radius: 20px;
+    border: 1px solid rgba(201,162,39,0.25); backdrop-filter: blur(6px); transition: opacity .4s; }
+  body.locked #help { opacity: 0.25; }
+  #start { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 62%, rgba(5,8,18,0.25) 0%, rgba(4,6,14,0.78) 100%);
+    cursor: pointer; transition: opacity .6s; }
+  #start.hidden { opacity: 0; pointer-events: none; }
+  #start .t1 { font-family: "Kaiti SC", "KaiTi", "STKaiti", serif; font-size: 64px; letter-spacing: 18px; color: #eccf87;
+    text-shadow: 0 0 34px rgba(255,190,90,0.4); margin-bottom: 10px; }
+  #start .t2 { font-size: 15px; letter-spacing: 6px; color: rgba(235,230,210,0.8); margin-bottom: 44px; }
+  #start .btn { font-size: 16px; letter-spacing: 4px; color: #0a0e1a; background: linear-gradient(135deg, #e8c87a, #c9a227);
+    padding: 15px 52px; border-radius: 30px; box-shadow: 0 6px 30px rgba(201,162,39,0.35); animation: pulse 2.2s infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+  #start .keys { margin-top: 40px; font-size: 12.5px; line-height: 2.1; letter-spacing: 1.5px; color: rgba(230,222,198,0.6); text-align: center; }
+  #start .keys b { color: #d8c58e; font-weight: 600; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="cross" class="hud"></div>
+<div id="loc" class="hud">紫禁城 · 夜景</div>
+<div id="mode" class="hud"></div>
+<div id="help" class="hud">W A S D 移动 · 鼠标环视 · Shift 加速 · F 飞行（Space 升 / C 降） · Esc 退出</div>
+<div id="start">
+  <div class="t1">紫 禁 城</div>
+  <div class="t2">夜 游 · 3D 实 景 重 建</div>
+  <div class="btn">点 击 进 入 游 览</div>
+  <div class="keys">
+    <b>WASD</b> 行走 &nbsp;·&nbsp; <b>鼠标</b> 环视 &nbsp;·&nbsp; <b>Shift</b> 疾行<br>
+    <b>F</b> 飞行模式 &nbsp;·&nbsp; <b>Space / C</b> 升降 &nbsp;·&nbsp; <b>滚轮</b> 调速
+  </div>
+</div>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
