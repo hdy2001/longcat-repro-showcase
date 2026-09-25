@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>凤冠 · Traditional Chinese Phoenix Crown</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(ellipse at 50% 42%, #232326 0%, #101012 55%, #050506 100%);
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 28px; left: 32px; pointer-events: none;
+    color: #d8b45a; z-index: 10;
+    text-shadow: 0 1px 8px rgba(0,0,0,.8);
+  }
+  #ui h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: 14px; opacity: .92; }
+  #ui .sub { margin-top: 8px; font-size: 12px; letter-spacing: 4px; color: #9d8a55; opacity: .8; }
+  #ui .hint {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; letter-spacing: 3px; color: #8a7a52; opacity: .65; white-space: nowrap;
+  }
+  #err {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    color: #c9b47a; font-size: 15px; letter-spacing: 2px; text-align: center; line-height: 2;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>凤 冠</h1>
+  <div class="sub">TRADITIONAL CHINESE PHOENIX CROWN</div>
+</div>
+<div class="hint">拖 拽 旋 转 · 滚 轮 缩 放</div>
+<div id="err">当前环境不支持 WebGL 或 CDN 加载失败<br>请使用现代浏览器并检查网络后刷新</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ============================================================
+   基础:渲染器 / 场景 / 相机 / 控制器
+============================================================ */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+} catch (e) {
+  document.getElementById('err').style.display = 'flex';
+  throw e;
+}
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 120);
+camera.position.set(5.0, 2.8, 6.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.55, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 2.2;
+controls.maxDistance = 18;
+controls.maxPolarAngle = Math.PI * 0.62;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.7;
+controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+const keyLight = new THREE.DirectionalLight(0xfff1da, 1.5); keyLight.position.set(3, 7, 4);
+const rimLight = new THREE.DirectionalLight(0xa9c2ff, 0.8); rimLight.position.set(-5, 3.5, -5);
+const fillLight = new THREE.DirectionalLight(0xffe6bd, 0.45); fillLight.position.set(-2.5, 1.2, 5.5);
+scene.add(keyLight, rimLight, fillLight);
+
+/* ============================================================
+   程序化贴图:缠枝卷草纹 & 底部装饰带纹样
+============================================================ */
+function makeVineTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 1024);
+  g.addColorStop(0, '#26857c'); g.addColorStop(0.5, '#2b948a'); g.addColorStop(1, '#258176');
+  x.fillStyle = g; x.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 420; i++) {
+    x.fillStyle = `rgba(${12 + Math.random() * 26 | 0},${75 + Math.random() * 40 | 0},${70 + Math.random() * 40 | 0},0.12)`;
+    x.beginPath(); x.arc(Math.random() * 1024, Math.random() * 1024, 5 + Math.random() * 34, 0, 7); x.fill();
+  }
+  x.lineCap = 'round';
+  for (let v = 0; v < 17; v++) {
+    let px = Math.random() * 1024, py = Math.random() * 1024, ang = Math.random() * Math.PI * 2;
+    x.strokeStyle = '#c8a24b'; x.lineWidth = 4.5 + Math.random() * 3;
+    x.beginPath(); x.moveTo(px, py);
+    const segs = 22 + (Math.random() * 22 | 0);
+    for (let i = 0; i < segs; i++) {
+      ang += (Math.random() - 0.5) * 1.3;
+      const step = 15 + Math.random() * 20;
+      const nx = px + Math.cos(ang) * step, ny = py + Math.sin(ang) * step;
+      x.quadraticCurveTo(px + Math.cos(ang + 0.7) * step * 0.5, py + Math.sin(ang + 0.7) * step * 0.5, nx, ny);
+      if (Math.random() < 0.55) {
+        x.save(); x.translate(nx, ny); x.rotate(ang + (Math.random() < 0.5 ? 0.9 : -0.9));
+        x.fillStyle = '#dcbc60';
+        x.beginPath(); x.ellipse(9, 0, 8 + Math.random() * 6, 3.5 + Math.random() * 2, 0, 0, 7); x.fill();
+        x.restore();
+      }
+      px = nx; py = ny;
+    }
+  }
+  for (let i = 0; i < 14; i++) {
+    x.strokeStyle = '#cfb055'; x.lineWidth = 4 + Math.random() * 2;
+    x.beginPath();
+    const cx = Math.random() * 1024, cy = Math.random() * 1024, r = 10 + Math.random() * 18;
+    x.arc(cx, cy, r, Math.random() * 6, Math.random() * 6 + 4.2); x.stroke();
+  }
+  for (let i = 0; i < 40; i++) {
+    x.fillStyle = '#e6cd7d';
+    x.beginPath(); x.arc(Math.random() * 1024, Math.random() * 1024, 1.5 + Math.random() * 2.5, 0, 7); x.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 1);
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeBandTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#26877d'; x.fillRect(0, 0, 1024, 256);
+  for (let i = 0; i < 160; i++) {
+    x.fillStyle = `rgba(16,${55 + Math.random() * 30 | 0},${50 + Math.random() * 30 | 0},0.15)`;
+    x.beginPath(); x.arc(Math.random() * 1024, Math.random() * 256, 4 + Math.random() * 18, 0, 7); x.fill();
+  }
+  const gold = '#d8b95e', gold2 = '#e7cb74', red = '#b02030';
+  x.strokeStyle = gold2; x.lineWidth = 5;
+  x.beginPath(); x.moveTo(0, 26); x.lineTo(1024, 26); x.stroke();
+  x.beginPath(); x.moveTo(0, 230); x.lineTo(1024, 230); x.stroke();
+  x.strokeStyle = red; x.lineWidth = 6;
+  x.beginPath(); x.moveTo(0, 42); x.lineTo(1024, 42); x.stroke();
+  x.beginPath(); x.moveTo(0, 214); x.lineTo(1024, 214); x.stroke();
+  for (let i = 0; i < 5; i++) {
+    const cx = 1024 * (i + 0.5) / 5, cy = 128, r = 52;
+    x.strokeStyle = gold; x.lineWidth = 5;
+    x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke();
+    for (let p = 0; p < 8; p++) {
+      const a = p / 8 * Math.PI * 2;
+      x.save(); x.translate(cx + Math.cos(a) * r * 0.58, cy + Math.sin(a) * r * 0.58); x.rotate(a);
+      x.fillStyle = gold2;
+      x.beginPath(); x.ellipse(0, 0, r * 0.30, r * 0.12, 0, 0, Math.PI * 2); x.fill();
+      x.restore();
+    }
+    x.fillStyle = gold2;
+    x.beginPath(); x.arc(cx, cy, r * 0.16, 0, Math.PI * 2); x.fill();
+    x.fillStyle = red;
+    x.beginPath(); x.arc(cx, cy, r * 0.07, 0, Math.PI * 2); x.fill();
+    const sx = 1024 * (i + 1) / 5;
+    x.fillStyle = gold;
+    x.beginPath(); x.arc(sx, 88, 7, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(sx, 168, 7, 0, Math.PI * 2); x.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 1);
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* ============================================================
+   材质
+============================================================ */
+const vineTex = makeVineTexture();
+const MAT = {
+  gold:     new THREE.MeshStandardMaterial({ color: 0xd9b45c, metalness: 1.0, roughness: 0.27 }),
+  goldDark: new THREE.MeshStandardMaterial({ color: 0xb08d3e, metalness: 1.0, roughness: 0.38 }),
+  teal:     new THREE.MeshStandardMaterial({ map: vineTex, bumpMap: vineTex, bumpScale: 0.5, metalness: 0.18, roughness: 0.42, side: THREE.DoubleSide }),
+  band:     new THREE.MeshStandardMaterial({ map: makeBandTexture(), metalness: 0.25, roughness: 0.4, side: THREE.DoubleSide }),
+  red:      new THREE.MeshPhysicalMaterial({ color: 0xc1121f, metalness: 0.1, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, flatShading: true }),
+  redBead:  new THREE.MeshPhysicalMaterial({ color: 0xd00000, metalness: 0.25, roughness: 0.12, clearcoat: 1, flatShading: true }),
+  pearl:    new THREE.MeshPhysicalMaterial({ color: 0xf6f1e7, metalness: 0, roughness: 0.13, clearcoat: 1, clearcoatRoughness: 0.08, iridescence: 0.55, iridescenceIOR: 1.32 }),
+  purple:   new THREE.MeshPhysicalMaterial({ color: 0x8a1fd0, metalness: 0.1, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.06 }),
+  black:    new THREE.MeshPhysicalMaterial({ color: 0x0d0d10, metalness: 0.3, roughness: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.22 }),
+  trimRed:  new THREE.MeshPhysicalMaterial({ color: 0xa41623, metalness: 0.2, roughness: 0.15, clearcoat: 1 }),
+};
+
+/* ============================================================
+   工具函数
+============================================================ */
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const smooth = t => t * t * (3 - 2 * t);
+const UP = V3(0, 1, 0);
+
+/* 叶片/羽毛:宽身、圆尖、横向兜拢成勺状、沿长度微弯 */
+function bladeGeometry(len, wid, cup = 0.8, bend = 0.25, depth = 0.02) {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(wid * 0.78, len * 0.22, wid * 0.74, len * 0.5, wid * 0.34, len * 0.78);
+  s.quadraticCurveTo(wid * 0.15, len * 0.96, 0, len);
+  s.quadraticCurveTo(-wid * 0.15, len * 0.96, -wid * 0.34, len * 0.78);
+  s.bezierCurveTo(-wid * 0.74, len * 0.5, -wid * 0.78, len * 0.22, 0, 0);
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth, bevelEnabled: true, bevelThickness: depth * 0.7, bevelSize: wid * 0.03,
+    bevelSegments: 1, curveSegments: 8
+  });
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+    const t = THREE.MathUtils.clamp(py / len, 0, 1);
+    pos.setZ(i, pz + bend * len * t * t * 0.4 + cup * wid * 1.1 * (px / wid) * (px / wid) * (0.3 + 0.7 * t));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const _y = new THREE.Vector3(), _z = new THREE.Vector3(), _x = new THREE.Vector3();
+const _m4 = new THREE.Matrix4();
+function orient(obj, dir, outward) {
+  _y.copy(dir).normalize();
+  _z.copy(outward).addScaledVector(_y, -outward.dot(_y));
+  if (_z.lengthSq() < 1e-6) _z.set(0, 0, 1);
+  _z.normalize();
+  _x.crossVectors(_y, _z);
+  obj.quaternion.setFromRotationMatrix(_m4.makeBasis(_x, _y, _z));
+}
+
+function addBlade(group, len, wid, mat = MAT.gold, cup, bend) {
+  const m = new THREE.Mesh(bladeGeometry(len, wid, cup, bend), mat);
+  group.add(m);
+  return m;
+}
+
+/* ============================================================
+   黑色展示座
+============================================================ */
+const crown = new THREE.Group();
+scene.add(crown);
+
+{
+  const profile = [
+    [0.02, -1.34], [1.05, -1.34], [1.36, -1.30], [1.44, -1.18], [1.30, -1.04],
+    [0.76, -0.92], [0.42, -0.80], [0.50, -0.62], [0.57, -0.47], [0.45, -0.30],
+    [0.33, -0.13], [0.42, -0.05], [0.56, -0.02]
+  ].map(p => new THREE.Vector2(p[0], p[1]));
+  crown.add(new THREE.Mesh(new THREE.LatheGeometry(profile, 72), MAT.black));
+}
+
+/* ============================================================
+   青绿碗状冠身 + 底部装饰带 + 红镶边
+============================================================ */
+const bowlProfile = [
+  [0.02, 0.00], [0.55, 0.02], [1.15, 0.10], [1.70, 0.30], [2.02, 0.62],
+  [2.12, 0.95], [2.02, 1.30], [1.78, 1.62], [1.50, 1.88], [1.28, 2.06], [1.20, 2.10]
+];
+const bowlPts = bowlProfile.map(p => new THREE.Vector2(p[0], p[1]));
+crown.add(new THREE.Mesh(new THREE.LatheGeometry(bowlPts, 128), MAT.teal));
+
+function radiusAt(y) {
+  for (let i = 0; i < bowlProfile.length - 1; i++) {
+    const [r0, y0] = bowlProfile[i], [r1, y1] = bowlProfile[i + 1];
+    if (y >= y0 && y <= y1) return r0 + (r1 - r0) * (y - y0) / (y1 - y0);
+  }
+  return bowlProfile[bowlProfile.length - 1][0];
+}
+
+{
+  const pts = [];
+  for (let i = 0; i <= 16; i++) {
+    const y = 0.05 + (0.50 - 0.05) * i / 16;
+    pts.push(new THREE.Vector2(radiusAt(y) + 0.045, y));
+  }
+  crown.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 128), MAT.band));
+  for (const y of [0.075, 0.485]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radiusAt(y) + 0.055, 0.028, 10, 96), MAT.trimRed);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = y;
+    crown.add(ring);
+  }
+}
+
+/* ============================================================
+   冠身立体缠枝卷草(细金藤 + 小叶 + 红宝石)
+============================================================ */
+{
+  const vineGroup = new THREE.Group();
+  const rng = (a, b) => a + Math.random() * (b - a);
+  for (let v = 0; v < 13; v++) {
+    const th0 = rng(0, Math.PI * 2), y0 = rng(0.85, 1.85);
+    const drift = rng(-0.5, 0.5), span = rng(1.2, 2.6), dir = Math.random() < 0.5 ? 1 : -1;
+    const pts = [];
+    const steps = 26;
+    for (let i = 0; i <= steps; i++) {
+      const th = th0 + dir * span * i / steps;
+      const y = THREE.MathUtils.clamp(y0 + drift * Math.sin(i / steps * Math.PI) + rng(-0.04, 0.04), 0.72, 1.95);
+      const r = radiusAt(y) + 0.03;
+      pts.push(V3(Math.cos(th) * r, y, Math.sin(th) * r));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    vineGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.015, 6), MAT.goldDark));
+    for (let i = 2; i < steps - 1; i += 3) {
+      const p = curve.getPoint(i / steps);
+      const tan = curve.getTangent(i / steps);
+      const out = V3(p.x, 0.12, p.z).normalize();
+      const leaf = addBlade(vineGroup, rng(0.10, 0.14), rng(0.055, 0.075), MAT.gold, 1.4, 0.1);
+      leaf.position.copy(p);
+      orient(leaf, tan, out);
+    }
+  }
+  for (let i = 0; i < 10; i++) {
+    const y = rng(0.95, 1.8), th = rng(0, Math.PI * 2);
+    const r = radiusAt(y) + 0.05;
+    const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), MAT.red);
+    gem.position.set(Math.cos(th) * r, y, Math.sin(th) * r);
+    const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.082, 0.02, 8, 20), MAT.gold);
+    bezel.position.copy(gem.position);
+    bezel.lookAt(gem.position.clone().multiplyScalar(2).setY(y + 0.3));
+    vineGroup.add(gem, bezel);
+  }
+  crown.add(vineGroup);
+}
+
+/* 冠口金珠圈 */
+{
+  const n = 56, dummy = new THREE.Object3D();
+  const beads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.045, 10, 8), MAT.gold, n);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2;
+    dummy.position.set(Math.cos(a) * 1.24, 2.08, Math.sin(a) * 1.24);
+    dummy.updateMatrix();
+    beads.setMatrixAt(i, dummy.matrix);
+  }
+  crown.add(beads);
+}
+
+/* 腹部珍珠流苏 */
+{
+  const n = 84, dummy = new THREE.Object3D();
+  const pearls = new THREE.InstancedMesh(new THREE.SphereGeometry(0.048, 10, 8), MAT.pearl, n);
+  const pins = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.11, 6), MAT.gold, n);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, r = 2.13;
+    dummy.position.set(Math.cos(a) * r, 0.655, Math.sin(a) * r); dummy.updateMatrix();
+    pearls.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(Math.cos(a) * r, 0.735, Math.sin(a) * r); dummy.updateMatrix();
+    pins.setMatrixAt(i, dummy.matrix);
+  }
+  crown.add(pearls, pins);
+}
+
+/* ============================================================
+   正面:金莲花(多层花瓣 + 大红宝石) + 下垂金绶带
+============================================================ */
+function makeLotus(s = 1) {
+  const g = new THREE.Group();
+  const rings = [
+    { n: 6, l: 0.46, w: 0.32, tilt: 0.24 },
+    { n: 7, l: 0.70, w: 0.42, tilt: 0.50 },
+    { n: 9, l: 0.92, w: 0.52, tilt: 0.82 },
+  ];
+  for (let ri = 0; ri < rings.length; ri++) {
+    const r = rings[ri];
+    for (let i = 0; i < r.n; i++) {
+      const a = i / r.n * Math.PI * 2 + ri * 0.45;
+      const f = addBlade(g, r.l, r.w, MAT.gold, 0.55, 0.18);
+      f.rotateY(a);          // 先绕竖直轴分布
+      f.rotateX(r.tilt);     // 再向外倾,形成放射花盘
+    }
+  }
+  const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1), MAT.red);
+  gem.scale.set(1, 0.78, 1);
+  gem.position.set(0, 0.10, 0.16);
+  const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.05, 10, 32), MAT.gold);
+  bezel.rotation.x = Math.PI / 2;
+  bezel.position.set(0, 0.08, 0.16);
+  g.add(gem, bezel);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), MAT.gold);
+    b.position.set(Math.cos(a) * 0.48, 0.03, Math.sin(a) * 0.48);
+    g.add(b);
+  }
+  g.scale.setScalar(s);
+  return g;
+}
+
+{
+  const lotus = makeLotus(1.15);
+  lotus.rotation.x = 1.22;
+  lotus.position.set(0, 1.28, 1.98);
+  crown.add(lotus);
+
+  /* 莲花背后小金底盘 */
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.48, 24, 16), MAT.goldDark);
+  halo.scale.set(1, 1.3, 0.14);
+  halo.position.set(0, 1.30, 1.78);
+  const haloRim = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.04, 10, 48), MAT.gold);
+  haloRim.scale.set(1, 1.3, 1);
+  haloRim.position.copy(halo.position);
+  crown.add(halo, haloRim);
+
+  /* 下垂金绶带(沿冠身曲面) */
+  const ribbonGroup = new THREE.Group();
+  const mkRibbon = (w0, w1, xOff) => {
+    const pts = [];
+    const N = 26;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const y = 1.02 - 0.92 * t;
+      const z = radiusAt(y) + 0.06 + 0.16 * Math.sin(t * Math.PI);
+      pts.push(V3(xOff, y, z));
+    }
+    const geo = new THREE.BufferGeometry();
+    const verts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const w = (w0 + (w1 - w0) * t) / 2;
+      const p = pts[i];
+      verts.push(p.x - w, p.y, p.z, p.x + w, p.y, p.z);
+    }
+    const idx = [];
+    for (let i = 0; i < N; i++) {
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd9b45c, metalness: 1, roughness: 0.3, side: THREE.DoubleSide }));
+    ribbonGroup.add(mesh);
+    return pts;
+  };
+  const mainPts = mkRibbon(0.26, 0.06, 0);
+  mkRibbon(0.12, 0.05, -0.17);
+  mkRibbon(0.12, 0.05, 0.17);
+  const ridgeCurve = new THREE.CatmullRomCurve3(mainPts.filter((_, i) => i % 2 === 0));
+  ribbonGroup.add(new THREE.Mesh(new THREE.TubeGeometry(ridgeCurve, 32, 0.018, 6), MAT.gold));
+  crown.add(ribbonGroup);
+}
+
+/* ============================================================
+   金色凤凰大翼:主翼羽 / 次级翼羽 / 密覆羽,环绕铺展至冠顶
+============================================================ */
+function makeWing(s) {
+  const g = new THREE.Group();
+  const spine = new THREE.QuadraticBezierCurve3(
+    V3(s * 1.60, 0.30, 0.92),
+    V3(s * 2.10, 1.55, 0.05),
+    V3(s * 0.90, 3.05, -1.15)
+  );
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(spine, 28, 0.10, 10), MAT.goldDark));
+
+  const out = V3(s, 0.30, 0.12).normalize();
+  const dirA = V3(s * 0.95, 0.45, 0.22).normalize();
+  const dirB = V3(s * 0.30, 0.55, -0.92).normalize();
+
+  const place = (t, len, wid, off, dA = dirA, dB = dirB) => {
+    const p = spine.getPoint(t);
+    const pos = p.clone().addScaledVector(out, off);
+    const dir = dA.clone().lerp(dB, smooth(t)).normalize();
+    const f = addBlade(g, len, wid, MAT.gold, 0.85, 0.28);
+    f.position.copy(pos);
+    orient(f, dir, out);
+    return f;
+  };
+
+  for (let i = 0; i < 13; i++) {                 // 主翼羽
+    const t = 0.28 + 0.70 * i / 12;
+    const env = Math.sin((t - 0.28) / 0.70 * Math.PI);   // 中间长两端稍短
+    place(t, 1.45 + 0.55 * env, 0.46, 0.10 + 0.10 * t);
+  }
+  const dirB2 = V3(s * 0.28, 0.30, -0.96).normalize();
+  for (let i = 0; i < 10; i++) {                 // 次级翼羽
+    const t = 0.12 + 0.58 * i / 9;
+    place(t, 1.00 + 0.40 * t, 0.40, 0.055 + 0.05 * t, dirA, dirB2);
+  }
+  for (let i = 0; i < 16; i++) {                 // 小覆羽(贴臂鳞状)
+    const t = 0.02 + 0.62 * i / 15;
+    const p = spine.getPoint(t);
+    const tan = spine.getTangent(t);
+    const dir = tan.clone().lerp(out, 0.5).normalize();
+    const f = addBlade(g, 0.34, 0.24, MAT.gold, 1.3, 0.15);
+    f.position.copy(p).addScaledVector(out, 0.02);
+    orient(f, dir, out);
+  }
+  for (let i = 0; i < 5; i++) {                  // 肩羽
+    const dir = V3(s * (1.0 - i * 0.10), -0.15 - i * 0.05, 0.30 - i * 0.04).normalize();
+    const f = addBlade(g, 0.72 - i * 0.06, 0.30, MAT.gold, 1.0, 0.25);
+    f.position.set(s * (1.76 + i * 0.04), 0.88 - i * 0.07, 0.88 - i * 0.04);
+    orient(f, dir, out);
+  }
+
+  /* 连接耳饰锚点的金卷草(从翼根到锚点) */
+  const linkCurve = new THREE.CatmullRomCurve3([
+    V3(s * 1.40, 1.60, 1.06),
+    V3(s * 1.62, 1.66, 1.38),
+    V3(s * 1.47, 1.58, 1.74),
+  ]);
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(linkCurve, 16, 0.035, 6), MAT.gold));
+
+  /* 翼根装饰:金卷草 + 小尖角 */
+  const curlPts = [];
+  for (let i = 0; i <= 40; i++) {
+    const a = i / 40 * Math.PI * 2.6;
+    const r = 0.30 * (1 - i / 52);
+    curlPts.push(V3(s * (1.40 + r * Math.cos(a)), 1.60 + r * Math.sin(a), 1.06 + 0.05 * Math.sin(a * 2)));
+  }
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(curlPts), 48, 0.032, 6), MAT.gold));
+  for (let i = 0; i < 3; i++) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.30, 8), MAT.gold);
+    horn.position.set(s * (1.60 + i * 0.12), 1.22 - i * 0.12, 0.90);
+    horn.rotation.z = -s * (0.9 + i * 0.25);
+    g.add(horn);
+  }
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), MAT.gold);
+  tip.position.copy(spine.getPoint(1)).addScaledVector(out, 0.18);
+  g.add(tip);
+  return g;
+}
+crown.add(makeWing(1), makeWing(-1));
+
+/* ============================================================
+   金凤:细长曲颈 + 头 + 喙 + 红眼 + 冠羽
+============================================================ */
+function makePhoenix(s) {
+  const g = new THREE.Group();
+  const neck = new THREE.CubicBezierCurve3(
+    V3(s * 1.25, 1.32, 1.30),
+    V3(s * 1.80, 1.95, 1.36),
+    V3(s * 1.05, 2.55, 1.28),
+    V3(s * 0.50, 2.38, 1.02)
+  );
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(neck, 24, 0.085, 10), MAT.gold));
+
+  const head = neck.getPoint(1);
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.125, 20, 16), MAT.gold);
+  headMesh.position.copy(head);
+  headMesh.scale.set(1, 0.9, 1.2);
+  g.add(headMesh);
+
+  const beakDir = V3(-s, -0.38, 0.15).normalize();
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.24, 12), MAT.goldDark);
+  beak.position.copy(head).addScaledVector(beakDir, 0.15);
+  beak.quaternion.setFromUnitVectors(UP, beakDir);
+  g.add(beak);
+
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), MAT.red);
+    eye.position.copy(head).add(V3(side * 0.09, 0.03, 0.07));
+    g.add(eye);
+  }
+  for (let i = -1; i <= 1; i++) {
+    const dir = V3(-s * 0.2 + i * 0.34, 1, -0.3).normalize();
+    const f = addBlade(g, 0.46 - Math.abs(i) * 0.09, 0.085, MAT.gold, 1.2, 0.35);
+    f.position.copy(head).add(V3(0, 0.09, -0.03));
+    orient(f, dir, V3(s * 0.4, 0.5, 0));
+  }
+  return g;
+}
+crown.add(makePhoenix(1), makePhoenix(-1));
+
+/* ============================================================
+   两侧流苏耳饰:镂空金片 + 红宝石 + 红菱形珠串 + 紫水滴坠
+============================================================ */
+function roundedRectShape(w, h, r) {
+  const s = new THREE.Shape();
+  const x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y); s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0);
+  s.lineTo(x + w, y + h - r); s.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+  s.lineTo(x + r, y + h); s.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+  s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
+  return s;
+}
+
+function makeTassel(s) {
+  const g = new THREE.Group();
+  const anchor = V3(s * 1.47, 1.58, 1.74);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.02, 8, 20), MAT.gold);
+  ring.position.copy(anchor);
+  ring.rotation.y = Math.PI / 2;
+  g.add(ring);
+  const link = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.16, 6), MAT.gold);
+  link.position.copy(anchor).add(V3(0, -0.12, 0));
+  g.add(link);
+
+  /* 镂空花片 */
+  const plaqueC = anchor.clone().add(V3(0, -0.52, 0));
+  const normal = V3(s * 0.55, 0, 0.85).normalize();
+  const plaque = new THREE.Group();
+  plaque.position.copy(plaqueC);
+  plaque.quaternion.setFromUnitVectors(V3(0, 0, 1), normal);
+
+  const plate = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(roundedRectShape(0.56, 0.72, 0.15), { depth: 0.035, bevelEnabled: false, curveSegments: 10 }),
+    MAT.goldDark
+  );
+  plaque.add(plate);
+  const framePts = roundedRectShape(0.56, 0.72, 0.15).getPoints(40).map(p => V3(p.x, p.y, 0.045));
+  plaque.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(framePts, true), 48, 0.032, 6, true), MAT.gold));
+
+  for (const [qx, qy] of [[-0.15, 0.17], [0.15, 0.17], [-0.15, -0.17], [0.15, -0.17]]) {
+    const pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const a = i / 24 * Math.PI * 2.2;
+      const r = 0.11 * (1 - i / 30);
+      pts.push(V3(qx + r * Math.cos(a), qy + r * Math.sin(a), 0.05));
+    }
+    plaque.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 32, 0.02, 6), MAT.gold));
+  }
+  const pgem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), MAT.red);
+  pgem.position.set(0, 0, 0.07);
+  const pbez = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.022, 8, 24), MAT.gold);
+  pbez.position.set(0, 0, 0.07);
+  plaque.add(pgem, pbez);
+  for (const [cx, cy] of [[-0.22, 0.28], [0.22, 0.28], [-0.22, -0.28], [0.22, -0.28]]) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), MAT.pearl);
+    b.position.set(cx, cy, 0.05);
+    plaque.add(b);
+  }
+  g.add(plaque);
+
+  /* 垂串 */
+  const dropProfile = [
+    new THREE.Vector2(0.001, 0), new THREE.Vector2(0.075, 0.03), new THREE.Vector2(0.115, 0.12),
+    new THREE.Vector2(0.105, 0.22), new THREE.Vector2(0.06, 0.30), new THREE.Vector2(0.001, 0.345)
+  ];
+  const dropGeo = new THREE.LatheGeometry(dropProfile, 20);
+  const diamondGeo = new THREE.OctahedronGeometry(1, 0);
+  diamondGeo.scale(0.095, 0.14, 0.095);
+
+  const mkStrand = (x, beads, dropScale = 1) => {
+    const sg = new THREE.Group();
+    const top = plaqueC.clone().add(V3(x, -0.40, 0));
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.10, 6), MAT.gold);
+    pin.position.copy(top).add(V3(0, -0.03, 0));
+    sg.add(pin);
+    let y = top.y - 0.10;
+    for (let i = 0; i < beads; i++) {
+      const d = new THREE.Mesh(diamondGeo, MAT.redBead);
+      d.position.set(top.x, y - 0.07, top.z);
+      const spacer = new THREE.Mesh(new THREE.SphereGeometry(0.034, 8, 8), MAT.gold);
+      spacer.position.set(top.x, y - 0.155, top.z);
+      sg.add(d, spacer);
+      y -= 0.175;
+    }
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.07, 8), MAT.gold);
+    cap.position.set(top.x, y - 0.035, top.z);
+    const drop = new THREE.Mesh(dropGeo, MAT.purple);
+    drop.scale.setScalar(dropScale);
+    drop.position.set(top.x, y - 0.36 * dropScale, top.z);
+    sg.add(cap, drop);
+    return sg;
+  };
+  g.add(mkStrand(-0.17, 3));
+  g.add(mkStrand(0, 4, 1.12));
+  g.add(mkStrand(0.17, 3));
+
+  for (const x of [-0.27, 0.27]) {
+    const sg = new THREE.Group();
+    const top = plaqueC.clone().add(V3(x, -0.38, 0));
+    for (let i = 0; i < 7; i++) {
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.034, 8, 8), MAT.pearl);
+      p.position.set(top.x, top.y - 0.06 - i * 0.075, top.z);
+      sg.add(p);
+    }
+    const drop = new THREE.Mesh(dropGeo, MAT.purple);
+    drop.scale.setScalar(0.8);
+    drop.position.set(top.x, top.y - 0.62, top.z);
+    sg.add(drop);
+    g.add(sg);
+  }
+  return g;
+}
+crown.add(makeTassel(1), makeTassel(-1));
+
+/* ============================================================
+   背后金色扇形羽屏:辐条 + 珍珠顶 + 弧形连杆
+============================================================ */
+{
+  const fan = new THREE.Group();
+  fan.position.set(0, 1.00, -1.85);
+  fan.rotation.x = -0.20;
+  const n = 25, spread = THREE.MathUtils.degToRad(80);
+  for (let i = 0; i < n; i++) {
+    const a = -spread + 2 * spread * i / (n - 1);
+    const L = 1.30 + 0.90 * Math.pow(Math.cos(a), 1.3);
+    const ray = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.04, L, 6), MAT.goldDark);
+    ray.scale.z = 0.5;
+    ray.position.set(Math.sin(a) * L / 2, Math.cos(a) * L / 2, 0);
+    ray.rotation.z = -a;
+    fan.add(ray);
+    const tipPearl = new THREE.Mesh(new THREE.SphereGeometry(0.075 + 0.028 * Math.cos(a), 14, 12), MAT.pearl);
+    tipPearl.position.set(Math.sin(a) * L, Math.cos(a) * L, 0);
+    fan.add(tipPearl);
+  }
+  for (const rr of [0.72, 1.18, 1.62]) {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.016, 6, 64, spread * 2), MAT.gold);
+    arc.rotation.z = Math.PI / 2 - spread;
+    fan.add(arc);
+  }
+  for (let i = 0; i <= 10; i++) {
+    const a = Math.PI / 2 - spread + 2 * spread * i / 10;
+    const hub = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), MAT.gold);
+    hub.position.set(Math.sin(a) * 0.18, Math.cos(a) * 0.18, 0);
+    fan.add(hub);
+  }
+  crown.add(fan);
+}
+
+/* ============================================================
+   冠顶:大金珍珠 + 莲座 + 火焰金饰
+============================================================ */
+{
+  const top = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.44, 0.20, 24), MAT.goldDark);
+  base.position.set(0, 2.30, -0.10);
+  top.add(base);
+
+  const seat = makeLotus(0.34);
+  seat.position.set(0, 2.44, -0.10);
+  top.add(seat);
+
+  const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.335, 48, 32), MAT.pearl);
+  pearl.position.set(0, 2.82, -0.10);
+  top.add(pearl);
+  const pearlSeat = new THREE.Mesh(
+    new THREE.TorusGeometry(0.26, 0.035, 8, 28), MAT.gold);
+  pearlSeat.rotation.x = Math.PI / 2;
+  pearlSeat.position.set(0, 2.60, -0.10);
+  top.add(pearlSeat);
+
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const curve = new THREE.QuadraticBezierCurve3(
+      V3(Math.cos(a) * 0.36, 2.34, -0.10 + Math.sin(a) * 0.36),
+      V3(Math.cos(a) * 0.66, 2.58, -0.10 + Math.sin(a) * 0.66),
+      V3(Math.cos(a + 0.35) * 0.58, 3.02, -0.10 + Math.sin(a + 0.35) * 0.58)
+    );
+    top.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.04, 6), MAT.gold));
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), MAT.gold);
+    ember.position.copy(curve.getPoint(1));
+    top.add(ember);
+  }
+  crown.add(top);
+}
+
+/* ============================================================
+   底部柔和光晕(假接触阴影)
+============================================================ */
+{
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(128, 128, 10, 128, 128, 128);
+  g.addColorStop(0, 'rgba(255,238,205,0.20)');
+  g.addColorStop(0.45, 'rgba(255,238,205,0.07)');
+  g.addColorStop(1, 'rgba(255,238,205,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  const glow = new THREE.Mesh(
+    new THREE.CircleGeometry(4.2, 40),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+  );
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = -1.355;
+  scene.add(glow);
+}
+
+/* ============================================================
+   动画循环 / 自适应
+============================================================ */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  crown.position.y = Math.sin(t * 0.6) * 0.02;
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* 调试视角钩子 */
+window.__view = (x, y, z, tx = 0, ty = 1.5, tz = 0) => {
+  controls.autoRotate = false;
+  camera.position.set(x, y, z);
+  controls.target.set(tx, ty, tz);
+  controls.update();
+};
+</script>
+</body>
+</html>

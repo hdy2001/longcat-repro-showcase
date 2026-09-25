@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>上海滩大富翁</title>
+<style>
+:root{
+  --bg:#070d0b;
+  --jade:#2fe6a7;
+  --gold:#e8b565;
+  --cream:#f2ead8;
+  --ink:#e9f4ee;
+  --ink-dim:#8fb3a5;
+  --crimson:#e0705f;
+  --violet:#9b8cf2;
+  --board-edge:#122119;
+  --panel:rgba(22,34,29,.72);
+  --panel-line:rgba(47,230,167,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",sans-serif;
+  background:
+    radial-gradient(1100px 700px at 85% -10%, rgba(47,230,167,.12), transparent 60%),
+    radial-gradient(900px 600px at 5% 110%, rgba(232,181,101,.09), transparent 55%),
+    linear-gradient(160deg,#0a120f,#070d0b 55%,#050908);
+  color:var(--ink);min-height:100vh;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ================= 顶栏 ================= */
+.topbar{
+  display:flex;align-items:center;gap:16px;
+  padding:16px 28px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(7,13,11,.6);backdrop-filter:blur(10px);
+  position:sticky;top:0;z-index:50;
+}
+.topbar .logo{
+  width:40px;height:40px;border-radius:12px;flex:none;
+  background:linear-gradient(135deg,var(--gold),#b57a2e);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px rgba(232,181,101,.3);
+}
+.topbar .logo svg{width:22px;height:22px}
+.topbar h1{font-size:19px;font-weight:800;letter-spacing:2px}
+.topbar h1 em{font-style:normal;color:var(--gold)}
+.topbar .sub{font-size:11px;color:var(--ink-dim);letter-spacing:3px;margin-top:2px}
+.topbar .spacer{flex:1}
+.tbtn{
+  padding:9px 18px;border-radius:12px;font-size:13px;font-weight:600;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:var(--ink);
+  transition:all .15s;
+}
+.tbtn:hover{background:rgba(47,230,167,.12);border-color:rgba(47,230,167,.35);color:var(--jade)}
+.tbtn:active{transform:scale(.96)}
+
+/* ================= 布局 ================= */
+.layout{
+  display:flex;gap:26px;padding:26px 28px 40px;
+  max-width:1240px;margin:0 auto;align-items:flex-start;
+}
+.board-col{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+
+/* ================= 棋盘 ================= */
+.board-wrap{
+  position:relative;width:100%;max-width:660px;
+  background:linear-gradient(150deg,#0e1a14,#0a130e);
+  border:1px solid rgba(232,181,101,.22);
+  border-radius:22px;padding:14px;
+  box-shadow:0 30px 70px rgba(0,0,0,.5),inset 0 0 60px rgba(0,0,0,.4);
+}
+.board-wrap::before{
+  content:"";position:absolute;inset:6px;border:1px solid rgba(232,181,101,.14);
+  border-radius:16px;pointer-events:none;
+}
+.board{
+  display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(7,1fr);
+  gap:4px;width:100%;aspect-ratio:1;position:relative;z-index:1;
+}
+.center{
+  grid-row:2/7;grid-column:2/7;position:relative;overflow:hidden;border-radius:12px;
+  background:linear-gradient(160deg,#0d2b33 0%,#123c46 45%,#0e2a38 100%);
+  border:1px solid rgba(127,212,193,.2);
+}
+.river-svg{position:absolute;inset:0;width:100%;height:100%}
+.center-title{
+  position:absolute;top:12px;left:0;right:0;text-align:center;z-index:3;
+  font-family:"STKaiti","KaiTi","STSong",serif;
+  font-size:clamp(22px,4.5vw,34px);letter-spacing:8px;color:rgba(242,234,216,.92);
+  text-shadow:0 2px 12px rgba(0,0,0,.5);pointer-events:none;
+}
+.center-sub{
+  position:absolute;top:calc(12px + clamp(30px,5.5vw,46px));left:0;right:0;text-align:center;z-index:3;
+  font-size:10px;letter-spacing:4px;color:rgba(242,234,216,.55);pointer-events:none;
+}
+.boat{animation:boatFloat 5s ease-in-out infinite}
+.boat.b2{animation-delay:2.4s}
+@keyframes boatFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.wave{animation:waveMove 6s linear infinite}
+.wave.w2{animation-duration:8s;animation-delay:1.5s}
+@keyframes waveMove{from{transform:translateX(0)}to{transform:translateX(60px)}}
+
+.dice-zone{
+  position:absolute;left:0;right:0;bottom:12px;z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:9px;padding:0 16px;
+}
+.dice-row{display:flex;gap:10px}
+.die{
+  width:46px;height:46px;border-radius:10px;background:linear-gradient(150deg,#fdf8ec,#e8dcc0);
+  display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:7px;gap:1px;
+  box-shadow:0 4px 12px rgba(0,0,0,.45),inset 0 -2px 4px rgba(0,0,0,.12);
+  transition:transform .1s;
+}
+.die.rolling{animation:diceShake .12s linear infinite}
+@keyframes diceShake{
+  0%{transform:rotate(-8deg) translateY(-2px)}50%{transform:rotate(6deg) translateY(1px)}
+  100%{transform:rotate(-4deg) translateY(-1px)}
+}
+.pip{background:#22302a;border-radius:50%;opacity:0;transform:scale(.4)}
+.pip.on{opacity:1;transform:scale(1)}
+.controls{display:flex;gap:10px;width:100%;justify-content:center}
+.big-btn{
+  padding:11px 26px;border-radius:14px;font-size:15px;font-weight:700;letter-spacing:2px;
+  transition:all .15s;min-width:132px;
+}
+.big-btn.primary{background:linear-gradient(135deg,var(--gold),#c98a3e);color:#2a1c08;box-shadow:0 8px 22px rgba(232,181,101,.3)}
+.big-btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+.big-btn.ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--ink)}
+.big-btn.ghost:hover:not(:disabled){background:rgba(47,230,167,.14);border-color:rgba(47,230,167,.4);color:var(--jade)}
+.big-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.big-btn:not(:disabled):active{transform:scale(.96)}
+.turn-msg{
+  font-size:12px;color:rgba(242,234,216,.75);min-height:16px;text-align:center;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.turn-msg b{color:var(--gold)}
+
+/* ================= 地块 ================= */
+.tile{
+  position:relative;border-radius:6px;background:var(--cream);color:#2a2118;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow:hidden;font-weight:700;min-height:0;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);
+  transition:transform .15s,box-shadow .15s;
+}
+.tile.prop .band{position:absolute;top:0;left:0;right:0;height:16%;background:var(--gc,#999);box-shadow:inset 0 -1px 0 rgba(0,0,0,.15)}
+.tile .tname{font-size:clamp(9px,1.35vw,12.5px);line-height:1.15;text-align:center;padding:0 2px;z-index:1;margin-top:6%}
+.tile .tprice{font-size:clamp(7px,1vw,10px);opacity:.75;z-index:1;font-weight:600}
+.tile .owner{
+  position:absolute;bottom:0;left:0;right:0;height:5px;background:transparent;z-index:2;
+}
+.tile .pips{position:absolute;bottom:7px;left:0;right:0;display:flex;justify-content:center;gap:2px;z-index:2;height:5px}
+.tile .pips i{width:4px;height:4px;border-radius:50%;background:#22302a;opacity:.85}
+.tile .owner-stripe{position:absolute;bottom:0;left:0;right:0;height:5px;z-index:2;background:var(--oc,transparent)}
+.tile.chance{background:linear-gradient(150deg,#f7d9c9,#f0bfa4);color:#7a2d1d}
+.tile.fate{background:linear-gradient(150deg,#cfe8df,#a8d4c2);color:#14523c}
+.tile.station{background:linear-gradient(150deg,#2b3f6e,#1c2c50);color:#e8ecf7}
+.tile.tax{background:linear-gradient(150deg,#f3dfae,#e8c87e);color:#6e4c10}
+.tile.park{background:linear-gradient(150deg,#cfe3cf,#a9cba9);color:#2c5230}
+.tile.start{background:linear-gradient(150deg,#0e2b21,#123c2f);color:var(--cream)}
+.tile .glyph{font-size:clamp(13px,2.2vw,20px);font-weight:800;z-index:1;font-family:"STKaiti","KaiTi",serif}
+.tile.special .tname{margin-top:0}
+.tile.landed{transform:scale(1.04);box-shadow:0 0 0 2px var(--gold),0 6px 16px rgba(0,0,0,.35);z-index:5}
+
+/* ================= 棋子 ================= */
+.tokens{position:absolute;inset:0;pointer-events:none;z-index:20}
+.token{
+  position:absolute;width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#0a0f0d;
+  box-shadow:0 3px 8px rgba(0,0,0,.5),inset 0 -3px 5px rgba(0,0,0,.22),inset 0 2px 3px rgba(255,255,255,.4);
+  transition:left .22s ease,top .22s ease,transform .2s,opacity .3s;
+}
+.token.teleport-flash{animation:tpFlash .5s ease}
+@keyframes tpFlash{0%{transform:scale(.2);filter:brightness(2.5)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
+.token.bankrupt{opacity:.25;filter:grayscale(1)}
+.float-layer{position:absolute;inset:0;pointer-events:none;z-index:30;overflow:visible}
+.mfloat{
+  position:absolute;font-size:13px;font-weight:800;white-space:nowrap;
+  animation:floatUp 1.15s ease-out forwards;text-shadow:0 1px 4px rgba(0,0,0,.6);
+}
+.mfloat.plus{color:var(--jade)}
+.mfloat.minus{color:var(--crimson)}
+@keyframes floatUp{0%{opacity:0;transform:translateY(6px) scale(.8)}15%{opacity:1;transform:translateY(0) scale(1.08)}100%{opacity:0;transform:translateY(-34px) scale(1)}}
+
+/* ================= 卡牌 ================= */
+.card-overlay{
+  position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+  background:rgba(5,9,8,.55);backdrop-filter:blur(3px);border-radius:14px;
+}
+.card-overlay.show{display:flex}
+.mcard{
+  width:min(300px,80%);border-radius:18px;padding:26px 24px 22px;text-align:center;position:relative;
+  transform-style:preserve-3d;animation:cardIn .5s cubic-bezier(.2,.9,.3,1.2);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+}
+@keyframes cardIn{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:rotateY(0) scale(1);opacity:1}}
+.mcard.chance{background:linear-gradient(160deg,#7a2d1d,#b5503a);color:#ffe9dd}
+.mcard.fate{background:linear-gradient(160deg,#14523c,#1f7a5c);color:#dff5e9}
+.mcard .ck{font-size:13px;letter-spacing:6px;opacity:.85;font-weight:700}
+.mcard .cglyph{font-size:52px;font-weight:800;font-family:"STKaiti","KaiTi",serif;margin:10px 0 4px;text-shadow:0 3px 10px rgba(0,0,0,.35)}
+.mcard .ct{font-size:17px;font-weight:800;margin:6px 0 8px}
+.mcard .cd{font-size:13px;line-height:1.7;opacity:.92;min-height:44px}
+.mcard .cbtn{
+  margin-top:14px;padding:10px 34px;border-radius:22px;font-size:14px;font-weight:700;
+  background:rgba(255,255,255,.92);color:#222;transition:transform .12s;
+}
+.mcard .cbtn:active{transform:scale(.95)}
+
+/* ================= 右侧栏 ================= */
+.side{width:340px;flex:none;display:flex;flex-direction:column;gap:16px}
+.players{display:flex;flex-direction:column;gap:10px}
+.pcard{
+  background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
+  padding:13px 15px;backdrop-filter:blur(14px);position:relative;overflow:hidden;
+  transition:border-color .3s,box-shadow .3s,opacity .3s;
+}
+.pcard.active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 8px 24px rgba(232,181,101,.15)}
+.pcard .prow{display:flex;align-items:center;gap:10px}
+.pdot{width:16px;height:16px;border-radius:50%;flex:none;box-shadow:inset 0 -2px 3px rgba(0,0,0,.3)}
+.pname{font-size:15px;font-weight:700;color:var(--cream)}
+.ptag{font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.1);color:var(--ink-dim);margin-left:auto}
+.pcard.active .ptag{background:rgba(232,181,101,.16);color:var(--gold)}
+.pcash{font-size:22px;font-weight:800;font-variant-numeric:tabular-numeric;color:var(--jade);margin-top:6px}
+.pcash.neg{color:var(--crimson)}
+.pmeta{display:flex;gap:12px;margin-top:5px;font-size:11.5px;color:var(--ink-dim)}
+.pmeta b{color:var(--ink);font-weight:600}
+.pprops{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:52px;overflow:hidden}
+.pprop{
+  font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);color:var(--ink-dim);white-space:nowrap;
+}
+.pcard.bankrupt{opacity:.45;filter:grayscale(.7)}
+.pcard.bankrupt .pcash{color:var(--crimson)}
+
+.logbox{
+  background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
+  backdrop-filter:blur(14px);display:flex;flex-direction:column;flex:1;min-height:200px;max-height:520px;
+}
+.log-title{
+  padding:13px 16px;font-size:12px;letter-spacing:3px;color:var(--jade);font-weight:700;
+  border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;align-items:center;
+}
+.log-title .round{font-size:11px;color:var(--ink-dim);letter-spacing:1px}
+.log{list-style:none;overflow-y:auto;padding:10px 14px;flex:1;display:flex;flex-direction:column;gap:6px}
+.log li{font-size:12px;line-height:1.6;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.035);animation:logIn .3s ease}
+@keyframes logIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.log li.lg-good{border-left:2px solid var(--jade)}
+.log li.lg-money{border-left:2px solid var(--gold)}
+.log li.lg-bad{border-left:2px solid var(--crimson)}
+.log li.lg-sys{border-left:2px solid rgba(255,255,255,.2);color:var(--ink-dim)}
+
+/* ================= 弹窗（购买/升级/传送） ================= */
+.modal-mask{
+  position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+  background:rgba(4,8,6,.6);backdrop-filter:blur(4px);
+}
+.modal-mask.show{display:flex}
+.modal{
+  width:min(400px,92vw);background:linear-gradient(160deg,#16241d,#0e1a14);
+  border:1px solid rgba(47,230,167,.25);border-radius:20px;padding:24px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);animation:modalIn .25s ease;
+}
+@keyframes modalIn{from{transform:translateY(16px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+.modal h3{font-size:17px;color:var(--cream);font-weight:800}
+.modal .mclose-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal .mx{color:var(--ink-dim);font-size:18px;padding:2px 8px}
+.modal .mx:hover{color:#fff}
+.modal .mbody{font-size:14px;line-height:1.8;color:var(--ink)}
+.modal .price-line{
+  display:flex;justify-content:space-between;background:rgba(255,255,255,.05);
+  border-radius:12px;padding:12px 14px;margin-top:12px;font-size:13px;
+}
+.modal .price-line b{color:var(--gold);font-size:15px}
+.modal .mnote{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
+.mbtns{display:flex;gap:10px;margin-top:18px}
+.mbtns button{flex:1;padding:12px;border-radius:13px;font-size:14px;font-weight:700;transition:all .14s}
+.mbtns .buy{background:linear-gradient(135deg,var(--gold),#c98a3e);color:#2a1c08}
+.mbtns .skip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:var(--ink)}
+.mbtns button:hover:not(:disabled){filter:brightness(1.1)}
+.mbtns button:active:not(:disabled){transform:scale(.96)}
+.mbtns button:disabled{opacity:.35;cursor:not-allowed}
+.upg-row{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;
+  background:rgba(255,255,255,.04);margin-top:8px;
+}
+.upg-row .un{flex:1;font-size:14px;font-weight:600;color:var(--cream)}
+.upg-row .ul{display:flex;gap:3px}
+.upg-row .ul i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15)}
+.upg-row .ul i.on{background:var(--gold);box-shadow:0 0 5px rgba(232,181,101,.6)}
+.upg-row button{
+  padding:7px 14px;border-radius:10px;font-size:12px;font-weight:700;flex:none;
+  background:linear-gradient(135deg,var(--jade),#0f9c70);color:#052a1f;
+}
+.upg-row button:disabled{opacity:.3;cursor:not-allowed}
+.st-row{
+  display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+  border-radius:12px;background:rgba(255,255,255,.04);margin-top:8px;font-size:14px;
+}
+.st-row .sn{font-weight:600;color:var(--cream)}
+.st-row button{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:700;background:rgba(47,230,167,.14);color:var(--jade);border:1px solid rgba(47,230,167,.3)}
+.st-row button:active{transform:scale(.95)}
+
+/* ================= 开局设置 ================= */
+.setup{
+  position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(1000px 600px at 80% 0%, rgba(47,230,167,.1), transparent 60%),
+    radial-gradient(800px 600px at 10% 100%, rgba(232,181,101,.1), transparent 55%),
+    #070d0b;
+  padding:20px;overflow-y:auto;
+}
+.setup.hide{display:none}
+.setup-card{
+  width:min(560px,94vw);background:linear-gradient(165deg,#18261f,#0e1a13);
+  border:1px solid rgba(232,181,101,.3);border-radius:24px;padding:30px 30px 26px;
+  box-shadow:0 40px 100px rgba(0,0,0,.7);animation:modalIn .35s ease;
+}
+.setup-card::before{content:"";display:block;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--gold),var(--jade));margin-bottom:20px}
+.setup-card h2{font-size:24px;font-weight:800;letter-spacing:3px;color:var(--cream);text-align:center;font-family:"STKaiti","KaiTi",serif}
+.setup-card .ssub{text-align:center;font-size:11px;color:var(--ink-dim);letter-spacing:5px;margin:6px 0 22px}
+.cfg-row{margin-bottom:18px}
+.cfg-label{font-size:12px;color:var(--jade);letter-spacing:3px;font-weight:700;margin-bottom:9px}
+.seg{display:flex;gap:8px}
+.seg button{
+  padding:9px 0;border-radius:11px;font-size:14px;font-weight:600;flex:1;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--ink-dim);
+  transition:all .15s;
+}
+.seg button.on{background:linear-gradient(135deg,rgba(232,181,101,.2),rgba(232,181,101,.08));border-color:var(--gold);color:var(--gold)}
+.seg button:active{transform:scale(.97)}
+.prow-setup{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;
+  background:rgba(255,255,255,.04);margin-top:8px;border:1px solid transparent;transition:border-color .2s;
+}
+.prow-setup.active{border-color:rgba(232,181,101,.35)}
+.prow-setup .pdot{width:14px;height:14px;border-radius:50%;flex:none}
+.prow-setup input[type=text]{
+  flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;
+  padding:8px 11px;font-size:13px;color:var(--cream);outline:none;min-width:0;
+}
+.seg.tog button{font-size:12.5px;padding:8px 0}
+.seg.tog button.on.ai{background:linear-gradient(135deg,rgba(47,230,167,.2),rgba(47,230,167,.08));border-color:var(--jade);color:var(--jade)}
+.start-btn{
+  width:100%;padding:15px;border-radius:15px;font-size:16px;font-weight:800;letter-spacing:6px;
+  background:linear-gradient(135deg,var(--gold),#c98a3e);color:#2a1c08;margin-top:22px;
+  box-shadow:0 10px 28px rgba(232,181,101,.3);transition:all .15s;
+}
+.start-btn:hover{filter:brightness(1.07)}
+.start-btn:active{transform:scale(.98)}
+
+/* ================= 结算 ================= */
+.gameover{
+  position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;
+  background:rgba(4,8,6,.85);backdrop-filter:blur(6px);
+}
+.gameover.show{display:flex}
+.go-card{
+  width:min(480px,94vw);background:linear-gradient(165deg,#1a2a22,#0e1a13);
+  border:1px solid rgba(232,181,101,.4);border-radius:24px;padding:30px;text-align:center;
+  box-shadow:0 40px 100px rgba(0,0,0,.8);animation:modalIn .4s ease;
+}
+.go-card h2{font-size:30px;font-weight:800;font-family:"STKaiti","KaiTi",serif;letter-spacing:4px;color:var(--gold);text-shadow:0 3px 16px rgba(232,181,101,.4)}
+.go-card .greason{font-size:13px;color:var(--ink-dim);margin:8px 0 18px}
+.go-stand{width:100%;border-collapse:collapse;margin-bottom:20px}
+.go-stand td,.go-stand th{
+  padding:10px 8px;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;
+}
+.go-stand th{font-size:11px;color:var(--ink-dim);letter-spacing:2px;font-weight:600}
+.go-stand tr.winner td{color:var(--gold);font-weight:700}
+.go-stand td.num{font-variant-numeric:tabular-nums}
+.confetti{position:absolute;top:-4px;width:9px;height:14px;border-radius:2px;animation:confFall linear forwards;pointer-events:none}
+@keyframes confFall{to{transform:translateY(105vh) rotate(720deg);opacity:.7}}
+
+@media (max-width:980px){
+  .layout{flex-direction:column;align-items:center}
+  .side{width:100%;max-width:660px}
+  .logbox{max-height:280px}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<header class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#2a1c08" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2M12 12v4M10 14h4"/></svg>
+  </div>
+  <div>
+    <h1>上海滩 <em>大富翁</em></h1>
+    <div class="sub">SHANGHAI MONOPOLY · 黄浦江置业风云</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="soundBtn">音效：开</button>
+  <button class="tbtn" id="newGameBtn">新游戏</button>
+</header>
+
+<!-- ================= 主区 ================= -->
+<main class="layout">
+  <section class="board-col">
+    <div class="board-wrap" id="boardWrap">
+      <div class="board" id="board"></div>
+      <div class="tokens" id="tokens"></div>
+      <div class="float-layer" id="floatLayer"></div>
+      <div class="card-overlay" id="cardOverlay"></div>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="players" id="playersPanel"></div>
+    <div class="logbox">
+      <div class="log-title">事件记录 <span class="round" id="roundInfo"></span></div>
+      <ul class="log" id="log"></ul>
+    </div>
+  </aside>
+</main>
+
+<!-- 通用弹窗 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<!-- ================= 开局设置 ================= -->
+<div class="setup" id="setup">
+  <div class="setup-card">
+    <h2>上海滩大富翁</h2>
+    <div class="ssub">外滩 · 静安寺 · 武康路 · 新天地 · 淮海路 · 田子坊 · 豫园</div>
+
+    <div class="cfg-row">
+      <div class="cfg-label">玩家人数</div>
+      <div class="seg" id="segCount">
+        <button data-v="2">2 人</button>
+        <button data-v="3" class="on">3 人</button>
+        <button data-v="4">4 人</button>
+      </div>
+    </div>
+
+    <div class="cfg-row">
+      <div class="cfg-label">玩家设置</div>
+      <div id="playerRows"></div>
+    </div>
+
+    <div class="cfg-row">
+      <div class="cfg-label">初始资金</div>
+      <div class="seg" id="segCapital">
+        <button data-v="5000">¥5,000</button>
+        <button data-v="10000" class="on">¥10,000</button>
+        <button data-v="15000">¥15,000</button>
+        <button data-v="20000">¥20,000</button>
+      </div>
+    </div>
+
+    <button class="start-btn" id="startBtn">开 局</button>
+  </div>
+</div>
+
+<!-- ================= 结算 ================= -->
+<div class="gameover" id="gameover">
+  <div class="go-card">
+    <h2 id="goTitle">游戏结束</h2>
+    <div class="greason" id="goReason"></div>
+    <table class="go-stand"><thead><tr><th>玩家</th><th>现金</th><th>地产</th><th>净资产</th></tr></thead><tbody id="goBody"></tbody></table>
+    <button class="start-btn" id="againBtn">再来一局</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==================== 基础工具 ==================== */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rand=n=>Math.floor(Math.random()*n);
+const fmt=n=>'¥'+Math.round(n).toLocaleString('zh-CN');
+
+/* ==================== 音效引擎（WebAudio 合成，无外部资源） ==================== */
+const FX={
+  ctx:null,on:true,
+  ensure(){
+    if(!this.ctx){ try{ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ this.on=false; } }
+    if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
+  },
+  tone(f,d,type='sine',v=.12,t=0,slide){
+    if(!this.on||!this.ctx)return;
+    const c=this.ctx,o=c.createOscillator(),g=c.createGain(),now=c.currentTime+t;
+    o.type=type;o.frequency.setValueAtTime(f,now);
+    if(slide)o.frequency.exponentialRampToValueAtTime(slide,now+d);
+    g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(v,now+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,now+d);
+    o.connect(g).connect(c.destination);o.start(now);o.stop(now+d+.03);
+  },
+  noise(d=.1,v=.1,t=0,fq=1800){
+    if(!this.on||!this.ctx)return;
+    const c=this.ctx,len=c.sampleRate*d,buf=c.createBuffer(1,len,c.sampleRate),ch=buf.getChannelData(0);
+    for(let i=0;i<len;i++)ch[i]=(Math.random()*2-1)*(1-i/len);
+    const src=c.createBufferSource();src.buffer=buf;
+    const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=fq;f.Q.value=.8;
+    const g=c.createGain();g.gain.value=v;
+    src.connect(f).connect(g).connect(c.destination);src.start(c.currentTime+t);
+  },
+  click(){this.ensure();this.tone(1500,.05,'square',.05);},
+  step(){this.ensure();this.tone(620,.05,'triangle',.09);},
+  diceTick(){this.ensure();this.noise(.05,.12,0,2400);},
+  diceFinal(){this.ensure();this.tone(180,.12,'square',.16);this.noise(.12,.18,0,900);},
+  cash(){this.ensure();this.tone(1320,.1,'sine',.12);this.tone(1760,.16,'sine',.12,.09);},
+  pay(){this.ensure();this.tone(880,.12,'sine',.11);this.tone(520,.2,'sine',.11,.1);},
+  card(){this.ensure();this.noise(.3,.12,0,1200);this.tone(440,.25,'sine',.05,0,880);},
+  build(){this.ensure();this.tone(300,.1,'triangle',.14,0,620);},
+  teleport(){this.ensure();this.tone(220,.35,'sine',.12,0,1900);},
+  error(){this.ensure();this.tone(140,.28,'sawtooth',.09);},
+  fine(){this.ensure();this.tone(300,.12,'square',.1);this.tone(300,.12,'square',.1,.16);},
+  fanfare(){this.ensure();[523,659,784,1046,1318].forEach((f,i)=>this.tone(f,.32,'sine',.13,i*.13));},
+};
+document.addEventListener('pointerdown',()=>FX.ensure(),{once:true});
+
+/* ==================== 常量与数据 ==================== */
+const SALARY=2000, MAX_ROUND=30, TAX_MIN=500;
+const PLAYER_COLORS=['#2fe6a7','#e8b565','#e0705f','#9b8cf2'];
+const AI_NAMES=['金絲雀','夜航船','梧桐叶'];
+const GROUP_NAMES=['老城厢','静安','徐汇','黄浦'];
+const GROUP_COLORS=['#a9805a','#4a7fb5','#b55a6e','#7a5fc0'];
+
+/* 24 格棋盘：外滩/静安寺/武康路/新天地/淮海路/田子坊/豫园 环黄浦江 */
+const TILES=[
+  {type:'start', name:'起点'},
+  {type:'prop', name:'文庙',     price:650,  group:0,level:0},
+  {type:'chance'},
+  {type:'prop', name:'多伦路',   price:750,  group:0,level:0},
+  {type:'fate'},
+  {type:'prop', name:'复兴公园', price:850,  group:0,level:0},
+  {type:'prop', name:'城隍庙',   price:900,  group:0,level:0},
+  {type:'prop', name:'静安寺',   price:1400, group:1,level:0},
+  {type:'station', name:'人民广场站', station:true},
+  {type:'chance'},
+  {type:'prop', name:'南京东路', price:1250, group:1,level:0},
+  {type:'fate'},
+  {type:'prop', name:'外滩',     price:1600, group:1,level:0},
+  {type:'tax'},
+  {type:'prop', name:'武康路',   price:1350, group:2,level:0},
+  {type:'station', name:'徐家汇站', station:true},
+  {type:'chance'},
+  {type:'prop', name:'淮海路',   price:1200, group:2,level:0},
+  {type:'fate'},
+  {type:'prop', name:'田子坊',   price:1300, group:2,level:0},
+  {type:'park'},
+  {type:'prop', name:'新天地',   price:1150, group:3,level:0},
+  {type:'station', name:'陆家嘴站', station:true},
+  {type:'chance'},
+];
+const RENT_MULT=[1,3,6,11,18];
+const rentOf=t=>Math.round(t.price*.25);
+const upCostOf=t=>Math.round(t.price*.5);
+const isProp=t=>t.type==='prop';
+
+const CHANCE_CARDS=[
+  {title:'股票大涨', desc:'持有的锦江酒店股票涨停，获得分红。', fx:async p=>{await gain(p,1500,'股票分红');}},
+  {title:'彩票中奖', desc:'随手买的一张彩票中了小奖。', fx:async p=>{await gain(p,600,'彩票奖金');}},
+  {title:'地铁月卡', desc:'获得地铁通票，随机传送到一个地铁站。', fx:async p=>{await teleportRandom(p);}},
+  {title:'前进到起点', desc:'市政府补贴创业，前进到起点领取补贴。', fx:async p=>{await moveTo(p,0,{collect:true,teleport:false});}},
+  {title:'违章停车', desc:'车被贴条了，缴纳罚款。', fx:async p=>{await lose(p,400,'违章罚款');}},
+  {title:'房屋维修', desc:'老洋房漏水，需要一笔维修费。', fx:async p=>{await lose(p,800,'维修费');}},
+  {title:'走错路口', desc:'在外滩迷路了，后退 3 格。', fx:async p=>{await moveSteps(p,-3);}},
+  {title:'拾金不昧', desc:'捡到的钱包失主给了酬谢。', fx:async p=>{await gain(p,300,'酬谢金');}},
+];
+const FATE_CARDS=[
+  {title:'黄浦江游船', desc:'登上游船夜航，传送到外滩。', fx:async p=>{await moveTo(p,12,{teleport:true});}},
+  {title:'台风预警', desc:'台风「梅花」过境，损失惨重。', fx:async p=>{await lose(p,500,'台风损失');}},
+  {title:'生日聚会', desc:'朋友们纷纷发来红包，每位玩家送你 ¥200。', fx:async p=>{
+      const others=players.filter(q=>q!==p&&!q.bankrupt);
+      for(const q of others){await transfer(q,p,200,'生日红包');}
+      if(!others.length)await gain(p,200,'生日红包');
+  }},
+  {title:'中大奖', desc:'商场抽奖中了一台相机，转手卖出。', fx:async p=>{await gain(p,1200,'转卖相机');}},
+  {title:'急诊就医', desc:'突发肠胃炎，支付医药费。', fx:async p=>{await lose(p,600,'医药费');}},
+  {title:'时光倒流', desc:'乘上渡轮回溯时光，再掷一次骰子。', fx:async p=>{p.extraRolls++;setMsg(`${p.name} 获得了额外一次掷骰机会`);}},
+  {title:'迷路弄堂', desc:'在石库门里弄迷路，回到最近的地铁站。', fx:async p=>{
+      let best=null,bd=99;
+      for(let k=1;k<=24;k++){const i=(p.pos-k+48)%24;if(TILES[i].type==='station'){if(k<bd){bd=k;best=i;}}}
+      if(best!=null)await moveTo(p,best,{teleport:true});
+      else setMsg('附近没有地铁站，只能原地休息');
+  }},
+  {title:'好心的哥', desc:'的哥免单还资助了零花钱。', fx:async p=>{await gain(p,300,'的哥资助');}},
+];
+
+/* ==================== 游戏状态 ==================== */
+const state={players:[],idx:0,round:1,over:false,busy:false,awaiting:null,capital:10000};
+let tileEls=[],tokenEls=[];
+
+/* ==================== 棋盘构建 ==================== */
+function tilePos(i){
+  if(i<=6) return {r:6,c:6-i};
+  if(i<=12) return {r:12-i,c:0};
+  if(i<=18) return {r:0,c:i-12};
+  return {r:i-18,c:6};
+}
+function pipMap(v){return {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];}
+function buildBoard(){
+  const board=$('#board');board.innerHTML='';
+  tileEls=TILES.map((t,i)=>{
+    const {r,c}=tilePos(i);
+    const el=document.createElement('div');
+    el.className='tile '+t.type;
+    el.style.gridRow=r+1;el.style.gridColumn=c+1;
+    let html='';
+    if(t.type==='prop'){
+      el.style.setProperty('--gc',GROUP_COLORS[t.group]);
+      html=`<div class="band"></div><div class="tname">${t.name}</div><div class="tprice">${fmt(t.price)}</div><div class="owner-stripe"></div><div class="pips"></div>`;
+      el.title=`${GROUP_NAMES[t.group]} · ${t.name}\n价格 ${fmt(t.price)} · 基础租金 ${fmt(rentOf(t))}\n升级费用 ${fmt(upCostOf(t))}/级`;
+    }else if(t.type==='chance'){html=`<div class="glyph">?</div><div class="tname">机会</div>`;el.title='机会：抽取一张机会卡';}
+    else if(t.type==='fate'){html=`<div class="glyph">?</div><div class="tname">命运</div>`;el.title='命运：抽取一张命运卡';}
+    else if(t.type==='station'){html=`<div class="glyph" style="font-family:Arial,sans-serif;font-size:15px;border:2px solid #e8ecf7;border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center">M</div><div class="tname" style="font-size:9.5px">${t.name}</div>`;el.title=`地铁站：可传送至任意其他地铁站`;}
+    else if(t.type==='tax'){html=`<div class="glyph" style="font-size:15px">税</div><div class="tname">税务局</div><div class="tprice">缴 10%</div>`;el.title='税务局：缴纳现金的 10%（最低 ¥500）';}
+    else if(t.type==='park'){html=`<div class="glyph" style="font-size:14px">园</div><div class="tname">和平公园</div>`;el.title='公园：免费休息一回合';}
+    else if(t.type==='start'){html=`<div class="glyph" style="font-size:13px;letter-spacing:2px">起 点</div><div class="tprice" style="color:var(--jade)">过路 +${fmt(SALARY)}</div>`;el.title=`起点：经过领取 ${fmt(SALARY)}`;}
+    el.innerHTML=html;
+    board.appendChild(el);
+    return el;
+  });
+  /* 中央黄浦江场景 */
+  const center=document.createElement('div');center.className='center';
+  center.innerHTML=`
+    <svg class="river-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <path d="M-5 78 C 20 74, 30 60, 38 52 S 60 28, 78 22 S 96 14, 105 10" fill="none" stroke="#7fd4c1" stroke-width="7" opacity=".30" stroke-linecap="round"/>
+      <path class="wave" d="M-5 80 C 20 76, 30 62, 38 54 S 60 30, 78 24 S 96 16, 105 12" fill="none" stroke="#aef0e2" stroke-width="1.6" opacity=".5" stroke-linecap="round"/>
+      <path class="wave w2" d="M-5 82 C 20 78, 30 64, 38 56 S 60 32, 78 26 S 96 18, 105 14" fill="none" stroke="#7fd4c1" stroke-width="1.1" opacity=".35" stroke-linecap="round"/>
+      <g class="boat"><rect x="46" y="46" width="7" height="3" rx="1" fill="#e8b565" opacity=".9"/><rect x="48" y="43" width="3" height="3" fill="#e8b565" opacity=".9"/></g>
+      <g class="boat b2"><rect x="66" y="34" width="6" height="2.6" rx="1" fill="#f2ead8" opacity=".85"/><rect x="67.8" y="31.4" width="2.6" height="2.6" fill="#f2ead8" opacity=".85"/></g>
+      <g opacity=".8">
+        <circle cx="88" cy="18" r="2.2" fill="#e8b565"/>
+        <rect x="86.8" y="20" width="2.4" height="9" fill="#c98a3e"/>
+        <line x1="88" y1="29" x2="88" y2="38" stroke="#8a5a20" stroke-width="1.4"/>
+        <line x1="82" y1="30" x2="94" y2="30" stroke="#8a5a20" stroke-width="1.2"/>
+        <line x1="84" y1="33" x2="92" y2="33" stroke="#8a5a20" stroke-width="1"/>
+      </g>
+    </svg>
+    <div class="center-title">黄 浦 江</div>
+    <div class="center-sub">HUANGPU RIVER</div>
+    <div class="dice-zone">
+      <div class="turn-msg" id="turnMsg">欢迎来到上海滩</div>
+      <div class="dice-row" id="diceRow"></div>
+      <div class="controls">
+        <button class="big-btn primary" id="rollBtn">掷骰子</button>
+        <button class="big-btn ghost" id="endBtn" disabled>结束回合</button>
+      </div>
+    </div>`;
+  center.style.gridRow='2/7';center.style.gridColumn='2/7';
+  board.appendChild(center);
+
+  /* 骰子 */
+  const diceRow=$('#diceRow');diceRow.innerHTML='';
+  for(let k=0;k<2;k++){
+    const d=document.createElement('div');d.className='die';d.id='die'+k;
+    for(let j=0;j<9;j++){const p=document.createElement('i');p.className='pip';d.appendChild(p);}
+    diceRow.appendChild(d);
+  }
+  setDice(1,1);
+}
+function setDice(v1,v2){
+  [v1,v2].forEach((v,k)=>{
+    const die=$('#die'+k);if(!die)return;
+    [...die.children].forEach((p,j)=>p.classList.toggle('on',pipMap(v).includes(j)));
+  });
+}
+function rollAnim(){
+  return new Promise(res=>{
+    [0,1].forEach(k=>$('#die'+k).classList.add('rolling'));
+    const iv=setInterval(()=>{
+      setDice(rand(6)+1,rand(6)+1);FX.diceTick();
+    },75);
+    setTimeout(()=>{
+      clearInterval(iv);
+      const v1=rand(6)+1,v2=rand(6)+1;
+      [0,1].forEach(k=>$('#die'+k).classList.remove('rolling'));
+      setDice(v1,v2);FX.diceFinal();res([v1,v2]);
+    },820);
+  });
+}
+
+/* ==================== 棋子 ==================== */
+function buildTokens(){
+  const layer=$('#tokens');layer.innerHTML='';tokenEls=[];
+  state.players.forEach((p,i)=>{
+    const t=document.createElement('div');t.className='token';
+    t.style.background=`linear-gradient(150deg,${p.color},${p.color}cc)`;
+    t.textContent=p.name[0];
+    layer.appendChild(t);tokenEls.push(t);
+  });
+}
+function placeToken(p){
+  const t=tokenEls[state.players.indexOf(p)];if(!t)return;
+  const el=tileEls[p.pos];if(!el)return;
+  const w=el.offsetWidth,h=el.offsetHeight,s=26,g=3;
+  const corners=[[g,g],[w-s-g,g],[g,h-s-g],[w-s-g,h-s-g]];
+  const [cx,cy]=corners[state.players.indexOf(p)%4];
+  t.style.left=(el.offsetLeft+cx)+'px';
+  t.style.top=(el.offsetTop+cy)+'px';
+}
+function floatText(p,txt,cls){
+  const layer=$('#floatLayer'),wrap=$('#boardWrap');
+  const t=tokenEls[state.players.indexOf(p)];if(!t)return;
+  const s=document.createElement('span');s.className='mfloat '+cls;s.textContent=txt;
+  const tr=wrap.getBoundingClientRect(),br=t.getBoundingClientRect();
+  s.style.left=(br.left-tr.left-14)+'px';s.style.top=(br.top-tr.top-26)+'px';
+  layer.appendChild(s);setTimeout(()=>s.remove(),1200);
+}
+function flashToken(p){
+  const t=tokenEls[state.players.indexOf(p)];if(!t)return;
+  t.classList.remove('teleport-flash');void t.offsetWidth;t.classList.add('teleport-flash');
+  setTimeout(()=>t.classList.remove('teleport-flash'),550);
+}
+function setMsg(html){const m=$('#turnMsg');if(m)m.innerHTML=html;}
+
+/* ==================== 日志与面板 ==================== */
+function log(msg,cls=''){
+  const li=document.createElement('li');if(cls)li.className='lg-'+cls;
+  li.innerHTML=msg;const box=$('#log');
+  box.appendChild(li);box.scrollTop=box.scrollHeight;
+  while(box.children.length>120)box.firstChild.remove();
+}
+function updateUI(){
+  /* 玩家面板 */
+  const pp=$('#playersPanel');
+  pp.innerHTML=state.players.map((p,i)=>`
+    <div class="pcard ${i===state.idx&&!p.bankrupt?'active':''} ${p.bankrupt?'bankrupt':''}">
+      <div class="prow">
+        <span class="pdot" style="background:${p.color}"></span>
+        <span class="pname">${p.name}</span>
+        <span class="ptag">${p.bankrupt?'破产':(p.ai?'电脑':'人类')}</span>
+      </div>
+      <div class="pcash ${p.cash<0?'neg':''}">${fmt(p.cash)}</div>
+      <div class="pmeta"><span>地产 <b>${ownedProps(p).length}</b></span><span>净资产 <b>${fmt(netWorth(p))}</b></span><span>位置 <b>${TILES[p.pos].name}</b></span></div>
+      <div class="pprops">${ownedProps(p).map(t=>`<span class="pprop">${t.name}${t.level?'·'.repeat(0)+'▲'.repeat(Math.min(t.level,3)):''}</span>`).join('')}</div>
+    </div>`).join('');
+  $('#roundInfo').textContent=`第 ${state.round} / ${MAX_ROUND} 回合`;
+  /* 地块归属条 */
+  tileEls.forEach((el,i)=>{
+    const t=TILES[i],stripe=el.querySelector('.owner-stripe'),pips=el.querySelector('.pips');
+    if(stripe){const o=t.owner;stripe.style.background=o?o.color:'transparent';}
+    if(pips){pips.innerHTML=t.level>0?`<i></i>`.repeat(Math.min(t.level,4)):'';}
+  });
+  /* 按钮 */
+  const human=!state.players[state.idx]?.ai;
+  const canRoll=!state.over&&!state.busy&&state.awaiting==='roll'&&human&&!state.players[state.idx].bankrupt;
+  $('#rollBtn').disabled=!canRoll;
+  const canEnd=!state.over&&!state.busy&&state.awaiting==='end'&&human;
+  $('#endBtn').disabled=!canEnd;
+}
+
+/* ==================== 经济运算 ==================== */
+function ownedProps(p){return TILES.filter(t=>isProp(t)&&t.owner===p);}
+function ownsGroup(p,g){
+  const all=TILES.filter(t=>isProp(t)&&t.group===g);
+  return all.length>0&&all.every(t=>t.owner===p);
+}
+function calcRent(t){
+  let r=rentOf(t);
+  if(t.owner&&ownsGroup(t.owner,t.group))r*=2;
+  return r*RENT_MULT[t.level];
+}
+function netWorth(p){
+  return p.cash+ownedProps(p).reduce((s,t)=>s+t.price+upCostOf(t)*t.level,0);
+}
+async function transfer(from,to,amt,label){
+  from.cash-=amt;to.cash+=amt;
+  floatText(from,'-'+fmt(amt),'minus');floatText(to,'+'+fmt(amt),'plus');
+  FX.pay();updateUI();
+  log(`${from.name} 支付 ${fmt(amt)} 给 ${to.name}${label?`（${label}）`:''}`,'money');
+  await sleep(420);
+  await liquidate(from);
+}
+async function gain(p,amt,label){
+  p.cash+=amt;floatText(p,'+'+fmt(amt),'plus');FX.cash();
+  log(`${p.name} 获得 ${fmt(amt)}${label?`（${label}）`:''}`,'good');updateUI();await sleep(380);
+}
+async function lose(p,amt,label){
+  p.cash-=amt;floatText(p,'-'+fmt(amt),'minus');FX.fine();
+  log(`${p.name} 支付 ${fmt(amt)}${label?`（${label}）`:''}`,'bad');updateUI();await sleep(380);
+  await liquidate(p);
+}
+
+/* 破产清算：先卖房，再卖地 */
+async function liquidate(p){
+  if(p.cash>=0||p.bankrupt)return;
+  let guard=40;
+  while(p.cash<0&&guard-->0){
+    const withHouse=ownedProps(p).filter(t=>t.level>0).sort((a,b)=>a.price-b.price)[0];
+    if(withHouse){
+      withHouse.level--;p.cash+=Math.round(upCostOf(withHouse)/2);
+      log(`${p.name} 卖出 ${withHouse.name} 的 ${withHouse.level+1} 级建筑，回笼 ${fmt(Math.round(upCostOf(withHouse)/2))}`,'bad');
+      FX.build();updateUI();await sleep(320);continue;
+    }
+    const prop=ownedProps(p).sort((a,b)=>a.price-b.price)[0];
+    if(prop){
+      const back=Math.round(prop.price/2);
+      log(`${p.name} 变卖了 ${prop.name}，回笼 ${fmt(back)}`,'bad');
+      prop.owner=null;prop.level=0;p.cash+=back;
+      FX.pay();updateUI();await sleep(320);continue;
+    }
+    break;
+  }
+  if(p.cash<0){eliminate(p);}
+}
+function eliminate(p){
+  p.bankrupt=true;
+  ownedProps(p).forEach(t=>{t.owner=null;t.level=0;});
+  tokenEls[state.players.indexOf(p)]?.classList.add('bankrupt');
+  log(`<b>${p.name}</b> 资不抵债，破产离场！`,'bad');
+  FX.error();updateUI();
+  checkEnd();
+}
+function checkEnd(){
+  const alive=state.players.filter(p=>!p.bankrupt);
+  if(alive.length===1&&state.players.length>1){gameOver(alive[0],'所有对手均已破产');}
+}
+
+/* ==================== 移动 ==================== */
+async function moveSteps(p,steps,opts={}){
+  const dir=steps>=0?1:-1;
+  for(let i=0;i<Math.abs(steps);i++){
+    p.pos=(p.pos+dir+24)%24;
+    if(dir>0&&p.pos===0&&!opts.noCollect){
+      p.cash+=SALARY;floatText(p,'+'+fmt(SALARY),'plus');
+      log(`${p.name} 经过起点，领取 ${fmt(SALARY)}`,'good');
+      FX.cash();updateUI();await sleep(200);
+    }
+    placeToken(p);FX.step();
+    tileEls.forEach(el=>el.classList.remove('landed'));
+    tileEls[p.pos].classList.add('landed');
+    await sleep(225);
+  }
+}
+async function moveTo(p,idx,opts={}){
+  if(opts.teleport){flashToken(p);FX.teleport();setMsg(`${p.name} 乘地铁前往「${TILES[idx].name}」`);await sleep(320);}
+  p.pos=idx;placeToken(p);
+  tileEls.forEach(el=>el.classList.remove('landed'));
+  tileEls[p.pos].classList.add('landed');
+  if(opts.collect!==false&&idx===0){
+    p.cash+=SALARY;floatText(p,'+'+fmt(SALARY),'plus');FX.cash();
+    log(`${p.name} 到达起点，领取 ${fmt(SALARY)}`,'good');
+  }
+  updateUI();await sleep(360);
+}
+async function teleportRandom(p){
+  const stations=TILES.map((x,i)=>({x,i})).filter(o=>o.x.type==='station'&&o.i!==p.pos);
+  if(!stations.length)return;
+  const t=stations[rand(stations.length)].i;
+  log(`地铁通票生效：${p.name} 传送至 ${TILES[t].name}`,'sys');
+  await moveTo(p,t,{teleport:true});
+}
+
+/* ==================== 落格结算 ==================== */
+async function landProp(p,t){
+  if(!t.owner){
+    const buy=p.ai?aiBuyDecide(p,t):await askBuy(p,t);
+    if(buy){
+      t.owner=p;p.cash-=t.price;
+      floatText(p,'-'+fmt(t.price),'minus');FX.cash();
+      log(`${p.name} 以 ${fmt(t.price)} 购入 <b>${t.name}</b>（${GROUP_NAMES[t.group]}）`,'money');
+      updateUI();await sleep(420);
+    }else{
+      log(`${p.name} 放弃了购买 ${t.name}`,'sys');await sleep(300);
+    }
+  }else if(t.owner===p){
+    log(`${p.name} 回到了自己的 ${t.name}`,'sys');
+  }else{
+    const rent=calcRent(t);
+    log(`${p.name} 踏入了 ${t.owner.name} 的 <b>${t.name}</b>（${GROUP_NAMES[t.group]}${ownsGroup(t.owner,t.group)?' · 整区垄断':''}）`,'sys');
+    await transfer(p,t.owner,rent,'租金');
+  }
+}
+async function drawCard(p,kind){
+  const pool=kind==='机会'?CHANCE_CARDS:FATE_CARDS;
+  const card=pool[rand(pool.length)];
+  FX.card();
+  await showCard(p,kind,card);
+  log(`<b>${p.name}</b> 抽到${kind}卡「${card.title}」`,'sys');
+  await card.fx(p);
+  updateUI();
+}
+async function payTax(p){
+  const amt=Math.max(TAX_MIN,Math.floor(p.cash*.1));
+  log(`${p.name} 到达税务局，缴纳 ${fmt(amt)}（现金 10%）`,'bad');
+  await lose(p,amt,'税款');
+}
+async function stationPrompt(p,t){
+  const stations=TILES.map((x,i)=>({x,i})).filter(o=>o.x.type==='station');
+  let target=null;
+  if(p.ai){
+    /* AI：寻找离未购买地产最近的地铁站 */
+    let bd=99;
+    for(const s of stations){
+      if(s.i===p.pos)continue;
+      for(let k=1;k<=12;k++){
+        const ti=(s.i+k)%24,tt=TILES[ti];
+        if(isProp(tt)&&!tt.owner){if(k<bd){bd=k;target=s.i;}}
+      }
+    }
+    if(target!=null){log(`电脑 ${p.name} 决定乘地铁去 ${TILES[target].name}`,'sys');}
+  }else{
+    target=await askTeleport(p,t);
+  }
+  if(target!=null)await moveTo(p,target,{teleport:true});
+  else log(`${p.name} 选择留在原地`,'sys');
+}
+
+/* ==================== 升级 ==================== */
+function upgradable(p){
+  return ownedProps(p).filter(t=>t.level<4&&p.cash>=upCostOf(t)+200);
+}
+async function doUpgrade(p,t){
+  const cost=upCostOf(t);
+  if(t.level>=4||p.cash<cost)return false;
+  p.cash-=cost;t.level++;
+  FX.build();floatText(p,'-'+fmt(cost),'minus');
+  log(`${p.name} 将 <b>${t.name}</b> 升级到 ${t.level} 级（租金 ${fmt(calcRent(t))}）`,'good');
+  updateUI();await sleep(360);
+  return true;
+}
+async function aiUpgrade(p){
+  let n=0;
+  while(n<3){
+    const cands=upgradable(p);
+    if(!cands.length)break;
+    /* 优先凑齐片区，其次最贵的地 */
+    const comp=cands.find(t=>{const g=TILES.filter(x=>isProp(x)&&x.group===t.group);return g.filter(x=>x.owner===p).length===g.length-1;});
+    const pick=(comp||cands.sort((a,b)=>b.price-a.price)[0]);
+    await doUpgrade(p,pick);n++;
+    if(p.cash<0)break;
+  }
+}
+async function humanUpgrade(p){
+  const ups=upgradable(p);
+  if(!ups.length)return;
+  await new Promise(res=>{
+    const render=()=>{
+      const rows=ups.map(t=>{
+        const afford=p.cash>=upCostOf(t);
+        return `<div class="upg-row" data-i="${TILES.indexOf(t)}">
+          <span class="un">${t.name}</span>
+          <span class="ul">${[1,2,3,4].map(l=>`<i class="${l<=t.level?'on':''}"></i>`).join('')}</span>
+          <button data-t="${TILES.indexOf(t)}" ${!afford?'disabled':''}>${t.level>=4?'已满级':`升级 ${fmt(upCostOf(t))}`}</button>
+        </div>`;}).join('');
+      openModal(`
+        <div class="mclose-row"><h3>升级房产</h3><span class="mx" id="mx">✕</span></div>
+        <div class="mbody">现金 <b style="color:var(--gold)">${fmt(p.cash)}</b> · 升级后租金大幅提升，集齐片区租金翻倍</div>
+        ${rows}
+        <div class="mbtns"><button class="skip" id="mdone">完成</button></div>`);
+      $('#mx').onclick=()=>{closeModal();res();};
+      $('#mdone').onclick=()=>{closeModal();res();};
+      $$('.upg-row button').forEach(b=>b.onclick=async()=>{
+        const t=TILES[+b.dataset.t];
+        if(await doUpgrade(p,t)){render();}
+      });
+    };
+    render();
+  });
+}
+
+/* ==================== AI 决策 ==================== */
+function aiBuyDecide(p,t){
+  const completes=ownsGroup(p,t.group)||TILES.filter(x=>isProp(x)&&x.group===t.group).every(x=>x.owner===p||x===t);
+  if(p.cash-t.price>=800)return true;
+  if(completes&&p.cash>t.price+300)return true;
+  if(t.price<=700&&p.cash>t.price+400)return true;
+  return false;
+}
+
+/* ==================== 弹窗框架 ==================== */
+function openModal(html){const m=$('#modalBox');m.innerHTML=html;$('#modalMask').classList.add('show');}
+function closeModal(){$('#modalMask').classList.remove('show');}
+function askBuy(p,t){
+  return new Promise(res=>{
+    openModal(`
+      <div class="mclose-row"><h3>购买地产</h3><span class="mx" id="mx">✕</span></div>
+      <div class="mbody"><b style="color:var(--cream)">${t.name}</b> · ${GROUP_NAMES[t.group]} 区<br>
+      当前无人持有，售价 <b style="color:var(--gold);font-size:17px">${fmt(t.price)}</b></div>
+      <div class="price-line"><span>基础租金</span><b>${fmt(rentOf(t))}</b></div>
+      <div class="price-line"><span>升级费用 / 级</span><b>${fmt(upCostOf(t))}</b></div>
+      <div class="price-line"><span>你的现金</span><b style="color:${p.cash>=t.price?'var(--jade)':'var(--crimson)'}">${fmt(p.cash)}</b></div>
+      <div class="mnote">集齐「${GROUP_NAMES[t.group]}」全部地块后，该区租金 ×2。</div>
+      <div class="mbtns">
+        <button class="skip" id="bno">跳过</button>
+        <button class="buy" id="byes" ${p.cash<t.price?'disabled':''}>购买</button>
+      </div>`);
+    $('#mx').onclick=()=>{closeModal();res(false);};
+    $('#bno').onclick=()=>{FX.click();closeModal();res(false);};
+    $('#byes').onclick=()=>{FX.click();closeModal();res(true);};
+  });
+}
+function askTeleport(p,cur){
+  return new Promise(res=>{
+    const stations=TILES.map((x,i)=>({x,i})).filter(o=>o.x.type==='station'&&o.i!==p.pos);
+    openModal(`
+      <div class="mclose-row"><h3>地铁传送</h3><span class="mx" id="mx">✕</span></div>
+      <div class="mbody">你到达了 <b style="color:var(--cream)">${cur.name}</b>，可乘坐地铁前往：</div>
+      ${stations.map(s=>`<div class="st-row"><span class="sn">${s.x.name}</span><button data-i="${s.i}">前往</button></div>`).join('')}
+      <div class="mbtns"><button class="skip" id="stay">留在原地</button></div>`);
+    $('#mx').onclick=()=>{closeModal();res(null);};
+    $('#stay').onclick=()=>{FX.click();closeModal();res(null);};
+    $$('.st-row button').forEach(b=>b.onclick=()=>{FX.click();closeModal();res(+b.dataset.i);});
+  });
+}
+function showCard(p,kind,card){
+  return new Promise(res=>{
+    const ov=$('#cardOverlay');
+    ov.innerHTML=`<div class="mcard ${kind==='机会'?'chance':'fate'}">
+      <div class="ck">${kind}</div>
+      <div class="cglyph">${kind==='机会'?'机':'命'}</div>
+      <div class="ct">${card.title}</div>
+      <div class="cd">${card.desc}</div>
+      <button class="cbtn" id="cok">确定</button>
+    </div>`;
+    ov.classList.add('show');
+    const done=()=>{ov.classList.remove('show');ov.innerHTML='';res();};
+    $('#cok').onclick=()=>{FX.click();done();};
+    if(p.ai)setTimeout(done,1700);
+  });
+}
+
+/* ==================== 回合引擎 ==================== */
+async function takeTurn(p){
+  setMsg(`轮到 <b>${p.name}</b>${p.ai?'（电脑）':''}`);
+  updateUI();
+  let doubles=0;
+  while(true){
+    state.busy=true;updateUI();
+    const [d1,d2]=await rollAnim();
+    FX.ensure();
+    const isDbl=d1===d2;
+    setMsg(`<b>${p.name}</b> 掷出 ${d1} + ${d2}${isDbl?' · 对子！':''}`);
+    log(`—— 第 ${state.round} 回合 · ${p.name} 掷出 ${d1} 和 ${d2} ——`,'sys');
+    updateUI();
+    if(isDbl){
+      doubles++;
+      if(doubles>=3){
+        log(`${p.name} 连续三次掷出对子，缴纳罚款 ${fmt(500)}`,'bad');
+        await lose(p,500,'对子罚款');
+        break;
+      }
+    }
+    await moveSteps(p,d1+d2);
+    await resolveTile(p);
+    if(state.over)return;
+    if(!isDbl){
+      if(p.extraRolls>0){p.extraRolls--;log(`${p.name} 使用时光倒流，再掷一次`,'good');}
+      else break;
+    }else{
+      log(`${p.name} 掷出对子，获得额外一掷`,'good');
+      await sleep(500);
+    }
+  }
+  /* 升级阶段 */
+  if(!p.bankrupt&&!state.over){
+    if(p.ai)await aiUpgrade(p);
+    else if(upgradable(p).length)await humanUpgrade(p);
+  }
+  state.busy=false;
+  if(!state.over){
+    if(p.ai){
+      /* 由驱动层在 takeTurn 完成后推进 */
+    }else if(p.bankrupt){
+      setTimeout(advance,1600);
+    }else{
+      state.awaiting='end';updateUI();
+      setMsg(`<b>${p.name}</b> 的回合结束，点击「结束回合」`);
+    }
+  }
+  updateUI();
+}
+async function resolveTile(p){
+  const t=TILES[p.pos];
+  switch(t.type){
+    case 'start':
+      p.cash+=SALARY;floatText(p,'+'+fmt(SALARY),'plus');FX.cash();
+      log(`${p.name} 到达起点，领取 ${fmt(SALARY)}`,'good');updateUI();await sleep(400);break;
+    case 'prop':await landProp(p,t);break;
+    case 'chance':await drawCard(p,'机会');break;
+    case 'fate':await drawCard(p,'命运');break;
+    case 'tax':await payTax(p);break;
+    case 'station':await stationPrompt(p,t);break;
+    case 'park':
+      log(`${p.name} 在和平公园休息了一回合，欣赏梧桐落叶`,'sys');await sleep(400);break;
+  }
+  checkEnd();
+}
+
+/* ==================== 回合驱动 ==================== */
+function startTurn(){
+  const p=state.players[state.idx];
+  if(!p||state.over)return;
+  if(p.bankrupt){advance();return;}
+  if(p.ai){
+    state.busy=false;state.awaiting=null;
+    takeTurn(p).then(()=>{if(!state.over)setTimeout(advance,450);});
+  }else{
+    state.awaiting='roll';state.busy=false;
+    setMsg(`轮到 <b>${p.name}</b>，点击「掷骰子」`);
+    updateUI();
+  }
+}
+function advance(){
+  if(state.over)return;
+  state.idx=(state.idx+1)%state.players.length;
+  if(state.idx===0){
+    state.round++;
+    if(state.round>MAX_ROUND){endByWealth();return;}
+  }
+  startTurn();
+}
+/* 事件在 buildBoard 之前无法绑定到动态创建的按钮，故用 document 级委托 */
+function onRoll(){
+  const p=state.players[state.idx];
+  if(!p||p.ai||state.busy||state.awaiting!=='roll'||p.bankrupt)return;
+  FX.click();state.awaiting=null;state.busy=true;updateUI();
+  takeTurn(p);
+}
+function onEnd(){
+  if(state.awaiting!=='end'||state.busy)return;
+  FX.click();advance();
+}
+document.addEventListener('click',e=>{
+  if(e.target.closest('#rollBtn'))onRoll();
+  else if(e.target.closest('#endBtn'))onEnd();
+});
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&state.awaiting==='roll'&&!state.busy){
+    e.preventDefault();onRoll();
+  }
+});
+
+/* ==================== 终局 ==================== */
+function gameOver(winner,reason){
+  if(state.over)return;
+  state.over=true;state.busy=false;updateUI();
+  FX.fanfare();
+  $('#goTitle').textContent=`${winner.name} 问鼎上海滩`;
+  $('#goReason').textContent=reason;
+  const rows=state.players.slice().sort((a,b)=>netWorth(b)-netWorth(a)).map(p=>`
+    <tr class="${p===winner?'winner':''}">
+      <td><span class="pdot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name}${p.bankrupt?'（破产）':''}</td>
+      <td class="num">${fmt(p.cash)}</td>
+      <td class="num">${ownedProps(p).length} 处</td>
+      <td class="num">${fmt(netWorth(p))}</td>
+    </tr>`).join('');
+  $('#goBody').innerHTML=rows;
+  $('#gameover').classList.add('show');
+  confetti();
+  log(`<b>${winner.name}</b> 赢得最终胜利！`,'good');
+}
+function endByWealth(){
+  const alive=state.players.filter(p=>!p.bankrupt);
+  const winner=alive.sort((a,b)=>netWorth(b)-netWorth(a))[0]||state.players[0];
+  gameOver(winner,`${MAX_ROUND} 回合结束，按净资产结算`);
+}
+function confetti(){
+  const go=$('#gameover');
+  const colors=['#2fe6a7','#e8b565','#e0705f','#9b8cf2','#f2ead8'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('span');c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=colors[rand(colors.length)];
+    c.style.animationDuration=(2.2+Math.random()*2)+'s';
+    c.style.animationDelay=(Math.random()*1.2)+'s';
+    go.appendChild(c);setTimeout(()=>c.remove(),6000);
+  }
+}
+
+/* ==================== 开局设置 ==================== */
+let cfgCount=3,cfgCapital=10000;
+let cfgPlayers=[
+  {name:'玩家 1',ai:false},
+  {name:'金絲雀',ai:true},
+  {name:'夜航船',ai:true},
+];
+function renderSetupRows(){
+  const box=$('#playerRows');box.innerHTML='';
+  for(let i=0;i<cfgCount;i++){
+    const c=cfgPlayers[i]||{name:'玩家 '+(i+1),ai:false};
+    const row=document.createElement('div');
+    row.className='prow-setup'+(i===0?' active':'');
+    row.innerHTML=`
+      <span class="pdot" style="background:${PLAYER_COLORS[i]}"></span>
+      <input type="text" maxlength="6" value="${c.name}" data-i="${i}" class="nm">
+      <div class="seg tog" style="width:150px;flex:none">
+        <button data-t="h" class="${!c.ai?'on':''}">人类</button>
+        <button data-t="ai" class="${c.ai?'on ai':''}">电脑</button>
+      </div>`;
+    box.appendChild(row);
+    row.querySelector('.nm').addEventListener('input',e=>{cfgPlayers[i].name=e.target.value;});
+    row.querySelectorAll('.tog button').forEach(b=>b.addEventListener('click',()=>{
+      c.ai=b.dataset.t==='ai';
+      if(c.ai&&!c.name.replace('玩家','').trim())c.name=AI_NAMES[i]||('电脑'+(i+1));
+      if(!c.ai)c.name='玩家 '+(i+1);
+      FX.click();renderSetupRows();
+    }));
+  }
+}
+$('#segCount').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  cfgCount=+b.dataset.v;FX.click();
+  $$('#segCount button').forEach(x=>x.classList.toggle('on',x===b));
+  renderSetupRows();
+});
+$('#segCapital').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  cfgCapital=+b.dataset.v;FX.click();
+  $$('#segCapital button').forEach(x=>x.classList.toggle('on',x===b));
+});
+$('#startBtn').addEventListener('click',()=>{
+  FX.ensure();FX.fanfare();
+  state.players=[];
+  for(let i=0;i<cfgCount;i++){
+    const c=cfgPlayers[i]||{name:'玩家 '+(i+1),ai:false};
+    state.players.push({
+      name:(c.name||'').trim()||(c.ai?(AI_NAMES[i]||'电脑'):'玩家 '+(i+1)),
+      ai:!!c.ai,color:PLAYER_COLORS[i],cash:cfgCapital,pos:0,bankrupt:false,extraRolls:0,
+    });
+  }
+  state.idx=0;state.round=1;state.over=false;state.busy=false;state.awaiting=null;
+  TILES.forEach(t=>{if(t.type==='prop'){t.owner=null;t.level=0;}});
+  $('#log').innerHTML='';
+  log(`游戏开始！${state.players.map(p=>`${p.name}${p.ai?'（电脑）':''}`).join('、')}，初始资金 ${fmt(cfgCapital)}`,'sys');
+  buildBoard();buildTokens();
+  state.players.forEach(placeToken);
+  tileEls[0].classList.add('landed');
+  $('#setup').classList.add('hide');
+  setTimeout(startTurn,900);
+});
+$('#againBtn').addEventListener('click',()=>{
+  $('#gameover').classList.remove('show');
+  $('#setup').classList.remove('hide');
+});
+$('#newGameBtn').addEventListener('click',()=>{
+  $('#gameover').classList.remove('show');
+  $('#setup').classList.remove('hide');
+  state.over=true;
+  log('已开启新游戏','sys');
+});
+$('#soundBtn').addEventListener('click',()=>{
+  FX.on=!FX.on;FX.ensure();
+  $('#soundBtn').textContent=FX.on?'音效：开':'音效：关';
+  FX.click();
+});
+
+renderSetupRows();
+buildBoard(); /* 预渲染棋盘作背景 */
+</script>
+</body>
+</html>

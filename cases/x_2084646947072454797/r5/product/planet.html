@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procedural Planet — Blue Marble</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  #view {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; cursor: grab;
+  }
+  #view:active { cursor: grabbing; }
+
+  #ui {
+    position: fixed; top: 16px; left: 16px; width: 238px;
+    padding: 14px 16px 12px;
+    background: rgba(8, 13, 26, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(110, 170, 255, 0.22);
+    border-radius: 14px;
+    color: #dfe9ff;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  }
+  #ui h1 {
+    font-size: 15px; font-weight: 650; letter-spacing: 0.3px;
+    margin-bottom: 10px; color: #eaf2ff;
+  }
+  #ui button {
+    display: block; width: 100%;
+    padding: 7px 10px; margin-bottom: 8px;
+    background: rgba(70, 130, 220, 0.14);
+    color: #cfe0ff;
+    border: 1px solid rgba(110, 170, 255, 0.28);
+    border-radius: 9px;
+    font: inherit; font-size: 12.5px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #ui button:hover { background: rgba(90, 150, 255, 0.28); border-color: rgba(140, 190, 255, 0.5); }
+  #ui button:active { transform: translateY(1px); }
+  #ui button.primary {
+    background: linear-gradient(135deg, rgba(40,110,230,0.55), rgba(30,80,200,0.55));
+    border-color: rgba(140, 190, 255, 0.55);
+    font-weight: 600;
+  }
+  #ui button.active {
+    background: rgba(80, 160, 255, 0.42);
+    border-color: rgba(160, 205, 255, 0.8);
+    color: #ffffff;
+  }
+  .modes { display: flex; gap: 6px; }
+  .modes button { flex: 1; padding: 6px 2px; font-size: 11px; margin-bottom: 0; }
+  .sec {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: #8fa8d0; margin: 10px 0 5px;
+    display: flex; justify-content: space-between;
+  }
+  .sec .val { color: #cfe0ff; font-variant-numeric: tabular-nums; }
+  #ui input[type="range"] {
+    width: 100%; margin-bottom: 4px;
+    accent-color: #5aa2ff; cursor: pointer;
+    height: 18px;
+  }
+  .hint {
+    margin-top: 10px; font-size: 10.5px; color: #6d81a5; text-align: center;
+  }
+  #err {
+    display: none;
+    position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    max-width: 90vw; padding: 10px 16px;
+    background: rgba(120, 20, 20, 0.9); color: #fff;
+    border-radius: 8px; font: 12px/1.4 monospace;
+    white-space: pre-wrap; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="err"></div>
+
+<div id="ui">
+  <h1>&#x1FA90; Blue Marble Planet</h1>
+
+  <button id="regen" class="primary">&#x1F3B2; Regenerate Planet</button>
+
+  <div class="sec"><span>Shading Mode</span></div>
+  <div class="modes">
+    <button class="mode-btn active" data-mode="0">Day-Night</button>
+    <button class="mode-btn" data-mode="1">Temperature</button>
+    <button class="mode-btn" data-mode="2">Humidity</button>
+  </div>
+
+  <div class="sec"><span>Terrain Roughness</span><span class="val" id="vRough"></span></div>
+  <input id="sRough" type="range" min="0" max="1" step="0.01">
+
+  <div class="sec"><span>Sea Level</span><span class="val" id="vSea"></span></div>
+  <input id="sSea" type="range" min="0.42" max="0.68" step="0.01">
+
+  <div class="sec"><span>Rotation Speed</span><span class="val" id="vSpeed"></span></div>
+  <input id="sSpeed" type="range" min="0" max="1.5" step="0.01">
+
+  <button id="tCycle" class="toggle"></button>
+  <button id="tAtmo" class="toggle"></button>
+  <button id="tCloud" class="toggle"></button>
+
+  <div class="hint">drag to orbit &middot; scroll to zoom</div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var canvas = document.getElementById('view');
+var errBox = document.getElementById('err');
+function showErr(msg) { errBox.textContent = msg; errBox.style.display = 'block'; }
+window.addEventListener('error', function (e) { showErr('Error: ' + e.message); });
+
+var gl = canvas.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' })
+      || canvas.getContext('experimental-webgl');
+if (!gl) { showErr('WebGL is not available in this browser.'); return; }
+
+/* ------------------------------------------------------------------ */
+/* Shaders                                                             */
+/* ------------------------------------------------------------------ */
+
+var VS_SRC = [
+  'attribute vec2 aPos;',
+  'void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }'
+].join('\n');
+
+/* The planet is shaded entirely in the fragment shader:
+   - classic 3D Perlin gradient noise (hash-based, sin-free)
+   - fBm continents + ridged mountains scaled by a roughness uniform
+   - biome coloring driven by moisture / temperature / elevation
+   - bump-mapped relief so the silhouette stays perfectly smooth
+   - city lights on the night side, subtle ocean sun glint,
+     day-night terminator, temperature & humidity map modes,
+     drifting thin cloud shell, fresnel atmosphere rim + space halo  */
+var FS_SRC = [
+'precision highp float;',
+'',
+'uniform vec2  uRes;',
+'uniform float uTime;',
+'uniform vec3  uCamPos;',
+'uniform float uSeed;',
+'uniform float uRough;',   // terrain roughness 0..1
+'uniform float uSea;',     // sea level threshold
+'uniform float uRot;',     // planet spin angle
+'uniform float uSunAng;',  // sun orbit angle (day-night cycle)
+'uniform float uMode;',    // 0 day-night | 1 temperature | 2 humidity
+'uniform float uAtmo;',    // atmosphere on/off
+'uniform float uCloud;',   // cloud layer on/off',
+'',
+'#define PLANET_R 1.0',
+'#define CLOUD_R  1.035',
+'',
+'vec3 rotY(vec3 p, float a){',
+'    float c = cos(a); float s = sin(a);',
+'    return vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z);',
+'}',
+'',
+'/* --- Perlin-style gradient noise (sin-free hash) --- */',
+'vec3 hash33(vec3 p){',
+'    p = fract(p * vec3(443.8975, 441.4233, 437.1948));',
+'    p += dot(p, p.yxz + 19.19);',
+'    return -1.0 + 2.0 * fract((p.xxy + p.yxx) * p.zyx);',
+'}',
+'',
+'float gnoise(vec3 p){',
+'    vec3 i = floor(p);',
+'    vec3 f = fract(p);',
+'    vec3 u = f*f*(3.0 - 2.0*f);',
+'    return mix(mix(mix(dot(hash33(i + vec3(0.,0.,0.)), f - vec3(0.,0.,0.)),',
+'                     dot(hash33(i + vec3(1.,0.,0.)), f - vec3(1.,0.,0.)), u.x),',
+'                 mix(dot(hash33(i + vec3(0.,1.,0.)), f - vec3(0.,1.,0.)),',
+'                     dot(hash33(i + vec3(1.,1.,0.)), f - vec3(1.,1.,0.)), u.x), u.y),',
+'             mix(mix(dot(hash33(i + vec3(0.,0.,1.)), f - vec3(0.,0.,1.)),',
+'                     dot(hash33(i + vec3(1.,0.,1.)), f - vec3(1.,0.,1.)), u.x),',
+'                 mix(dot(hash33(i + vec3(0.,1.,1.)), f - vec3(0.,1.,1.)),',
+'                     dot(hash33(i + vec3(1.,1.,1.)), f - vec3(1.,1.,1.)), u.x), u.y), u.z);',
+'}',
+'',
+'float fbm(vec3 p, float oct, float pers){',
+'    float s = 0.0; float a = 0.5; float n = 0.0;',
+'    mat3 m = mat3( 0.00,  0.80,  0.60,',
+'                  -0.80,  0.36, -0.48,',
+'                  -0.60, -0.48,  0.64);',
+'    for(int i = 0; i < 6; i++){',
+'        if(float(i) >= oct) break;',
+'        s += a * gnoise(p);',
+'        n += a;',
+'        p = m * p * 2.03;',
+'        a *= pers;',
+'    }',
+'    return s / max(n, 0.0001);',
+'}',
+'',
+'vec3 seedOff(float k){',
+'    return fract(vec3(uSeed * k) * vec3(0.1031, 0.1030, 0.0973)) * vec3(23.0, 19.0, 17.0);',
+'}',
+'',
+'/* Full elevation: continents + detail + ridged mountains */',
+'float elevation(vec3 q){',
+'    float cont = fbm(q * 1.7 + seedOff(1.0), 3.0, 0.5);',
+'    float det  = fbm(q * 5.2 + seedOff(2.0), 4.0, 0.55) * (0.35 + 0.65 * uRough);',
+'    float rn   = fbm(q * 3.1 + seedOff(3.0), 4.0, 0.6);',
+'    float ridge = pow(clamp(1.0 - abs(rn), 0.0, 1.0), 3.0);',
+'    float landMask = smoothstep(-0.30, 0.20, cont);',
+'    float h = cont * 0.60 + det * 0.30 + ridge * 0.9 * uRough * landMask;',
+'    return clamp(0.5 + 0.55 * h, 0.0, 1.0);',
+'}',
+'',
+'/* Lighter elevation used only for bump-mapping gradient */',
+'float elevationCheap(vec3 q){',
+'    float cont = fbm(q * 1.7 + seedOff(1.0), 3.0, 0.5);',
+'    float det  = fbm(q * 5.2 + seedOff(2.0), 4.0, 0.55) * (0.35 + 0.65 * uRough);',
+'    return clamp(0.5 + 0.55 * (cont * 0.60 + det * 0.30), 0.0, 1.0);',
+'}',
+'',
+'float moisture(vec3 q){',
+'    return clamp(0.5 + 0.5 * fbm(q * 2.7 + seedOff(4.0), 3.0, 0.55), 0.0, 1.0);',
+'}',
+'',
+'float temperature(float y, float e){',
+'    float t = 1.0 - abs(y) * 1.25 - max(e - uSea, 0.0) * 1.7;',
+'    return clamp(t, 0.0, 1.0);',
+'}',
+'',
+'/* Drifting cloud field (shared by the cloud shell and its shadow) */',
+'float cloudField(vec3 q){',
+'    vec3 p = rotY(q, uTime * 0.012);',
+'    return fbm(p * 3.3 + seedOff(6.0), 3.0, 0.55);',
+'}',
+'',
+'/* Ocean: bright cyan-turquoise shallows -> deep navy abyss */',
+'vec3 oceanColor(float depth, float temp){',
+'    vec3 shallow = vec3(0.05, 0.74, 0.80);',
+'    vec3 mid     = vec3(0.02, 0.40, 0.72);',
+'    vec3 deep    = vec3(0.01, 0.11, 0.42);',
+'    float d = clamp(depth * 3.2, 0.0, 1.0);',
+'    vec3 c = mix(shallow, mid, smoothstep(0.02, 0.30, d));',
+'    c = mix(c, deep, smoothstep(0.30, 0.95, d));',
+'    /* polar sea ice */',
+'    c = mix(c, vec3(0.82, 0.88, 0.92), 1.0 - smoothstep(0.05, 0.22, temp));',
+'    return c;',
+'}',
+'',
+'/* Land: arid tan -> yellow grassland -> deep green forest,',
+'   with elevation shading, rocky highs and snow caps */',
+'vec3 landColor(float e01, float moist, float temp, vec3 q){',
+'    vec3 forest = vec3(0.075, 0.30, 0.10);',
+'    vec3 grass  = vec3(0.60, 0.56, 0.15);',
+'    vec3 arid   = vec3(0.58, 0.42, 0.22);',
+'    vec3 rock   = vec3(0.40, 0.34, 0.28);',
+'    vec3 snow   = vec3(0.93, 0.95, 0.98);',
+'',
+'    float m = moist;',
+'    vec3 c = mix(arid, grass, smoothstep(0.28, 0.48, m));',
+'    c = mix(c, forest, smoothstep(0.52, 0.78, m));',
+'    float hot = 1.0 - smoothstep(0.55, 0.85, temp);',
+'    c = mix(c, arid, hot * (1.0 - m) * 0.65);',
+'    /* subtle hue variation */',
+'    float v = 0.90 + 0.20 * (0.5 + 0.5 * gnoise(q * 24.0 + seedOff(7.0)));',
+'    c *= v;',
+'    /* elevation-based shading */',
+'    c *= 0.78 + 0.40 * e01;',
+'    /* exposed rock on steep ground */',
+'    c = mix(c, rock, smoothstep(0.38, 0.72, e01));',
+'    /* snow caps near the snow line */',
+'    float snowline = 0.60 + (1.0 - temp) * 0.40;',
+'    c = mix(c, snow, smoothstep(snowline, snowline + 0.14, e01));',
+'    return c;',
+'}',
+'',
+'vec3 tempColor(float t){',
+'    vec3 c = mix(vec3(0.02, 0.08, 0.45), vec3(0.05, 0.45, 0.85), smoothstep(0.00, 0.30, t));',
+'    c = mix(c, vec3(0.15, 0.75, 0.55), smoothstep(0.30, 0.55, t));',
+'    c = mix(c, vec3(0.95, 0.85, 0.25), smoothstep(0.55, 0.80, t));',
+'    c = mix(c, vec3(0.90, 0.25, 0.10), smoothstep(0.80, 1.00, t));',
+'    return c;',
+'}',
+'',
+'vec3 moistColor(float m){',
+'    vec3 c = mix(vec3(0.78, 0.65, 0.35), vec3(0.55, 0.75, 0.35), smoothstep(0.00, 0.35, m));',
+'    c = mix(c, vec3(0.20, 0.55, 0.35), smoothstep(0.35, 0.65, m));',
+'    c = mix(c, vec3(0.08, 0.35, 0.75), smoothstep(0.65, 1.00, m));',
+'    return c;',
+'}',
+'',
+'float iSphere(vec3 ro, vec3 rd, float r){',
+'    float b = dot(ro, rd);',
+'    float c = dot(ro, ro) - r*r;',
+'    float h = b*b - c;',
+'    if(h < 0.0) return -1.0;',
+'    return -b - sqrt(h);',
+'}',
+'',
+'vec3 background(vec3 ro, vec3 rd, vec3 sunW){',
+'    vec3 c = vec3(0.004, 0.007, 0.018);',
+'    /* faint galactic band */',
+'    float band = exp(-abs(dot(rd, normalize(vec3(0.25, 1.0, 0.18)))) * 3.5);',
+'    c += vec3(0.012, 0.016, 0.028) * band;',
+'    /* stars */',
+'    vec3 id = floor(rd * 230.0);',
+'    float h = fract(sin(dot(id, vec3(12.9898, 78.233, 45.164))) * 43758.5453);',
+'    float star = step(0.9965, h);',
+'    float bright = 0.35 + 0.65 * fract(h * 91.73);',
+'    c += vec3(0.85, 0.90, 1.00) * star * bright * 0.75;',
+'    /* atmospheric halo ringing the planet */',
+'    float tca = -dot(ro, rd);',
+'    vec3 closest = ro + rd * max(tca, 0.0);',
+'    float d = length(closest);',
+'    float halo = exp(-max(d - PLANET_R, 0.0) * 8.0);',
+'    float sunF = dot(normalize(closest + vec3(0.00001)), sunW);',
+'    vec3 hcol = mix(vec3(0.35, 0.65, 1.0), vec3(1.0, 0.58, 0.28), exp(-abs(sunF) * 3.0));',
+'    hcol = mix(vec3(0.02, 0.04, 0.09), hcol, smoothstep(-0.5, 0.5, sunF));',
+'    c += hcol * halo * 0.50 * uAtmo;',
+'    return c;',
+'}',
+'',
+'vec3 shadePlanet(vec3 q, vec3 sun, vec3 V){',
+'    float sea = uSea;',
+'    float e = elevation(q);',
+'    float isLand = step(sea, e);',
+'    float depth = max(sea - e, 0.0);',
+'    float e01 = clamp((e - sea) / max(0.05, 1.0 - sea), 0.0, 1.0);',
+'    float temp = temperature(q.y, e);',
+'    float moist = moisture(q);',
+'    moist = clamp(moist + (1.0 - smoothstep(0.0, 0.05, e - sea)) * 0.30, 0.0, 1.0);',
+'',
+'    /* bump-mapped relief: silhouette stays a perfect smooth circle */',
+'    vec3 ref = abs(q.y) < 0.98 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);',
+'    vec3 t1 = normalize(cross(q, ref));',
+'    vec3 t2 = normalize(cross(q, t1));',
+'    float eps = 0.004;',
+'    float e0 = e;',
+'    float ex = elevationCheap(q + t1 * eps);',
+'    float ey = elevationCheap(q + t2 * eps);',
+'    vec3 grad = (t1 * (ex - e0) + t2 * (ey - e0)) / eps;',
+'    grad -= q * dot(grad, q);',
+'    vec3 N = normalize(q - grad * 0.030 * (isLand > 0.5 ? 1.0 : 0.12));',
+'',
+'    float ndl = dot(N, sun);',
+'    float ndl2 = max(ndl, 0.0);',
+'    float term = smoothstep(-0.10, 0.14, ndl);',
+'    float sunset = exp(-abs(ndl) * 5.0);',
+'',
+'    vec3 base;',
+'    if(uMode < 0.5){',
+'        vec3 ocean = oceanColor(depth, temp);',
+'        vec3 land = landColor(e01, moist, temp, q);',
+'        base = mix(ocean, land, isLand);',
+'    } else if(uMode < 1.5){',
+'        base = tempColor(temp);',
+'    } else {',
+'        base = moistColor(moist);',
+'    }',
+'',
+'    /* daylight: bright, night: dim but never pure black */',
+'    vec3 col = base * (0.040 + 1.06 * ndl2);',
+'',
+'    /* subtle ocean sun glint (day side only) */',
+'    if(isLand < 0.5 && uMode < 0.5){',
+'        vec3 H = normalize(sun + V);',
+'        float spec = pow(max(dot(N, H), 0.0), 80.0) * 0.16 * term;',
+'        col += vec3(1.0, 0.98, 0.92) * spec;',
+'    }',
+'',
+'    /* city lights: faint even at the terminator, stronger on the night side */',
+'    if(uMode < 0.5){',
+'        float nightF = 1.0 - smoothstep(-0.16, 0.10, ndl);',
+'        float c1 = smoothstep(0.10, 0.45, fbm(q * 16.0 + seedOff(8.0), 2.0, 0.5));',
+'        float c2 = smoothstep(-0.10, 0.35, fbm(q * 5.0 + seedOff(9.0), 2.0, 0.5));',
+'        float cities = c1 * c2 * isLand * (1.0 - smoothstep(0.05, 0.50, e01));',
+'        col += vec3(1.0, 0.72, 0.40) * cities * (0.10 + 0.90 * nightF) * 1.7;',
+'    }',
+'',
+'    /* warm sunset band along the terminator */',
+'    col += base * vec3(0.95, 0.42, 0.14) * sunset * 0.10;',
+'',
+'    /* cloud shadows drifting over the surface */',
+'    if(uCloud > 0.5 && uMode < 0.5){',
+'        float dens = cloudField(q);',
+'        float sh = smoothstep(0.05, 0.55, dens * 0.5 + 0.5);',
+'        col *= 1.0 - 0.28 * sh * term;',
+'    }',
+'',
+'    /* atmosphere: fresnel rim, blue by day, ember at sunset, faint at night */',
+'    if(uAtmo > 0.5){',
+'        float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);',
+'        vec3 acol = mix(vec3(0.30, 0.62, 1.0), vec3(1.0, 0.55, 0.25), sunset);',
+'        acol = mix(vec3(0.04, 0.07, 0.14), acol, term);',
+'        col += acol * rim * 0.9;',
+'    }',
+'    return col;',
+'}',
+'',
+'void main(){',
+'    vec3 roW = uCamPos;',
+'    vec3 fwd = normalize(-roW);',
+'    vec3 right = normalize(cross(fwd, vec3(0.0, 1.0, 0.0)));',
+'    vec3 up = cross(right, fwd);',
+'    vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;',
+'    vec3 rdW = normalize(uv.x * right + uv.y * up + fwd * 1.9);',
+'',
+'    vec3 sunW = normalize(vec3(cos(uSunAng), 0.22, sin(uSunAng)));',
+'    vec3 col = background(roW, rdW, sunW);',
+'',
+'    /* rays into planet-local (spun) space */',
+'    vec3 ro = rotY(roW, -uRot);',
+'    vec3 rd = rotY(rdW, -uRot);',
+'    vec3 sun = rotY(sunW, -uRot);',
+'    vec3 V = -rd;',
+'',
+'    float tP = iSphere(ro, rd, PLANET_R);',
+'    if(tP > 0.0){',
+'        vec3 pos = ro + rd * tP;',
+'        vec3 q = normalize(pos);',
+'        col = shadePlanet(q, sun, V);',
+'    }',
+'',
+'    /* thin drifting cloud shell */',
+'    if(uCloud > 0.5){',
+'        float tC = iSphere(ro, rd, CLOUD_R);',
+'        if(tC > 0.0){',
+'            vec3 cp = normalize(ro + rd * tC);',
+'            float dens = cloudField(cp);',
+'            float a = smoothstep(0.04, 0.55, dens * 0.5 + 0.5);',
+'            float ndlC = max(dot(cp, sun), 0.0);',
+'            float termC = smoothstep(-0.12, 0.10, dot(cp, sun));',
+'            vec3 cCol = mix(vec3(0.85, 0.45, 0.28) * 0.45, vec3(1.03, 1.01, 0.99), termC);',
+'            cCol *= 0.10 + 0.95 * ndlC;',
+'            col = mix(col, cCol, a * 0.55);',
+'        }',
+'    }',
+'',
+'    col = pow(max(col, 0.0), vec3(0.92));',
+'    gl_FragColor = vec4(col, 1.0);',
+'}'
+].join('\n');
+
+/* ------------------------------------------------------------------ */
+/* GL boilerplate                                                      */
+/* ------------------------------------------------------------------ */
+
+function compile(type, src) {
+  var s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    var log = gl.getShaderInfoLog(s);
+    showErr('Shader error:\n' + log);
+    throw new Error(log);
+  }
+  return s;
+}
+
+var prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS_SRC));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS_SRC));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  var linkLog = gl.getProgramInfoLog(prog);
+  showErr('Link error:\n' + linkLog);
+  throw new Error(linkLog);
+}
+gl.useProgram(prog);
+
+var buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+var aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+var U = {};
+['uRes', 'uTime', 'uCamPos', 'uSeed', 'uRough', 'uSea', 'uRot', 'uSunAng', 'uMode', 'uAtmo', 'uCloud']
+  .forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+
+/* ------------------------------------------------------------------ */
+/* State, camera, UI                                                   */
+/* ------------------------------------------------------------------ */
+
+var state = {
+  seed: Math.random() * 997 + 3,
+  rough: 0.55,
+  sea: 0.56,
+  speed: 0.35,
+  mode: 0,
+  cycle: true,
+  atmo: true,
+  cloud: true
+};
+
+var yaw = 0.6, pitch = 0.25, radius = 3.1;
+var rot = 0, sunAng = 0.9;
+var last = performance.now();
+var qScale = 1.0, ema = 16, frameCount = 0;
+
+function resize() {
+  var dpr = Math.min(window.devicePixelRatio || 1, 1.5) * qScale;
+  var w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  var h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+window.addEventListener('resize', resize);
+
+/* orbit + zoom */
+var dragging = false, lx = 0, ly = 0;
+canvas.addEventListener('pointerdown', function (e) {
+  dragging = true; lx = e.clientX; ly = e.clientY;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener('pointermove', function (e) {
+  if (!dragging) return;
+  yaw += (e.clientX - lx) * 0.005;
+  pitch += (e.clientY - ly) * 0.005;
+  pitch = Math.max(-1.45, Math.min(1.45, pitch));
+  lx = e.clientX; ly = e.clientY;
+});
+canvas.addEventListener('pointerup', function () { dragging = false; });
+canvas.addEventListener('pointercancel', function () { dragging = false; });
+canvas.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  radius *= Math.exp(e.deltaY * 0.0011);
+  radius = Math.max(1.75, Math.min(6.5, radius));
+}, { passive: false });
+
+/* UI wiring */
+function $(id) { return document.getElementById(id); }
+
+$('regen').addEventListener('click', function () {
+  state.seed = Math.random() * 997 + 3;
+});
+
+var modeBtns = document.querySelectorAll('.mode-btn');
+Array.prototype.forEach.call(modeBtns, function (b) {
+  b.addEventListener('click', function () {
+    state.mode = +b.dataset.mode;
+    Array.prototype.forEach.call(modeBtns, function (x) {
+      x.classList.toggle('active', x === b);
+    });
+  });
+});
+
+function bindToggle(id, key, label) {
+  var b = $(id);
+  function update() {
+    b.textContent = label + (state[key] ? ': On' : ': Off');
+    b.classList.toggle('active', state[key]);
+  }
+  b.addEventListener('click', function () { state[key] = !state[key]; update(); });
+  update();
+}
+bindToggle('tCycle', 'cycle', 'Day-Night Cycle');
+bindToggle('tAtmo', 'atmo', 'Atmosphere');
+bindToggle('tCloud', 'cloud', 'Clouds');
+
+function bindSlider(id, key, vid) {
+  var el = $(id), out = $(vid);
+  function show() { out.textContent = (+el.value).toFixed(2); }
+  el.addEventListener('input', function () { state[key] = +el.value; show(); });
+  el.value = state[key];
+  show();
+}
+bindSlider('sRough', 'rough', 'vRough');
+bindSlider('sSea', 'sea', 'vSea');
+bindSlider('sSpeed', 'speed', 'vSpeed');
+
+/* debug / test handle */
+window.PLANET = { state: state, setSun: function (a) { sunAng = a; } };
+
+/* ------------------------------------------------------------------ */
+/* Render loop (with adaptive resolution)                              */
+/* ------------------------------------------------------------------ */
+
+function frame(now) {
+  var dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+
+  rot += state.speed * dt;
+  if (state.cycle) sunAng += dt * 0.10;
+
+  ema = ema * 0.95 + dt * 1000 * 0.05;
+  frameCount++;
+  if (frameCount % 50 === 0) {
+    if (ema > 30 && qScale > 0.55) { qScale = Math.max(0.55, qScale - 0.15); resize(); }
+    else if (ema < 13 && qScale < 1.0) { qScale = Math.min(1.0, qScale + 0.10); resize(); }
+  }
+
+  var cp = Math.cos(pitch), sp = Math.sin(pitch);
+  var cx = Math.cos(yaw) * cp * radius;
+  var cy = sp * radius;
+  var cz = Math.sin(yaw) * cp * radius;
+
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform1f(U.uTime, now / 1000);
+  gl.uniform3f(U.uCamPos, cx, cy, cz);
+  gl.uniform1f(U.uSeed, state.seed);
+  gl.uniform1f(U.uRough, state.rough);
+  gl.uniform1f(U.uSea, state.sea);
+  gl.uniform1f(U.uRot, rot);
+  gl.uniform1f(U.uSunAng, sunAng);
+  gl.uniform1f(U.uMode, state.mode);
+  gl.uniform1f(U.uAtmo, state.atmo ? 1 : 0);
+  gl.uniform1f(U.uCloud, state.cloud ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  requestAnimationFrame(frame);
+}
+
+resize();
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

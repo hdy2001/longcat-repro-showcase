@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故宫 3D 动画解说 · 9:16</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+  #stage { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  #gl { display: block; }
+  #rec { position: fixed; top: 10px; left: 10px; z-index: 9; color: #6f6; font: 12px monospace; display: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<div id="stage"><canvas id="gl" width="1080" height="1920"></canvas></div>
+<div id="rec">● REC <span id="rect">0.0</span>s</div>
+<script type="module">
+import * as THREE from 'three';
+import { createScene } from '../js/scene.js';
+import { createComposer, createAmbience } from '../js/fx.js';
+import { createCinematic } from '../js/cinematic.js';
+
+const W = 1080, H = 1920;
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const camera = new THREE.PerspectiveCamera(58, W / H, 0.1, 4200);
+const { scene, update } = createScene(renderer, { crowdCount: 170 });
+const { composer } = createComposer(renderer, scene, camera, 0.85);
+composer.setSize(W, H);
+
+const cine = createCinematic(camera, W, H);
+
+// 环境音
+const ambience = createAmbience();
+
+// 舞台尺寸
+function fit() {
+  const stage = document.getElementById('stage');
+  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  stage.style.width = W + 'px'; stage.style.height = H + 'px';
+  stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+}
+fit();
+window.addEventListener('resize', fit);
+
+// ---------- 主循环 ----------
+const clock = new THREE.Clock();
+let time = 0, recording = false, warmFrames = 0;
+
+// 合成画布（GL + 叠加层）
+const comp = document.createElement('canvas');
+comp.width = W; comp.height = H;
+const cctx = comp.getContext('2d');
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (window.__paused) return;
+  const dt = Math.min(clock.getDelta(), 0.05);
+  time += dt;
+  update(dt, time);
+  if (time < cine.duration + 1.5) {
+    cine.update(0, time);
+    cine.drawOverlay(time);
+    composer.render();
+    cctx.drawImage(canvas, 0, 0);
+    cctx.drawImage(cine.overlay, 0, 0);
+  }
+  // 录制自动停止
+  if (recording && recorder && time > cine.duration + 0.4) {
+    try { recorder.stop(); } catch (e) {}
+  }
+  if (++warmFrames === 3) window.__READY = true;
+}
+
+window.__cine = cine;
+window.__app = { renderer, scene, camera, composer, THREE };
+
+// ---------- 录制接口 ----------
+let recorder = null, chunks = [];
+window.__READY = false;
+window.__startRecording = function () {
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = comp.captureStream(30);
+      const audio = ambience.getStream();
+      if (audio) audio.getAudioTracks().forEach((tr) => stream.addTrack(tr));
+      const mime = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm']
+        .find((m) => MediaRecorder.isTypeSupported(m)) || '';
+      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12_000_000 });
+      chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        recording = false;
+        document.getElementById('rec').style.display = 'none';
+        const blob = new Blob(chunks, { type: mime || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = mime.includes('mp4') ? 'forbidden-city-9x16.mp4' : 'forbidden-city-9x16.webm';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 4000);
+        resolve(blob.size);
+      };
+      recorder.start(500);
+      recording = true;
+      document.getElementById('rec').style.display = 'block';
+      time = 0;
+      clock.getDelta();
+      resolve(null);
+    } catch (e) { reject(e); }
+  });
+};
+
+window.__REC = {
+  get recording() { return recording; },
+  time: () => time,
+  mime: () => recorder ? recorder.mimeType : '',
+};
+
+// QA 抓帧：跳到指定时间渲染一帧并返回 dataURL（先 __paused=true）
+window.__captureStill = function (t) {
+  time = t;
+  update(0.016, time);
+  cine.update(0, time);
+  cine.drawOverlay(time);
+  composer.render();
+  cctx.drawImage(canvas, 0, 0);
+  cctx.drawImage(cine.overlay, 0, 0);
+  return comp.toDataURL('image/jpeg', 0.92);
+};
+
+// REC 计时显示
+setInterval(() => {
+  if (recording) document.getElementById('rect').textContent = time.toFixed(1);
+}, 200);
+
+frame();
+</script>
+</body>
+</html>

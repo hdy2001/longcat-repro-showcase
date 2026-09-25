@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天宫 · Heavenly Palace</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#0e1a26; }
+  #scene-container { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- cinematic vignette & grade ---------- */
+  #vignette {
+    position:fixed; inset:0; pointer-events:none; z-index:5;
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 42%, rgba(0,0,0,0) 55%, rgba(8,16,28,0.42) 100%),
+      linear-gradient(to bottom, rgba(20,34,52,0.18) 0%, rgba(0,0,0,0) 18%);
+    mix-blend-mode:multiply;
+  }
+  #grade {
+    position:fixed; inset:0; pointer-events:none; z-index:4;
+    background:linear-gradient(160deg, rgba(140,180,230,0.05) 0%, rgba(255,225,180,0.04) 100%);
+  }
+
+  /* ---------- title ---------- */
+  #ui {
+    position:fixed; inset:0; pointer-events:none; z-index:10;
+    font-family:"Noto Serif SC","STSong","STZhongsong","SimSun",serif;
+    color:#fff;
+  }
+  #title-wrap {
+    position:absolute; top:42px; left:48px;
+    opacity:0; animation:fadein 2.4s ease 0.6s forwards;
+  }
+  #title-cn {
+    font-size:64px; font-weight:700; letter-spacing:22px;
+    color:#fdfbf5; text-shadow:0 2px 24px rgba(20,40,70,0.55), 0 0 60px rgba(255,240,210,0.25);
+    writing-mode:horizontal-tb;
+  }
+  #title-cn span { display:inline-block; opacity:0; transform:translateY(14px); animation:rise 1.4s cubic-bezier(.2,.7,.2,1) forwards; }
+  #title-cn span:nth-child(1){ animation-delay:0.9s; } #title-cn span:nth-child(2){ animation-delay:1.15s; }
+  #title-sub {
+    margin-top:12px; font-size:14px; letter-spacing:8px; color:rgba(250,246,238,0.82);
+    text-shadow:0 1px 10px rgba(20,40,70,0.6);
+    opacity:0; animation:fadein 2s ease 1.6s forwards;
+  }
+  #title-line {
+    margin-top:14px; width:190px; height:1px;
+    background:linear-gradient(90deg, rgba(220,190,130,0.9), rgba(220,190,130,0));
+    opacity:0; animation:fadein 2s ease 1.8s forwards;
+  }
+  #hint {
+    position:absolute; bottom:34px; left:50%; transform:translateX(-50%);
+    font-size:13px; letter-spacing:6px; color:rgba(250,246,238,0.75);
+    text-shadow:0 1px 8px rgba(20,40,70,0.65);
+    opacity:0; animation:fadein 2.4s ease 2.6s forwards; white-space:nowrap;
+  }
+  #seal {
+    position:absolute; top:46px; right:52px; width:46px; height:46px;
+    border:1.5px solid rgba(200,60,48,0.85); border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(214,72,58,0.92); font-size:15px; letter-spacing:0; font-weight:700;
+    writing-mode:vertical-rl; padding:3px;
+    text-shadow:none; box-shadow:0 0 14px rgba(180,50,40,0.25);
+    opacity:0; animation:fadein 2.2s ease 2.2s forwards;
+    background:rgba(255,250,240,0.06);
+  }
+  @keyframes fadein { to { opacity:1; } }
+  @keyframes rise { to { opacity:1; transform:translateY(0); } }
+
+  /* ---------- loader ---------- */
+  #loader {
+    position:fixed; inset:0; z-index:50; background:linear-gradient(180deg,#16283a,#0e1a26);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    transition:opacity 1.6s ease; font-family:"Noto Serif SC","STSong","SimSun",serif;
+  }
+  #loader.done { opacity:0; pointer-events:none; }
+  #loader .zh { font-size:44px; letter-spacing:26px; color:#e8e2d2; text-indent:26px; }
+  #loader .bar { margin-top:26px; width:210px; height:1px; background:rgba(255,255,255,0.14); position:relative; overflow:hidden; }
+  #loader .bar i { position:absolute; left:-40%; top:0; width:40%; height:100%;
+    background:linear-gradient(90deg, transparent, rgba(230,200,140,0.95), transparent);
+    animation:scan 1.5s ease-in-out infinite; }
+  @keyframes scan { to { left:100%; } }
+  #err {
+    position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center;
+    color:#e8e2d2; font-family:serif; font-size:16px; background:#0e1a26; text-align:center; line-height:2;
+  }
+</style>
+</head>
+<body>
+<div id="loader"><div class="zh">天 宫</div><div class="bar"><i></i></div></div>
+<div id="err"><div>您的浏览器不支持 WebGL，无法进入天宫。<br>请使用最新版 Chrome / Edge / Safari 打开。</div></div>
+<div id="scene-container"></div>
+<div id="grade"></div>
+<div id="vignette"></div>
+<div id="ui">
+  <div id="title-wrap">
+    <div id="title-cn"><span>天</span><span>宫</span></div>
+    <div id="title-sub">HEAVENLY PALACE · 云上玉阙</div>
+    <div id="title-line"></div>
+  </div>
+  <div id="seal">凌霄</div>
+  <div id="hint">移 动 鼠 标 · 感 受 纵 深</div>
+</div>
+
+<script type="text/plain" id="three-src">
+<!--THREE_PLACEHOLDER-->
+</script>
+<script type="module">
+const THREE = await import(URL.createObjectURL(new Blob([document.getElementById('three-src').textContent], {type:'text/javascript'})));
+/*__APP_A__*/
+/*__APP_B__*/
+/*__APP_C__*/
+</script>
+</body>
+</html>

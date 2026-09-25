@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粒子古建 · 祈年殿 / 太和殿</title>
+<style>
+  html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  #label {
+    position:fixed; left:46px; top:50%; transform:translateY(-50%);
+    display:flex; gap:28px; align-items:flex-start;
+    pointer-events:none; transition:opacity .38s ease;
+  }
+  #label.hide { opacity:0; }
+  #name {
+    writing-mode:vertical-rl;
+    font-family:"Songti SC","STSong","Noto Serif SC",serif;
+    color:#f5f5f5; font-size:58px; font-weight:600; letter-spacing:16px;
+    text-shadow:0 0 22px rgba(255,255,255,.22);
+  }
+  #sub {
+    writing-mode:vertical-rl;
+    font-family:"Songti SC",serif; color:rgba(255,255,255,.48);
+    font-size:13px; letter-spacing:5px; padding-top:8px;
+  }
+  #hint {
+    position:fixed; top:26px; right:32px; pointer-events:none;
+    color:rgba(255,255,255,.40); font-family:"Songti SC",serif;
+    font-size:12px; letter-spacing:3px;
+  }
+  #nav {
+    position:fixed; left:50%; bottom:36px; transform:translateX(-50%);
+    display:flex; gap:14px;
+  }
+  #nav button {
+    appearance:none; border:1px solid rgba(255,255,255,.32);
+    background:transparent; color:rgba(255,255,255,.85);
+    font-family:"Songti SC",serif; font-size:14px; letter-spacing:4px;
+    padding:9px 24px 9px 28px; border-radius:999px; cursor:pointer;
+    transition:all .3s ease;
+  }
+  #nav button:hover { border-color:rgba(255,255,255,.8); }
+  #nav button.active { background:rgba(255,255,255,.92); color:#000; border-color:transparent; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="label"><div id="name">祈年殿</div><div id="sub">天坛 · TEMPLE OF HEAVEN</div></div>
+<div id="hint">拖拽旋转 · 滚轮缩放</div>
+<div id="nav"><button id="btn0" class="active">祈 年 殿</button><button id="btn1">太 和 殿</button></div>
+
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ============ renderer / scene / camera ============ */
+  var container = document.getElementById('app');
+  var renderer = new THREE.WebGLRenderer({ antialias:false, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 1);
+  container.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(62, 34, 84);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 15, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.enablePan = false;
+  controls.minDistance = 30;
+  controls.maxDistance = 230;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.45;
+
+  /* ============ shaders ============ */
+  var VERT = [
+    'attribute vec3 aOut;',
+    'attribute vec3 aColor;',
+    'attribute vec4 aMisc;', // phase, delay, floatAmp, sizeJitter
+    'uniform float uTime;',
+    'uniform float uMorph;',
+    'uniform float uPixelFactor;',
+    'uniform float uSize;',
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'void main(){',
+    '  float t = clamp(uMorph * (1.0 + aMisc.y) - aMisc.y, 0.0, 1.0);',
+    '  t = t * t * (3.0 - 2.0 * t);',
+    '  vec3 p = mix(position, aOut, t);',
+    '  float ph = aMisc.x;',
+    '  float amp = aMisc.z;',
+    '  p.x += sin(uTime * 0.55 + ph * 1.7) * amp * 0.7;',
+    '  p.y += sin(uTime * 0.75 + ph) * amp;',
+    '  p.z += cos(uTime * 0.62 + ph * 2.3) * amp * 0.7;',
+    '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+    '  gl_Position = projectionMatrix * mv;',
+    '  float size = uSize * aMisc.w * (1.0 - 0.45 * t);',
+    '  gl_PointSize = clamp(size * uPixelFactor / -mv.z, 1.0, 5.0);',
+    '  vColor = aColor;',
+    '  vAlpha = 1.0 - 0.35 * t;',
+    '}'
+  ].join('\n');
+
+  var FRAG = [
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'void main(){',
+    '  vec2 uv = gl_PointCoord - 0.5;',
+    '  float d = length(uv);',
+    '  float a = smoothstep(0.5, 0.10, d);',
+    '  gl_FragColor = vec4(vColor, a * vAlpha);',
+    '}'
+  ].join('\n');
+
+  var pixelFactor = 1000;
+  function updatePixelFactor() {
+    pixelFactor = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)));
+  }
+  updatePixelFactor();
+
+  function makeMaterial(size) {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uMorph: { value: 0 },
+        uPixelFactor: { value: pixelFactor },
+        uSize: { value: size }
+      },
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+  }
+
+  /* ============ cloud builder ============ */
+  function CloudBuilder() { return { home: [], color: [], misc: [] }; }
+  function put(b, x, y, z, r, g, bl, boost) {
+    var j = (0.66 + Math.random() * 0.40) * (boost || 1);
+    b.home.push(x, y, z);
+    b.color.push(r * j, g * j, bl * j);
+    b.misc.push(
+      Math.random() * Math.PI * 2,
+      Math.random() * 0.40,
+      0.08 + Math.random() * 0.08,
+      0.75 + Math.random() * 0.50
+    );
+  }
+  function pick(p, a, b) { return Math.random() < p ? a : b; }
+
+  function spherePt(b, cx, cy, cz, rad, n, rgb, shell) {
+    for (var i = 0; i < n; i++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2;
+      var s = Math.sqrt(1 - u * u);
+      var rr = shell ? rad * (0.68 + 0.32 * Math.random()) : rad * Math.cbrt(Math.random());
+      put(b, cx + s * Math.cos(th) * rr, cy + u * rr, cz + s * Math.sin(th) * rr, rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function linePt(b, x0, y0, z0, x1, y1, z1, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var t = Math.random();
+      put(b,
+        x0 + (x1 - x0) * t + (Math.random() - 0.5) * 0.08,
+        y0 + (y1 - y0) * t + (Math.random() - 0.5) * 0.08,
+        z0 + (z1 - z0) * t + (Math.random() - 0.5) * 0.08,
+        rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  // curved Chinese roof cone: steep at ridge, flattening + upturned at eave
+  function roofCone(b, N, rT, zT, rB, zB, curl, colorFn) {
+    for (var i = 0; i < N; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var t = Math.pow(Math.random(), 0.85);
+      var r = rT + (rB - rT) * t;
+      var z = zT + (zB - zT) * Math.pow(t, 0.55);
+      if (t > 0.88) { var u = (t - 0.88) / 0.12; z += curl * u * u; }
+      var rr = r + (Math.random() - 0.5) * 0.1;
+      var zz = z + (Math.random() - 0.5) * 0.1;
+      var c = colorFn(th, t);
+      put(b, rr * Math.cos(th), zz, rr * Math.sin(th), c[0], c[1], c[2]);
+    }
+  }
+  // hip roof (庑殿顶) heightfield over a rect plan, ridge along x
+  function roofHip(b, N, eX, eZ, eY, rY, rHalf, colorFn, curl) {
+    for (var i = 0; i < N; i++) {
+      var x = (Math.random() * 2 - 1) * eX;
+      var z = (Math.random() * 2 - 1) * eZ;
+      var hf = Math.max(0, Math.abs(x) - rHalf) / (eX - rHalf);
+      var ef = Math.abs(z) / eZ;
+      var m = Math.max(hf, ef);
+      var y = rY - (rY - eY) * Math.pow(m, 0.85);
+      y += curl * Math.pow(hf * ef, 2.0); // upturned corners
+      y += (Math.random() - 0.5) * 0.1;
+      var c = colorFn(x, z, m);
+      put(b, x + (Math.random() - 0.5) * 0.1, y, z + (Math.random() - 0.5) * 0.1, c[0], c[1], c[2]);
+    }
+  }
+  function rimRingCone(b, r, z, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var rr = r + (Math.random() - 0.5) * 0.12;
+      put(b, rr * Math.cos(th), z + (Math.random() - 0.5) * 0.12, rr * Math.sin(th), rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function rectPerimeter(w, d, t) { // t in [0,1) along rect outline
+    var p = t * 2 * (w + d);
+    if (p < w) return [-w / 2 + p, -d / 2];
+    p -= w;
+    if (p < d) return [w / 2, -d / 2 + p];
+    p -= d;
+    if (p < w) return [w / 2 - p, d / 2];
+    p -= w;
+    return [-w / 2, d / 2 - p];
+  }
+  function rimRect(b, w, d, y, n, rgb) {
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w, d, Math.random());
+      put(b, xz[0] + (Math.random() - 0.5) * 0.12, y + (Math.random() - 0.5) * 0.12, xz[1], rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function wallRing(b, r, y0, y1, segs, per, colorFn) {
+    for (var i = 0; i < segs; i++) {
+      var th = (i / segs) * Math.PI * 2;
+      for (var k = 0; k < per; k++) {
+        var t = k / per;
+        var c = colorFn(th, t);
+        put(b,
+          (r + (Math.random() - 0.5) * 0.08) * Math.cos(th),
+          y0 + (y1 - y0) * t + (Math.random() - 0.5) * 0.1,
+          (r + (Math.random() - 0.5) * 0.08) * Math.sin(th),
+          c[0], c[1], c[2]);
+      }
+    }
+  }
+  function bracketBand(b, r, y, n, cA, cB) {
+    for (var i = 0; i < n; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var seg = Math.floor(th / (Math.PI * 2) * 40);
+      var c = seg % 2 === 0 ? cA : cB;
+      var rr = r + (Math.random() - 0.5) * 0.35;
+      put(b, rr * Math.cos(th), y + (Math.random() - 0.5) * 0.4, rr * Math.sin(th), c[0], c[1], c[2]);
+    }
+  }
+  function bracketBandRect(b, w, d, y, n, cA, cB) {
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w, d, Math.random());
+      var seg = Math.floor(Math.random() * 48);
+      var c = seg % 2 === 0 ? cA : cB;
+      put(b,
+        xz[0] + (Math.random() - 0.5) * 0.35,
+        y + (Math.random() - 0.5) * 0.4,
+        xz[1] + (Math.random() - 0.5) * 0.35,
+        c[0], c[1], c[2]);
+    }
+  }
+  function column(b, x, z, y0, y1, per, rgb) {
+    for (var k = 0; k < per; k++) {
+      var t = k / (per - 1);
+      put(b, x + (Math.random() - 0.5) * 0.09, y0 + (y1 - y0) * t, z + (Math.random() - 0.5) * 0.09, rgb[0], rgb[1], rgb[2]);
+    }
+  }
+  function terrace(b, w, d, y0, y1, cTop, cSide, cEdge) {
+    var i, x, z;
+    for (i = 0; i < 2400; i++) { // top face
+      x = (Math.random() * 2 - 1) * w / 2; z = (Math.random() * 2 - 1) * d / 2;
+      put(b, x, y1 + 0.03, z, cTop[0], cTop[1], cTop[2]);
+    }
+    for (i = 0; i < 2400; i++) { // side faces, denser toward edges
+      var face = Math.floor(Math.random() * 4);
+      var v = Math.pow(Math.random(), 0.65), u = Math.random();
+      var y = y0 + (y1 - y0) * v;
+      if (face === 0) { x = (u * 2 - 1) * w / 2; z = d / 2 + 0.02; }
+      else if (face === 1) { x = (u * 2 - 1) * w / 2; z = -d / 2 - 0.02; }
+      else if (face === 2) { x = w / 2 + 0.02; z = (u * 2 - 1) * d / 2; }
+      else { x = -w / 2 - 0.02; z = (u * 2 - 1) * d / 2; }
+      put(b, x, y, z, cSide[0], cSide[1], cSide[2]);
+    }
+    for (i = 0; i < 700; i++) { // top edge line
+      var xz = rectPerimeter(w, d, Math.random());
+      put(b, xz[0], y1 + 0.03, xz[1], cEdge[0], cEdge[1], cEdge[2]);
+    }
+    for (i = 0; i < 350; i++) { // waist line
+      var xz2 = rectPerimeter(w, d, Math.random());
+      put(b, xz2[0], (y0 + y1) / 2, xz2[1], cSide[0] * 0.8, cSide[1] * 0.8, cSide[2] * 0.8);
+    }
+  }
+  function balustrade(b, w, d, y, spacing, rgbPost, rgbTip) {
+    var per = 2 * (w + d), n = Math.floor(per / spacing);
+    for (var i = 0; i < n; i++) {
+      var xz = rectPerimeter(w - 0.6, d - 0.6, i / n);
+      for (var k = 0; k < 4; k++) put(b, xz[0], y + 0.06 + k * 0.14, xz[1], rgbPost[0], rgbPost[1], rgbPost[2]);
+      put(b, xz[0], y + 0.62, xz[1], rgbTip[0], rgbTip[1], rgbTip[2]);
+    }
+  }
+  function stairs(b, x0, x1, zTop, zBot, yTop, yBot, cStep, cEdge) {
+    var steps = 12, dz = (zBot - zTop) / steps, s, k, x;
+    for (s = 0; s < steps; s++) {
+      var yA = yTop + (yBot - yTop) * s / steps;
+      var yB = yTop + (yBot - yTop) * (s + 1) / steps;
+      var zB = zTop + dz * (s + 1);
+      for (k = 0; k < 14; k++) { x = x0 + (x1 - x0) * k / 13; put(b, x, yB + 0.03, zB - dz * 0.45, cStep[0], cStep[1], cStep[2]); }
+      for (k = 0; k < 6; k++) { x = x0 + (x1 - x0) * k / 5; put(b, x, yB + (yA - yB) * k / 5 + 0.02, zB, cStep[0] * 0.85, cStep[1] * 0.85, cStep[2] * 0.85); }
+    }
+    for (k = 0; k < 70; k++) {
+      var t = k / 69;
+      put(b, x0 - 0.4, yTop + (yBot - yTop) * t, zTop + (zBot - zTop) * t, cEdge[0], cEdge[1], cEdge[2]);
+      put(b, x1 + 0.4, yTop + (yBot - yTop) * t, zTop + (zBot - zTop) * t, cEdge[0], cEdge[1], cEdge[2]);
+    }
+  }
+
+  /* ============ palettes (kept below 1.0 to avoid additive blowout) ============ */
+  var SILVER   = [0.58, 0.60, 0.64];
+  var SILVER_HI= [0.78, 0.80, 0.84];
+  var MARBLE  = [0.56, 0.58, 0.62];
+  var BLUE     = [0.10, 0.25, 0.62];
+  var BLUE_SL  = [0.40, 0.48, 0.70];
+  var GOLD     = [0.80, 0.58, 0.22];
+  var RED      = [0.52, 0.10, 0.10];
+  var DARKRED  = [0.30, 0.08, 0.08];
+  var GREEN    = [0.15, 0.45, 0.28];
+  var RIM_Q    = [0.52, 0.70, 0.90];
+
+  /* ============ 祈年殿 ============ */
+  function buildQinian() {
+    var b = CloudBuilder(), i;
+    // three circular terraces + balustrades
+    var tiers = [ { r: 14.6, y0: 0, y1: 1.3 }, { r: 13.6, y0: 1.3, y1: 2.6 }, { r: 12.6, y0: 2.6, y1: 3.9 } ];
+    for (i = 0; i < 3; i++) {
+      var tr = tiers[i];
+      for (var k = 0; k < 2400; k++) {
+        var rr = tr.r * Math.sqrt(Math.random()), th = Math.random() * Math.PI * 2;
+        put(b, rr * Math.cos(th), tr.y1 + 0.03, rr * Math.sin(th), MARBLE[0], MARBLE[1], MARBLE[2]);
+      }
+      for (k = 0; k < 2400; k++) {
+        th = Math.random() * Math.PI * 2;
+        var y = tr.y0 + (tr.y1 - tr.y0) * Math.pow(Math.random(), 0.65);
+        var rad = tr.r + 0.02;
+        put(b, rad * Math.cos(th), y, rad * Math.sin(th), SILVER[0] * 0.85, SILVER[1] * 0.85, SILVER[2] * 0.85);
+      }
+      for (k = 0; k < 700; k++) {
+        th = Math.random() * Math.PI * 2;
+        put(b, tr.r * Math.cos(th), tr.y1 + 0.03, tr.r * Math.sin(th), SILVER_HI[0], SILVER_HI[1], SILVER_HI[2]);
+      }
+      var posts = Math.floor(2 * Math.PI * tr.r / 2.4);
+      for (k = 0; k < posts; k++) {
+        th = k / posts * Math.PI * 2;
+        for (var m = 0; m < 4; m++) put(b, tr.r * Math.cos(th), tr.y1 + 0.06 + m * 0.14, tr.r * Math.sin(th), SILVER_HI[0], SILVER_HI[1], SILVER_HI[2]);
+        put(b, tr.r * Math.cos(th), tr.y1 + 0.62, tr.r * Math.sin(th), MARBLE[0] * 1.3, MARBLE[1] * 1.3, MARBLE[2] * 1.3);
+      }
+    }
+    // lower colonnade: red columns + dark red wall panels
+    for (i = 0; i < 48; i++) {
+      var cth = i / 48 * Math.PI * 2;
+      column(b, 10.8 * Math.cos(cth), 10.8 * Math.sin(cth), 3.9, 12.0, 62, RED);
+    }
+    wallRing(b, 9.9, 4.2, 11.4, 48, 80, function () { return DARKRED; });
+    bracketBand(b, 11.3, 12.3, 2200, GOLD, GREEN);
+    // roof 1 (lower eave)
+    roofCone(b, 12000, 8.6, 13.6, 14.2, 10.9, 0.5, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 14.2, 11.05, 1400, RIM_Q);
+    // drum wall
+    wallRing(b, 8.4, 13.6, 18.4, 48, 95, function (th, t) {
+      var seg = Math.floor(th / (Math.PI * 2) * 24);
+      if (seg % 2 === 0 && Math.random() < 0.10) return GOLD;
+      return pick(0.7, BLUE, BLUE_SL);
+    });
+    bracketBand(b, 8.9, 18.7, 1700, GOLD, GREEN);
+    // roof 2 (middle eave)
+    roofCone(b, 9500, 5.6, 19.6, 11.8, 17.2, 0.5, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 11.8, 17.35, 1100, RIM_Q);
+    // upper wall
+    wallRing(b, 5.4, 19.6, 23.8, 42, 85, function (th, t) {
+      var seg = Math.floor(th / (Math.PI * 2) * 24);
+      if (seg % 2 === 0 && Math.random() < 0.12) return GOLD;
+      return pick(0.7, BLUE, BLUE_SL);
+    });
+    bracketBand(b, 6.2, 24.1, 1300, GOLD, GREEN);
+    // roof 3 (top cone)
+    roofCone(b, 10500, 0.8, 31.0, 8.6, 23.4, 0.7, function () { return pick(0.62, BLUE, BLUE_SL); });
+    rimRingCone(b, 8.6, 23.55, 900, RIM_Q);
+    // gilded finial 宝顶
+    linePt(b, 0, 31.0, 0, 0, 31.9, 0, 200, GOLD);
+    spherePt(b, 0, 32.3, 0, 1.15, 1400, GOLD, true);
+    for (i = 0; i < 300; i++) { // lotus ring
+      var lth = Math.random() * Math.PI * 2;
+      put(b, 0.85 * Math.cos(lth), 31.7 + (Math.random() - 0.5) * 0.25, 0.85 * Math.sin(lth), GOLD[0], GOLD[1], GOLD[2]);
+    }
+    linePt(b, 0, 33.1, 0, 0, 34.4, 0, 220, GOLD);
+    spherePt(b, 0, 34.5, 0, 0.22, 120, GOLD, false);
+    return b;
+  }
+
+  /* ============ 太和殿 ============ */
+  var YELLOW = [0.70, 0.54, 0.18];
+  var WARM_SL= [0.50, 0.48, 0.42];
+  var GOLD_R = [0.80, 0.60, 0.22];
+  var EAVE_RM= [0.70, 0.66, 0.50];
+
+  function buildTaihe() {
+    var b = CloudBuilder(), i;
+    // three-tier marble terrace 三层台基
+    terrace(b, 64, 38, 0, 2.2, MARBLE, SILVER, SILVER_HI);
+    terrace(b, 60, 34, 2.2, 4.4, MARBLE, SILVER, SILVER_HI);
+    terrace(b, 56, 30, 4.4, 6.6, MARBLE, SILVER, SILVER_HI);
+    balustrade(b, 64, 38, 2.2, 2.3, SILVER, SILVER_HI);
+    balustrade(b, 60, 34, 4.4, 2.3, SILVER, SILVER_HI);
+    balustrade(b, 56, 30, 6.6, 2.3, SILVER, SILVER_HI);
+    // front stairways: central ramp + two side ramps
+    stairs(b, -4.5, 4.5, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    stairs(b, -15, -11, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    stairs(b, 11, 15, 15, 23.5, 6.6, 0, SILVER_HI, GOLD_R);
+    // red columns ring
+    var x, z;
+    for (x = -27; x <= 27.01; x += 5.4) { column(b, x, 14, 6.8, 15.6, 70, RED); column(b, x, -14, 6.8, 15.6, 70, RED); }
+    for (z = -9.8; z <= 9.81; z += 4.9) { column(b, 27, z, 6.8, 15.6, 70, RED); column(b, -27, z, 6.8, 15.6, 70, RED); }
+    // wall panels between columns
+    for (i = 0; i < 2800; i++) {
+      x = (Math.random() * 2 - 1) * 26.2; put(b, x, 6.8 + Math.random() * 8.0, 13.2, DARKRED[0], DARKRED[1], DARKRED[2]);
+      put(b, x, 6.8 + Math.random() * 8.0, -13.2, DARKRED[0], DARKRED[1], DARKRED[2]);
+    }
+    for (i = 0; i < 1600; i++) {
+      z = (Math.random() * 2 - 1) * 13.2; put(b, 26.2, 6.8 + Math.random() * 8.0, z, DARKRED[0], DARKRED[1], DARKRED[2]);
+      put(b, -26.2, 6.8 + Math.random() * 8.0, z, DARKRED[0], DARKRED[1], DARKRED[2]);
+    }
+    // bracket band 斗拱
+    bracketBandRect(b, 55, 29, 15.9, 3600, GREEN, GOLD);
+    // lower eave roof
+    roofHip(b, 15000, 33, 19, 16.8, 20.6, 19, function () { return pick(0.55, YELLOW, WARM_SL); }, 0.35);
+    rimRect(b, 66, 38, 16.75, 2200, EAVE_RM);
+    linePt(b, -19, 20.75, 0, 19, 20.75, 0, 800, GOLD_R);
+    ridgesOrnaments(b, 33, 19, 16.8, 20.6, 19);
+    // upper wall band with painted decor
+    for (i = 0; i < 3600; i++) {
+      var th = Math.random() * Math.PI * 2;
+      var rx = 24, rz = 11;
+      var px = rx * Math.cos(th), pz = rz * Math.sin(th);
+      var seg = Math.floor(th / (Math.PI * 2) * 48);
+      var c = seg % 3 === 0 ? GOLD : (seg % 3 === 1 ? GREEN : [0.12, 0.22, 0.55]);
+      put(b, px, 20.6 + Math.random() * 2.0, pz, c[0], c[1], c[2]);
+    }
+    // upper main roof
+    roofHip(b, 20000, 36, 21, 22.8, 26.6, 20, function () { return pick(0.55, YELLOW, WARM_SL); }, 0.4);
+    rimRect(b, 72, 42, 22.75, 2400, EAVE_RM);
+    linePt(b, -20.8, 26.75, 0, 20.8, 26.75, 0, 900, GOLD_R);
+    ridgesOrnaments(b, 36, 21, 22.8, 26.6, 20);
+    spherePt(b, 21.6, 27.1, 0, 0.6, 220, GOLD_R, true);
+    spherePt(b, -21.6, 27.1, 0, 0.6, 220, GOLD_R, true);
+    return b;
+  }
+  function ridgesOrnaments(b, eX, eZ, eY, rY, rHalf) {
+    var sx, sz;
+    for (sx = -1; sx <= 1; sx += 2) for (sz = -1; sz <= 1; sz += 2) {
+      // 垂脊: ridge end -> corner
+      linePt(b, sx * rHalf, rY, 0, sx * eX, eY + 0.1, sz * eZ, 260, GOLD_R);
+      // 脊兽 clusters along the ridge
+      for (var k = 0; k < 8; k++) {
+        var t = 0.2 + 0.7 * k / 7;
+        var px = sx * rHalf + (sx * eX - sx * rHalf) * t;
+        var py = rY + (eY + 0.1 - rY) * t;
+        var pz = sz * eZ * t;
+        spherePt(b, px, py + 0.25, pz, 0.22, 12, GOLD_R, false);
+      }
+    }
+  }
+
+  /* ============ assemble point clouds ============ */
+  function finalize(builder, cx, cy, cz, ampScale) {
+    var n = builder.home.length / 3;
+    var pos = new Float32Array(builder.home);
+    var col = new Float32Array(builder.color);
+    var misc = new Float32Array(builder.misc);
+    var out = new Float32Array(n * 3);
+    var amp = ampScale || 1;
+    for (var i = 0; i < n; i++) {
+      var ix = i * 3;
+      var dx = pos[ix] - cx, dy = pos[ix + 1] - cy, dz = pos[ix + 2] - cz;
+      var len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      dx /= len; dy /= len; dz /= len;
+      dx += (Math.random() - 0.5) * 1.3;
+      dy += (Math.random() - 0.5) * 1.3;
+      dz += (Math.random() - 0.5) * 1.3;
+      var l2 = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      var spread = 26 + Math.random() * 38;
+      out[ix] = pos[ix] + dx / l2 * spread;
+      out[ix + 1] = pos[ix + 1] + dy / l2 * spread;
+      out[ix + 2] = pos[ix + 2] + dz / l2 * spread;
+      misc[ix / 3 * 4 + 2] *= amp;
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aOut', new THREE.BufferAttribute(out, 3));
+    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aMisc', new THREE.BufferAttribute(misc, 4));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), 150);
+    return g;
+  }
+
+  var qinian = new THREE.Points(finalize(buildQinian(), 0, 15, 0), makeMaterial(0.20));
+  var taihe  = new THREE.Points(finalize(buildTaihe(), 0, 15, 0), makeMaterial(0.20));
+  taihe.visible = false;
+  scene.add(qinian); scene.add(taihe);
+
+  /* ============ background stars ============ */
+  (function stars() {
+    var b = CloudBuilder();
+    for (var i = 0; i < 700; i++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2;
+      var s = Math.sqrt(1 - u * u), r = 380 + Math.random() * 150;
+      var base = pick(0.12, [0.40, 0.55, 0.90], pick(0.10, [0.80, 0.65, 0.30], [0.30, 0.31, 0.36]));
+      b.home.push(s * Math.cos(th) * r, u * r, s * Math.sin(th) * r);
+      b.color.push(base[0], base[1], base[2]);
+      b.misc.push(Math.random() * Math.PI * 2, 0, 0.5, 0.7 + Math.random() * 0.7);
+    }
+    var n = b.home.length / 3;
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(b.home), 3));
+    g.setAttribute('aOut', new THREE.BufferAttribute(new Float32Array(b.home), 3));
+    g.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(b.color), 3));
+    g.setAttribute('aMisc', new THREE.BufferAttribute(new Float32Array(b.misc), 4));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 600);
+    var m = makeMaterial(1.1);
+    m.uniforms.uSize.value = 1.1;
+    var p = new THREE.Points(g, m);
+    p.frustumCulled = false;
+    scene.add(p);
+  })();
+
+  /* ============ transition (disperse -> converge) ============ */
+  var points = [qinian, taihe];
+  var mats = [qinian.material, taihe.material];
+  var clock = new THREE.Clock();
+  var anim = null, current = 0;
+
+  var nameEl = document.getElementById('name');
+  var subEl = document.getElementById('sub');
+  var labelEl = document.getElementById('label');
+  var DATA = [
+    { name: '祈年殿', sub: '天坛 · TEMPLE OF HEAVEN' },
+    { name: '太和殿', sub: '故宫 · HALL OF SUPREME HARMONY' }
+  ];
+  var labelTimer = null;
+
+  function updateNav(i) {
+    document.getElementById('btn0').classList.toggle('active', i === 0);
+    document.getElementById('btn1').classList.toggle('active', i === 1);
+  }
+  function fadeLabel(i) {
+    labelEl.classList.add('hide');
+    clearTimeout(labelTimer);
+    labelTimer = setTimeout(function () {
+      nameEl.textContent = DATA[i].name;
+      subEl.textContent = DATA[i].sub;
+      labelEl.classList.remove('hide');
+    }, 400);
+  }
+  function switchTo(i) {
+    if (i === current || anim) return;
+    anim = { phase: 'out', from: current, to: i, t0: clock.getElapsedTime() };
+    updateNav(i);
+    fadeLabel(i);
+  }
+  function stepAnim(t) {
+    if (!anim) return;
+    if (anim.phase === 'out') {
+      var p = (t - anim.t0) / 1.0;
+      if (p >= 1) {
+        mats[anim.from].uniforms.uMorph.value = 0;
+        points[anim.from].visible = false;
+        mats[anim.to].uniforms.uMorph.value = 1;
+        points[anim.to].visible = true;
+        anim = { phase: 'in', to: anim.to, t0: t };
+      } else {
+        mats[anim.from].uniforms.uMorph.value = p;
+      }
+    } else {
+      var p2 = (t - anim.t0) / 1.3;
+      if (p2 >= 1) {
+        mats[anim.to].uniforms.uMorph.value = 0;
+        anim = null;
+      } else {
+        mats[anim.to].uniforms.uMorph.value = 1 - p2;
+      }
+    }
+  }
+  document.getElementById('btn0').addEventListener('click', function () { switchTo(0); });
+  document.getElementById('btn1').addEventListener('click', function () { switchTo(1); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === '1') switchTo(0);
+    if (e.key === '2') switchTo(1);
+  });
+
+  /* ============ resize / loop ============ */
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    updatePixelFactor();
+    for (var i = 0; i < mats.length; i++) mats[i].uniforms.uPixelFactor.value = pixelFactor;
+  });
+
+  function tick() {
+    requestAnimationFrame(tick);
+    var t = clock.getElapsedTime();
+    for (var i = 0; i < mats.length; i++) mats[i].uniforms.uTime.value = t;
+    stepAnim(t);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  tick();
+  window.__dbg = { scene: scene, renderer: renderer, camera: camera, points: points, THREE: THREE };
+})();
+</script>
+</body>
+</html>

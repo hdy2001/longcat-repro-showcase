@@ -1,0 +1,46 @@
+<svg viewBox="0 0 560 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ARC-01 exploded diagram">
+<defs><style>
+.wire{fill:none;stroke:#c9c4b8;stroke-width:13;stroke-linecap:round}
+.wire-tip{fill:none;stroke:#e8ddc4;stroke-width:13;stroke-linecap:round}
+.axis{stroke:#4a463e;stroke-width:1;stroke-dasharray:2 6}
+.dim{stroke:#6b675e;stroke-width:1;fill:none}
+.dimtxt{font:italic 12px Georgia,serif;fill:#8f8a7e;letter-spacing:.12em}
+.badge{fill:#0a0a0a;stroke:#8f8a7e;stroke-width:1}
+.badgenum{font:11px Georgia,serif;fill:#d8d2c4;text-anchor:middle}
+</style></defs>
+<line class="axis" x1="280" y1="34" x2="280" y2="372"/>
+<path class="wire" d="M 247.0 70.1 A 66 150 0 0 1 291.5 52.3"/>
+<path class="wire" d="M 222.8 275.0 A 66 150 0 0 1 237.6 85.1"/>
+<path class="wire" d="M 313.0 329.9 A 66 150 0 0 1 229.4 296.4"/>
+<path class="wire" d="M 322.4 85.1 A 66 150 0 0 1 322.4 314.9"/>
+<path class="wire" d="M 296.0 54.5 A 66 150 0 0 1 316.9 75.6"/>
+<path class="wire" d="M 298.0 138.4 A 36 100 0 0 1 311.2 275.0"/>
+<path class="wire" d="M 311.2 275.0 A 36 100 0 0 1 248.8 275.0"/>
+<path class="wire" d="M 248.8 275.0 A 36 100 0 0 1 262.0 138.4"/>
+<path class="wire-tip" d="M 298.0 138.4 C 300.5 122, 302 112, 303 103"/>
+<path class="wire-tip" d="M 262.0 138.4 C 263.5 122, 265 112, 266.5 101"/>
+<circle class="badge" cx="269" cy="52" r="12"/>
+<text class="badgenum" x="269" y="56">01</text>
+<circle class="badge" cx="215" cy="174" r="12"/>
+<text class="badgenum" x="215" y="178">02</text>
+<circle class="badge" cx="269" cy="348" r="12"/>
+<text class="badgenum" x="269" y="352">03</text>
+<circle class="badge" cx="346" cy="200" r="12"/>
+<text class="badgenum" x="346" y="204">04</text>
+<circle class="badge" cx="307" cy="63" r="12"/>
+<text class="badgenum" x="307" y="67">05</text>
+<circle class="badge" cx="315" cy="199" r="12"/>
+<text class="badgenum" x="315" y="203">06</text>
+<circle class="badge" cx="280" cy="325" r="12"/>
+<text class="badgenum" x="280" y="329">07</text>
+<circle class="badge" cx="245" cy="199" r="12"/>
+<text class="badgenum" x="245" y="203">08</text>
+<line class="dim" x1="196" y1="52" x2="196" y2="350"/>
+<line class="dim" x1="190" y1="52" x2="214" y2="52" stroke-dasharray="0"/>
+<line class="dim" x1="190" y1="350" x2="214" y2="350"/>
+<text class="dimtxt" x="188" y="205" transform="rotate(-90 188 205)" text-anchor="middle">34.2 mm</text>
+<line class="dim" x1="214" y1="372" x2="346" y2="372"/>
+<line class="dim" x1="214" y1="366" x2="214" y2="378"/>
+<line class="dim" x1="346" y1="366" x2="346" y2="378"/>
+<text class="dimtxt" x="280" y="392" text-anchor="middle">9.8 mm</text>
+</svg>

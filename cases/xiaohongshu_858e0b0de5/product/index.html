@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>佛宫寺释迦塔 · 应县木塔 3D</title>
+<style>
+:root{
+  --gold:#e0b36a; --gold-dim:rgba(224,179,106,.32);
+  --ink:#efe6d2; --ink-dim:#b3a68c;
+  --panel:rgba(13,15,26,.66);
+  --wood:#c99a63;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#070912}
+body{font-family:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;color:var(--ink)}
+#app{position:fixed;inset:0}
+#app canvas{display:block;touch-action:none}
+
+/* ---------- 品牌 / 状态 ---------- */
+#brand{position:fixed;top:16px;left:18px;z-index:10;display:flex;gap:12px;align-items:center;pointer-events:none}
+.logo{width:44px;height:44px;border:1.5px solid var(--gold);border-radius:6px;display:grid;place-items:center;
+  font-size:24px;color:var(--gold);background:linear-gradient(160deg,rgba(224,179,106,.16),rgba(224,179,106,.03));
+  box-shadow:inset 0 0 16px rgba(0,0,0,.45)}
+#brand h1{font-size:18px;font-weight:600;letter-spacing:4px}
+#brand p{font-size:10px;color:var(--ink-dim);letter-spacing:2px;margin-top:3px}
+#statusBar{position:fixed;top:18px;right:18px;z-index:10;display:flex;align-items:center;gap:10px}
+#statusPill{font-size:12px;letter-spacing:2px;color:var(--gold);border:1px solid var(--gold-dim);padding:8px 14px;border-radius:999px;
+  background:var(--panel);backdrop-filter:blur(6px);display:flex;gap:8px;align-items:center}
+#pillDot{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.2}}
+#srcBtn{cursor:pointer;font-size:11px;letter-spacing:2px;color:var(--ink-dim);border:1px solid rgba(224,179,106,.18);
+  padding:8px 12px;border-radius:999px;background:var(--panel);backdrop-filter:blur(6px);transition:.25s}
+#srcBtn:hover{color:var(--gold);border-color:var(--gold-dim)}
+
+/* ---------- 右侧导航 ---------- */
+#sideNav{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:9px}
+#sideNav button{cursor:pointer;border:1px solid rgba(224,179,106,.22);background:var(--panel);backdrop-filter:blur(6px);
+  color:var(--ink);font-family:inherit;font-size:13px;letter-spacing:2px;padding:10px 13px 10px 9px;border-radius:10px;
+  display:flex;align-items:center;gap:9px;transition:.25s}
+#sideNav button i{font-style:normal;font-size:10px;color:var(--gold);border:1px solid rgba(224,179,106,.3);
+  border-radius:5px;width:21px;height:21px;display:grid;place-items:center;flex:none}
+#sideNav button:hover{border-color:var(--gold-dim);transform:translateX(-3px)}
+#sideNav button.active{background:linear-gradient(120deg,rgba(224,179,106,.24),rgba(224,179,106,.05));border-color:var(--gold);
+  box-shadow:0 4px 24px rgba(0,0,0,.4)}
+#sideNav button.gameBtn{color:#ffd9a8}
+
+/* ---------- 左下说明 ---------- */
+#infoPanel{position:fixed;left:20px;bottom:20px;z-index:9;max-width:420px;pointer-events:none}
+#kicker{font-size:11px;letter-spacing:4px;color:var(--gold);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+#kicker::before{content:"";width:22px;height:1px;background:var(--gold)}
+#infoTitle{font-size:clamp(24px,3.4vw,40px);line-height:1.28;font-weight:700;letter-spacing:2px;
+  text-shadow:0 4px 30px rgba(0,0,0,.7)}
+#infoDesc{margin-top:8px;font-size:12.5px;color:var(--ink-dim);letter-spacing:1px}
+#infoStats{margin-top:8px;font-size:11px;color:rgba(239,230,210,.75);letter-spacing:2px}
+
+/* ---------- 底部按钮 ---------- */
+#tenonBtn{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:11;cursor:pointer;font-family:inherit;
+  font-size:15px;letter-spacing:5px;color:#2a1608;background:linear-gradient(160deg,#ecc084,#c98f4e);border:none;
+  padding:13px 32px 13px 38px;border-radius:999px;
+  box-shadow:0 6px 26px rgba(201,143,78,.4),inset 0 2px 0 rgba(255,255,255,.28);transition:.25s}
+#tenonBtn:hover{transform:translateX(-50%) translateY(-2px);box-shadow:0 10px 34px rgba(201,143,78,.6)}
+
+/* ---------- 3D 标签 ---------- */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.lbl{position:absolute;top:0;left:0;font-size:12px;letter-spacing:2px;color:var(--ink);white-space:nowrap;
+  background:rgba(8,10,20,.68);border:1px solid rgba(224,179,106,.35);padding:4px 11px 4px 9px;border-radius:999px;
+  transform:translate(-50%,-50%);backdrop-filter:blur(4px)}
+.lbl::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-right:7px}
+
+/* ---------- 通用遮罩 ---------- */
+.overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+  background:rgba(5,6,12,.78);backdrop-filter:blur(10px)}
+.overlay.show{display:flex}
+
+/* ---------- 榫卯游戏 ---------- */
+#tenonWrap{position:relative;width:min(94vw,660px);height:min(92vh,620px);border-radius:20px;overflow:hidden;
+  background:radial-gradient(ellipse at 30% 20%,#1d2033,#0e1018 75%);
+  border:1px solid rgba(224,179,106,.22);display:flex;flex-direction:column}
+.tenon-top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px 6px}
+#backBtn{cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:2px;color:var(--ink);background:transparent;
+  border:1px solid rgba(224,179,106,.35);border-radius:999px;padding:7px 16px;transition:.2s}
+#backBtn:hover{border-color:var(--gold);color:var(--gold)}
+#tenonTopRight{font-size:12px;letter-spacing:3px;color:var(--ink-dim)}
+#tenonTopRight b{color:var(--gold);font-weight:600}
+#tenonOrder{display:flex;gap:8px;padding:8px 18px 0}
+#tenonOrder span{font-size:12px;padding:4px 12px;border:1px solid rgba(224,179,106,.25);border-radius:999px;
+  color:var(--ink-dim);letter-spacing:1px;transition:.3s}
+#tenonOrder span.now{color:#2a1608;background:var(--gold);border-color:var(--gold)}
+#tenonOrder span.done{color:#8fbf7a;border-color:#8fbf7a;text-decoration:line-through}
+#tenonStage{position:relative;flex:1;margin:12px 16px;border:1px dashed rgba(224,179,106,.28);border-radius:16px;
+  background:radial-gradient(ellipse at 50% 45%,#262a44,#12141f 78%)}
+#tenonStage svg.bg{position:absolute;inset:0;width:100%;height:100%}
+.piece{position:absolute;cursor:grab;touch-action:none;
+  transition:left .38s cubic-bezier(.2,.8,.3,1.25),top .38s cubic-bezier(.2,.8,.3,1.25);
+  filter:drop-shadow(0 8px 10px rgba(0,0,0,.55))}
+.piece svg{display:block;width:100%;height:100%}
+.piece.drag{transition:none;cursor:grabbing;z-index:6;filter:drop-shadow(0 16px 18px rgba(0,0,0,.65))}
+.piece.done{cursor:default;animation:knock .5s}
+@keyframes knock{0%{transform:scale(1)}35%{transform:scale(1.07,.92)}70%{transform:scale(.96,1.04)}100%{transform:scale(1)}}
+.piece.shake{animation:shake .4s}
+@keyframes shake{0%,100%{margin-left:0}25%{margin-left:-7px}50%{margin-left:6px}75%{margin-left:-4px}}
+#tenonSide{position:absolute;right:18px;top:50%;transform:translateY(-50%);text-align:center;pointer-events:none}
+#tenonSide .t-kicker{font-size:11px;letter-spacing:4px;color:var(--gold)}
+#tenonSide .t-title{font-size:30px;letter-spacing:6px;margin:6px 0 2px}
+#tenonSide .t-step{font-size:12px;color:var(--ink-dim);letter-spacing:2px;min-height:18px}
+#tenonSide .t-time{font-size:44px;color:var(--gold);font-variant-numeric:tabular-nums;letter-spacing:2px}
+#tenonSide .t-unit{font-size:13px;color:var(--ink-dim);letter-spacing:3px;margin-top:2px}
+#tenonFoot{display:flex;align-items:center;gap:14px;padding:8px 20px 6px}
+#progBar{flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+#progFill{height:100%;width:0;background:linear-gradient(90deg,#c98f4e,#eec084);transition:width .45s;border-radius:99px}
+#progText{font-size:12px;color:var(--ink-dim);letter-spacing:1px;min-width:80px;text-align:right}
+#tenonHint{font-size:12px;color:var(--gold);text-align:center;padding:2px 16px 12px;min-height:20px;letter-spacing:1px}
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:60;pointer-events:none;
+  background:rgba(20,16,10,.92);border:1px solid var(--gold-dim);color:var(--gold);font-size:13px;letter-spacing:2px;
+  padding:9px 22px;border-radius:999px;opacity:0;transition:opacity .25s}
+#toast.show{opacity:1}
+
+/* ---------- 纪念卡 ---------- */
+#cardOverlay{z-index:70}
+#cardBox{display:flex;gap:34px;align-items:center;width:min(94vw,860px)}
+#cardLeft{flex:1;text-align:left}
+#cardLeft .c-kicker{font-size:11px;letter-spacing:4px;color:var(--gold)}
+#cardLeft h2{font-size:34px;letter-spacing:5px;margin:12px 0 4px;font-weight:700}
+#cardLeft .c-name{font-size:52px;letter-spacing:12px;color:var(--gold);margin:10px 0}
+#cardLeft p{font-size:13px;color:var(--ink-dim);line-height:2;letter-spacing:1px}
+#card{width:300px;flex:none;background:linear-gradient(170deg,#f4e8ce,#e7d4ad);color:#3a2413;border-radius:8px;
+  padding:9px;box-shadow:0 34px 90px rgba(0,0,0,.65);transform:rotate(-1.4deg);position:relative}
+#cardInner{border:2px solid #a3442f;padding:16px 14px 13px;text-align:center;
+  background:repeating-linear-gradient(45deg,transparent 0 14px,rgba(163,68,47,.05) 14px 28px)}
+#cardImg{width:100%;border:6px solid #fffdf6;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#cardInner h3{font-size:14px;letter-spacing:6px;color:#7a2d1c;margin-top:11px;font-weight:600}
+#cardTitle{font-size:42px;letter-spacing:9px;color:#a3442f;margin:5px 0 3px;font-weight:700}
+#cardMeta{font-size:11.5px;color:#6b4a2c;line-height:1.9;letter-spacing:1px}
+#cardTime{font-size:13px;color:#a3442f;margin-top:7px;letter-spacing:2px}
+#seal{position:absolute;top:16px;right:16px;width:48px;height:48px;background:#a3442f;color:#f3e7cd;display:grid;
+  place-items:center;font-size:14px;letter-spacing:2px;border-radius:6px;transform:rotate(8deg);
+  box-shadow:0 3px 8px rgba(0,0,0,.3);writing-mode:vertical-rl;line-height:1.1}
+#cardBtns{display:flex;gap:10px;justify-content:center;margin-top:13px}
+#cardBtns button{font-family:inherit;cursor:pointer;font-size:12.5px;letter-spacing:2px;padding:8px 17px;
+  border-radius:999px;border:1px solid #a3442f;color:#a3442f;background:transparent;transition:.2s}
+#cardBtns button.solid{background:#a3442f;color:#f3e7cd}
+#cardBtns button:hover{filter:brightness(1.1)}
+
+/* ---------- 加载 ---------- */
+#loading{position:fixed;inset:0;z-index:100;background:#070912;display:flex;flex-direction:column;gap:18px;
+  align-items:center;justify-content:center;transition:opacity .9s}
+#loading.hide{opacity:0;pointer-events:none}
+#loading .ring{width:44px;height:44px;border-radius:50%;border:2px solid rgba(224,179,106,.18);border-top-color:var(--gold);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{font-size:13px;letter-spacing:7px;color:var(--ink-dim)}
+
+/* ---------- 移动端 ---------- */
+@media (max-width:640px){
+  #brand h1{font-size:14px;letter-spacing:2px}
+  #brand p{font-size:9px}
+  .logo{width:34px;height:34px;font-size:19px}
+  #statusPill{font-size:10px;padding:6px 10px}
+  #srcBtn{display:none}
+  #sideNav{top:60px;right:10px;bottom:auto;transform:none;flex-direction:row;flex-wrap:wrap;
+    justify-content:flex-end;max-width:64vw;gap:6px}
+  #sideNav button{font-size:11px;padding:7px 9px;letter-spacing:1px}
+  #sideNav button i{display:none}
+  #infoPanel{left:10px;right:10px;max-width:none;bottom:74px}
+  #infoTitle{font-size:21px}
+  #infoDesc{font-size:11px}
+  #tenonBtn{bottom:14px;font-size:13px;letter-spacing:3px;padding:11px 24px 11px 28px}
+  #cardBox{flex-direction:column;gap:18px;overflow-y:auto;max-height:92vh;padding:10px 0}
+  #cardLeft{text-align:center}
+  #cardLeft h2{font-size:24px}
+  #cardLeft .c-name{font-size:38px}
+  #card{width:250px}
+  #tenonSide{position:static;transform:none;padding:0 0 2px}
+  #tenonWrap{height:94vh}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<header id="brand">
+  <div class="logo">塔</div>
+  <div>
+    <h1>佛宫寺释迦塔</h1>
+    <p>山西应县 · 辽清宁二年（1056）</p>
+  </div>
+</header>
+
+<div id="statusBar">
+  <div id="statusPill"><span id="pillDot"></span><span id="pillText">自动导览中…</span></div>
+  <button id="srcBtn">资料说明</button>
+</div>
+
+<nav id="sideNav">
+  <button data-view="overview" class="active"><i>壹</i>全景</button>
+  <button data-view="cut"><i>贰</i>剖视九层</button>
+  <button data-view="inner"><i>叁</i>首层礼佛</button>
+  <button data-view="dougong"><i>肆</i>斗拱近观</button>
+  <button data-view="assembly"><i>伍</i>归位合拢</button>
+  <button id="navGameBtn" class="gameBtn"><i>陆</i>试试榫卯</button>
+</nav>
+
+<div id="infoPanel">
+  <div id="kicker">佛宫寺释迦塔</div>
+  <h2 id="infoTitle">应县宝塔 · 木构屹立近千年</h2>
+  <p id="infoDesc"></p>
+  <div id="infoStats"></div>
+</div>
+
+<button id="tenonBtn">试试榫卯</button>
+
+<div id="labels"></div>
+<div id="toast"></div>
+
+<!-- 榫卯游戏 -->
+<div class="overlay" id="tenonOverlay">
+  <div id="tenonWrap">
+    <div class="tenon-top">
+      <button id="backBtn">返回木塔</button>
+      <div id="tenonTopRight">守塔试炼 · <b id="tenonCount">01 / 04</b></div>
+    </div>
+    <div id="tenonOrder"></div>
+    <div id="tenonStage"><svg class="bg" id="stageBg" viewBox="0 0 480 430" preserveAspectRatio="none"></svg></div>
+    <div id="tenonSide">
+      <div class="t-kicker">守塔试炼</div>
+      <div class="t-title">合拢四木</div>
+      <div class="t-step" id="tStep">立柱入础</div>
+      <div class="t-time" id="tTime">0.0</div>
+      <div class="t-unit">秒</div>
+    </div>
+    <div id="tenonFoot">
+      <div id="progBar"><div id="progFill"></div></div>
+      <span id="progText">归位 0 / 4</span>
+    </div>
+    <div id="tenonHint">按顺序拖拽木构：立柱 → 承枋 → 压枋 → 锁楔</div>
+  </div>
+</div>
+
+<!-- 纪念卡 -->
+<div class="overlay" id="cardOverlay">
+  <div id="cardBox">
+    <div id="cardLeft">
+      <div class="c-kicker">已为你生成</div>
+      <h2>一张守塔纪念卡</h2>
+      <div class="c-name">守木构</div>
+      <p>手稳心定，四块木构依次归位。<br>守住每一次咬合，也守住木构秩序。</p>
+      <div id="cardBtns">
+        <button id="againBtn">再试一次</button>
+        <button class="solid" id="closeCardBtn">收下纪念卡</button>
+      </div>
+    </div>
+    <div id="card">
+      <div id="seal">应县<br>木塔</div>
+      <div id="cardInner">
+        <img id="cardImg" alt="塔影">
+        <h3>守 塔 纪 念 卡</h3>
+        <div id="cardTitle">守木构</div>
+        <div id="cardMeta">佛宫寺释迦塔<br>辽清宁二年（1056）· 山西应县</div>
+        <div id="cardTime">用时 -- 秒</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="loading"><div class="ring"></div><p>正在搭建木构</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>window.THREE||document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>')</script>
+<script>
+/* ================= 全局 ================= */
+const T = {
+  scene:null, camera:null, renderer:null, clock:null,
+  view:'overview', auto:true, t:0,
+  tower:new THREE.Group(),
+  mats:[], labels:[], cornerPos:[], clouds:[],
+  camCur:{theta:-0.7,phi:1.04,radius:105,target:new THREE.Vector3(0,16,0)},
+  camGoal:{theta:-0.7,phi:1.04,radius:105,target:new THREE.Vector3(0,16,0)},
+  innerLight:null, innerLightTarget:0.7, shot:'',
+};
+const D = {
+  steps:[{r:17.8,h:1.2},{r:16.0,h:1.2}],
+  porch:{colR:12.7,colH:3.4,n:16,eave:{rOut:16.2,rIn:11.7,yOut:3.95,yIn:4.95,rise:1.0},dgR:12.4,dgY:3.5},
+  stories:[
+    {r:11.8,y0:0.0,y1:6.8,eave:{rOut:17.0,rIn:11.2,yOut:6.45,yIn:6.95,rise:1.05},dgR:11.5,dgY:6.15,dgS:1.0},
+    {r:10.9,y0:9.2,y1:12.6,eave:{rOut:14.8,rIn:10.3,yOut:12.25,yIn:12.75,rise:1.1},dgR:10.6,dgY:11.95,dgS:0.95},
+    {r:10.0,y0:15.1,y1:18.5,eave:{rOut:13.2,rIn:9.4,yOut:18.1,yIn:18.65,rise:1.15},dgR:9.7,dgY:17.8,dgS:0.9},
+    {r:9.2,y0:21.0,y1:24.4,eave:{rOut:11.7,rIn:8.6,yOut:23.95,yIn:24.55,rise:1.2},dgR:8.8,dgY:23.65,dgS:0.85},
+    {r:8.5,y0:26.9,y1:30.3,eave:{rOut:10.2,rIn:7.9,yOut:29.85,yIn:30.5,rise:1.25},dgR:8.1,dgY:29.55,dgS:0.8},
+  ],
+  darks:[{y0:7.05,y1:9.2},{y0:12.95,y1:15.1},{y0:18.9,y1:21.0},{y0:24.8,y1:26.9}],
+  finialY:30.6,
+};
+const clipPlane = new THREE.Plane(new THREE.Vector3(1,0,0), 1.6);
+const V3 = (x,y,z)=>new THREE.Vector3(x,y,z);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function reg(m){T.mats.push(m);return m}
+
+/* ================= 程序化贴图 ================= */
+function ctex(w,h,fn,wrap){
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  fn(c.getContext('2d'),w,h);
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding;t.anisotropy=8;
+  if(wrap){t.wrapS=t.wrapT=THREE.RepeatWrapping}
+  return t;
+}
+const woodTex=ctex(256,256,(x,w,h)=>{
+  x.fillStyle='#9a6a3d';x.fillRect(0,0,w,h);
+  for(let i=0;i<44;i++){
+    x.strokeStyle=`rgba(${56+Math.random()*40|0},${32+Math.random()*22|0},${16+Math.random()*12|0},${.1+Math.random()*.22})`;
+    x.lineWidth=1+Math.random()*2;x.beginPath();
+    const gx=Math.random()*w;x.moveTo(gx,0);
+    for(let y=0;y<=h;y+=16)x.lineTo(gx+Math.sin(y*.05+i)*4+(Math.random()*6-3),y);
+    x.stroke();
+  }
+  for(let i=0;i<5;i++){
+    x.strokeStyle='rgba(48,26,11,.35)';
+    x.beginPath();x.ellipse(Math.random()*w,Math.random()*h,3+Math.random()*4,6+Math.random()*8,0,0,7);x.stroke();
+  }
+},true);
+const tileTex=ctex(256,256,(x,w,h)=>{
+  const g=x.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#6d7688');g.addColorStop(1,'#3d4455');
+  x.fillStyle=g;x.fillRect(0,0,w,h);
+  for(let i=0;i<16;i++){
+    x.strokeStyle='rgba(18,22,32,.55)';x.lineWidth=2;
+    x.beginPath();x.moveTo(i*16,0);x.lineTo(i*16,h);x.stroke();
+    x.strokeStyle='rgba(205,214,232,.10)';
+    x.beginPath();x.moveTo(i*16+8,0);x.lineTo(i*16+8,h);x.stroke();
+  }
+  for(let j=0;j<8;j++){
+    x.strokeStyle='rgba(16,20,30,.5)';x.lineWidth=2;
+    x.beginPath();x.moveTo(0,j*32+16);x.lineTo(w,j*32+16);x.stroke();
+  }
+},true);
+const wallTex=ctex(1024,512,(x,w,h)=>{
+  x.fillStyle='#7c4b30';x.fillRect(0,0,w,h);
+  for(let i=0;i<8;i++){
+    const fx=i*128;
+    x.fillStyle='#8a5535';x.fillRect(fx+8,42,112,h-84);
+    x.fillStyle='#3d2317';x.fillRect(fx+16,118,96,262);
+    x.strokeStyle='#caa06a';x.lineWidth=2;
+    for(let gx=0;gx<=6;gx++){x.beginPath();x.moveTo(fx+16+gx*16,118);x.lineTo(fx+16+gx*16,380);x.stroke()}
+    for(let gy=0;gy<=14;gy++){x.beginPath();x.moveTo(fx+16,118+gy*18);x.lineTo(fx+112,118+gy*18);x.stroke()}
+    x.fillStyle='#5a3a24';x.fillRect(fx,28,128,16);x.fillRect(fx,h-56,128,16);
+    x.fillStyle='#caa06a';
+    for(let s=0;s<8;s++){x.beginPath();x.arc(fx+12+s*15,36,2.5,0,7);x.fill()}
+  }
+  x.fillStyle='#5a3a24';x.fillRect(0,0,w,20);x.fillRect(0,h-24,w,24);
+});
+const stoneTex=ctex(256,256,(x,w,h)=>{
+  x.fillStyle='#5b5f6a';x.fillRect(0,0,w,h);
+  for(let i=0;i<500;i++){
+    x.fillStyle=Math.random()>.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';
+    x.fillRect(Math.random()*w,Math.random()*h,2,2);
+  }
+  x.strokeStyle='rgba(20,22,30,.5)';x.lineWidth=2;
+  for(let j=0;j<=4;j++){x.beginPath();x.moveTo(0,j*64);x.lineTo(w,j*64);x.stroke()}
+  for(let j=0;j<4;j++){const off=(j%2)*64;
+    for(let i=0;i<=4;i++){x.beginPath();x.moveTo(i*128+off,j*64);x.lineTo(i*128+off,j*64+64);x.stroke()}}
+},true);
+const caissonTex=ctex(512,512,(x,w,h)=>{
+  const cx=w/2,cy=h/2;
+  x.fillStyle='#5e3226';x.fillRect(0,0,w,h);
+  const rings=[[240,'#7a3b28'],[200,'#a3522f'],[160,'#7a3b28'],[120,'#c8955a'],[86,'#8a4030'],[56,'#d8b078'],[34,'#8a4030']];
+  rings.forEach(([r,c],i)=>{
+    x.fillStyle=c;x.beginPath();
+    for(let k=0;k<8;k++){const a=k*Math.PI/4-Math.PI/8;
+      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+      k?x.lineTo(px,py):x.moveTo(px,py)}
+    x.closePath();x.fill();
+    x.strokeStyle='rgba(255,220,160,.35)';x.lineWidth=3;x.stroke();
+    if(i>0){x.strokeStyle='rgba(40,16,10,.5)';x.lineWidth=2;
+      for(let k=0;k<8;k++){const a=k*Math.PI/4;
+        x.beginPath();x.moveTo(cx+Math.cos(a)*(r-14),cy+Math.sin(a)*(r-14));
+        x.lineTo(cx+Math.cos(a)*(r-6),cy+Math.sin(a)*(r-6));x.stroke()}}
+  });
+  x.fillStyle='#e8c887';x.beginPath();x.arc(cx,cy,26,0,7);x.fill();
+});
+
+/* ================= 材质 ================= */
+const M = {
+  wood:   reg(new THREE.MeshStandardMaterial({map:woodTex,color:0xbf9061,roughness:.8,metalness:.05})),
+  woodD:  reg(new THREE.MeshStandardMaterial({map:woodTex,color:0x8a5f3a,roughness:.85})),
+  red:    reg(new THREE.MeshStandardMaterial({map:woodTex,color:0x9a4636,roughness:.8})),
+  tile:   reg(new THREE.MeshStandardMaterial({map:tileTex,color:0xa8b0c4,roughness:.55,metalness:.18,side:THREE.DoubleSide})),
+  wall:   reg(new THREE.MeshStandardMaterial({map:wallTex,roughness:.85,side:THREE.DoubleSide})),
+  stone:  reg(new THREE.MeshStandardMaterial({map:stoneTex,color:0xa2a8b4,roughness:.95})),
+  gold:   reg(new THREE.MeshStandardMaterial({color:0xd8a94f,metalness:.85,roughness:.35})),
+  iron:   reg(new THREE.MeshStandardMaterial({color:0x3a3f4a,metalness:.7,roughness:.5})),
+  buddha: reg(new THREE.MeshStandardMaterial({color:0xc79a5e,metalness:.4,roughness:.5})),
+  buddhaR:reg(new THREE.MeshStandardMaterial({color:0x8a3a2c,roughness:.7})),
+  caisson:reg(new THREE.MeshStandardMaterial({map:caissonTex,side:THREE.DoubleSide,roughness:.8})),
+  dark:   reg(new THREE.MeshStandardMaterial({color:0x332619,roughness:.9})),
+};
+
+/* ================= 几何工具 ================= */
+function mergeBoxes(list){
+  const geos=list.map(b=>{
+    const g=new THREE.BoxGeometry(b.w,b.h,b.d);
+    const m=new THREE.Matrix4().compose(
+      V3(b.x||0,b.y||0,b.z||0),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(b.rx||0,b.ry||0,b.rz||0)),
+      V3(1,1,1));
+    g.applyMatrix4(m);return g.toNonIndexed();
+  });
+  let total=0;geos.forEach(g=>total+=g.attributes.position.count);
+  const pos=new Float32Array(total*3),nor=new Float32Array(total*3),uv=new Float32Array(total*2);
+  let o=0;
+  geos.forEach(g=>{
+    pos.set(g.attributes.position.array,o*3);
+    nor.set(g.attributes.normal.array,o*3);
+    uv.set(g.attributes.uv.array,o*2);
+    o+=g.attributes.position.count;
+  });
+  const out=new THREE.BufferGeometry();
+  out.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  out.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+  out.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  return out;
+}
+function dougongGeom(){
+  return mergeBoxes([
+    {w:1.15,h:0.5,d:1.15,y:0.25},
+    {w:2.0,h:0.42,d:0.55,y:0.72},
+    {w:0.55,h:0.42,d:1.85,y:1.05},
+    {w:0.42,h:0.5,d:2.7,y:1.5,rx:-0.34,z:-0.35},
+    {w:0.4,h:0.45,d:2.0,y:1.95},
+    {w:1.7,h:0.36,d:0.5,y:2.28},
+    {w:1.8,h:0.2,d:0.55,y:2.55},
+    {w:0.34,h:0.3,d:0.34,x:0.75,y:2.78},
+    {w:0.34,h:0.3,d:0.34,x:-0.75,y:2.78},
+    {w:0.34,h:0.3,d:0.34,y:1.32},
+  ]);
+}
+function roofRing(e){
+  const aSeg=72,rSeg=8,pos=[],uv=[],idx=[];
+  for(let i=0;i<=rSeg;i++){
+    const u=i/rSeg, r=e.rOut+(e.rIn-e.rOut)*u, yb=e.yOut+(e.yIn-e.yOut)*u;
+    for(let j=0;j<=aSeg;j++){
+      const v=j/aSeg, ang=v*Math.PI*2;
+      const corner=Math.pow(Math.abs(Math.cos(v*Math.PI*8)),2.1);
+      const lift=e.rise*corner*Math.pow(u,0.8);
+      pos.push(Math.cos(ang)*r, yb+lift, Math.sin(ang)*r);
+      uv.push(v*8, u*2);
+    }
+  }
+  for(let i=0;i<rSeg;i++)for(let j=0;j<aSeg;j++){
+    const a=i*(aSeg+1)+j,b=a+1,c=a+aSeg+1,d=c+1;
+    idx.push(a,b,c,b,d,d);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.computeVertexNormals();
+  return g;
+}
+function shadowed(m,cast=true,recv=true){m.castShadow=cast;m.receiveShadow=recv;return m}
+
+/* ================= 场景 ================= */
+function initScene(){
+  T.scene=new THREE.Scene();
+  T.scene.fog=new THREE.Fog(0x0b0f1e,130,400);
+  T.camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,900);
+  T.renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+  T.renderer.setSize(innerWidth,innerHeight);
+  T.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  T.renderer.shadowMap.enabled=true;
+  T.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  T.renderer.localClippingEnabled=true;
+  T.renderer.outputEncoding=THREE.sRGBEncoding;
+  T.renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  T.renderer.toneMappingExposure=1.08;
+  document.getElementById('app').appendChild(T.renderer.domElement);
+  T.clock=new THREE.Clock();
+
+  /* 灯光 */
+  T.scene.add(new THREE.AmbientLight(0x36405e,0.55));
+  T.scene.add(new THREE.HemisphereLight(0x2a3454,0x0c0a08,0.5));
+  const key=new THREE.DirectionalLight(0xffd2a0,1.35);
+  key.position.set(70,95,45);
+  key.castShadow=true;
+  key.shadow.mapSize.set(innerWidth<640?1024:2048,innerWidth<640?1024:2048);
+  key.shadow.camera.left=-48;key.shadow.camera.right=48;
+  key.shadow.camera.top=48;key.shadow.camera.bottom=-48;
+  key.shadow.camera.far=260;key.shadow.bias=-0.0006;
+  T.scene.add(key);
+  const rim=new THREE.DirectionalLight(0x7fa0ff,0.4);
+  rim.position.set(-60,40,-70);T.scene.add(rim);
+  T.innerLight=new THREE.PointLight(0xff9a4d,0.7,28,2);
+  T.innerLight.position.set(0,3.4,0);T.scene.add(T.innerLight);
+
+  /* 天空 */
+  const skyTex=ctex(1024,512,(x,w,h)=>{
+    const g=x.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#070a18');g.addColorStop(.45,'#131a33');
+    g.addColorStop(.75,'#2a2540');g.addColorStop(1,'#4a3040');
+    x.fillStyle=g;x.fillRect(0,0,w,h);
+  });
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(430,24,16),
+    new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,fog:false}));
+  T.scene.add(sky);
+  // 星
+  const sn=650,sp=new Float32Array(sn*3);
+  for(let i=0;i<sn;i++){
+    const a=Math.random()*Math.PI*2,e=Math.random()*Math.PI*0.48+0.06,r=410;
+    sp[i*3]=Math.cos(a)*Math.cos(e)*r;sp[i*3+1]=Math.sin(e)*r;sp[i*3+2]=Math.sin(a)*Math.cos(e)*r;
+  }
+  const sg=new THREE.BufferGeometry();
+  sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+  T.scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xaebfff,size:1.6,sizeAttenuation:false,fog:false,transparent:true,opacity:.75})));
+  // 月
+  const moonTex=ctex(128,128,(x,w,h)=>{
+    const g=x.createRadialGradient(64,64,6,64,64,64);
+    g.addColorStop(0,'rgba(255,240,210,.95)');g.addColorStop(.25,'rgba(255,230,190,.5)');g.addColorStop(1,'rgba(255,230,190,0)');
+    x.fillStyle=g;x.fillRect(0,0,w,h);
+  });
+  const moon=new THREE.Sprite(new THREE.SpriteMaterial({map:moonTex,fog:false,depthWrite:false}));
+  moon.position.set(-190,150,-300);moon.scale.set(150,150,1);T.scene.add(moon);
+  // 云
+  const cloudTex=ctex(256,128,(x,w,h)=>{
+    for(let i=0;i<26;i++){
+      const cx=40+Math.random()*(w-80),cy=40+Math.random()*(h-80),r=24+Math.random()*46;
+      const g=x.createRadialGradient(cx,cy,2,cx,cy,r);
+      g.addColorStop(0,'rgba(140,150,180,.14)');g.addColorStop(1,'rgba(140,150,180,0)');
+      x.fillStyle=g;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();
+    }
+  });
+  for(let i=0;i<6;i++){
+    const c=new THREE.Sprite(new THREE.SpriteMaterial({map:cloudTex,fog:false,depthWrite:false,opacity:.9}));
+    c.position.set(-300+i*120,60+Math.random()*90,-260-Math.random()*60);
+    c.scale.set(220+Math.random()*120,90+Math.random()*40,1);
+    T.scene.add(c);T.clouds.push(c);
+  }
+  // 地
+  const gTex=ctex(512,512,(x,w,h)=>{
+    const g=x.createRadialGradient(256,256,20,256,256,256);
+    g.addColorStop(0,'#1b2030');g.addColorStop(.5,'#11141f');g.addColorStop(1,'#080a12');
+    x.fillStyle=g;x.fillRect(0,0,w,h);
+  });
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(360,40),
+    new THREE.MeshStandardMaterial({map:gTex,roughness:1}));
+  ground.rotation.x=-Math.PI/2;ground.position.y=-2.41;ground.receiveShadow=true;
+  T.scene.add(ground);
+}
+
+/* ================= 木塔 ================= */
+const bellPos=[];
+function addRafters(g,e){
+  const L=Math.hypot(e.rIn-e.rOut,e.yIn-e.yOut)*0.99;
+  const ang=Math.atan2(e.yIn-e.yOut,e.rOut-e.rIn);
+  const inst=new THREE.InstancedMesh(new THREE.BoxGeometry(0.14,0.14,L),M.woodD,24);
+  const d=new THREE.Object3D();
+  for(let i=0;i<24;i++){
+    const a=i/24*Math.PI*2;
+    const rm=(e.rIn*0.72+e.rOut*0.96)/2;
+    const yb=e.yOut+(e.yIn-e.yOut)*((rm-e.rOut)/(e.rIn-e.rOut))+0.34;
+    d.position.set(Math.cos(a)*rm,yb,Math.sin(a)*rm);
+    d.rotation.order='YXZ';d.rotation.set(ang,-a+Math.PI/2,0);
+    d.updateMatrix();inst.setMatrixAt(i,d.matrix);
+  }
+  g.add(inst);
+}
+function addEave(g,e,dgR,dgY,sC,sI,record){
+  const roof=shadowed(new THREE.Mesh(roofRing(e),M.tile));
+  g.add(roof);
+  addRafters(g,e);
+  const geo=dougongGeom();
+  const cInst=new THREE.InstancedMesh(geo,M.wood,8);
+  const iInst=new THREE.InstancedMesh(geo,M.wood,8);
+  const d=new THREE.Object3D();
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    d.position.set(Math.cos(a)*dgR,dgY,Math.sin(a)*dgR);
+    d.rotation.set(0,Math.PI/2-a,0);
+    d.scale.set(sC,sC,sC);d.updateMatrix();cInst.setMatrixAt(k,d.matrix);
+    if(record)T.cornerPos.push({ang:a,pos:V3(Math.cos(a)*dgR,dgY,Math.sin(a)*dgR)});
+    const a2=a+Math.PI/8;
+    d.position.set(Math.cos(a2)*dgR,dgY,Math.sin(a2)*dgR);
+    d.rotation.set(0,Math.PI/2-a2,0);
+    d.scale.set(sI,sI,sI);d.updateMatrix();iInst.setMatrixAt(k,d.matrix);
+  }
+  cInst.castShadow=iInst.castShadow=true;
+  g.add(cInst);g.add(iInst);
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    bellPos.push([Math.cos(a)*e.rOut*0.985,e.yOut+e.rise-0.18,Math.sin(a)*e.rOut*0.985]);
+  }
+}
+function addBalcony(g,S){
+  const y=S.y0-0.1;
+  const floor=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(S.r+1.35,S.r+1.35,0.28,8),M.woodD));
+  floor.position.y=y;g.add(floor);
+  const posts=new THREE.InstancedMesh(new THREE.BoxGeometry(0.1,0.9,0.1),M.wood,16);
+  const d=new THREE.Object3D();
+  for(let k=0;k<16;k++){
+    const a=k/16*Math.PI*2;
+    d.position.set(Math.cos(a)*(S.r+1.18),y+0.55,Math.sin(a)*(S.r+1.18));
+    d.updateMatrix();posts.setMatrixAt(k,d.matrix);
+  }
+  g.add(posts);
+  const rail=new THREE.Mesh(new THREE.CylinderGeometry(S.r+1.18,S.r+1.18,0.09,8,1,true),M.red);
+  rail.position.y=y+1.0;g.add(rail);
+}
+function addFloorAndColumns(g,S,ri){
+  const slab=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(S.r+0.5,S.r+0.5,0.4,8),M.dark));
+  slab.position.y=S.y0+0.2;g.add(slab);
+  const h=S.y1-S.y0-0.35;
+  const inst=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.34,0.42,1,8),M.wood,8);
+  const d=new THREE.Object3D();
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4+Math.PI/8;
+    d.position.set(Math.cos(a)*ri,S.y0+0.4+h/2,Math.sin(a)*ri);
+    d.scale.set(1,h,1);d.updateMatrix();inst.setMatrixAt(k,d.matrix);
+  }
+  inst.castShadow=true;g.add(inst);
+  // 内槽阑额
+  const chord=2*ri*Math.sin(Math.PI/8)+0.5;
+  for(let k=0;k<8;k++){
+    const a=(k+1)*Math.PI/4;
+    const b=shadowed(new THREE.Mesh(new THREE.BoxGeometry(chord,0.35,0.3),M.woodD));
+    b.position.set(Math.cos(a)*ri,S.y1-0.55,Math.sin(a)*ri);
+    b.rotation.y=-a-Math.PI/2;
+    g.add(b);
+  }
+}
+function addDarkLayer(g,Dk,r){
+  const h=Dk.y1-Dk.y0;
+  const stub=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3,0.36,1,8),M.wood,8);
+  const d=new THREE.Object3D();
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    d.position.set(Math.cos(a)*r,Dk.y0+h/2,Math.sin(a)*r);
+    d.scale.set(1,h,1);d.updateMatrix();stub.setMatrixAt(k,d.matrix);
+  }
+  stub.castShadow=true;g.add(stub);
+  [Dk.y0+0.15,Dk.y1-0.15].forEach(y=>{
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(r*1.0,r*1.0,0.3,8,1,true),M.woodD);
+    band.position.y=y;g.add(band);
+  });
+  // 斜撑 X
+  for(let k=0;k<8;k++){
+    const a=(k+0.5)*Math.PI/4;
+    const faceW=2*r*0.93*Math.tan(Math.PI/8);
+    [0.62,-0.62].forEach(rz=>{
+      const b=new THREE.Mesh(new THREE.BoxGeometry(faceW*1.25,0.22,0.26),M.red);
+      b.position.set(Math.cos(a)*r*0.93,Dk.y0+h/2,Math.sin(a)*r*0.93);
+      b.rotation.order='YXZ';b.rotation.y=-a-Math.PI/2;b.rotation.z=rz;
+      g.add(b);
+    });
+  }
+  // 内圈短柱
+  const ri=r*0.5;
+  const inner=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.24,0.28,1,8),M.woodD,8);
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4+Math.PI/8;
+    d.position.set(Math.cos(a)*ri,Dk.y0+h/2,Math.sin(a)*ri);
+    d.scale.set(1,h*0.9,1);d.updateMatrix();inner.setMatrixAt(k,d.matrix);
+  }
+  g.add(inner);
+}
+function buildBuddha(){
+  const grp=new THREE.Group();
+  const ped1=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(2.6,3.0,0.5,8),M.stone));
+  ped1.position.y=0.25;grp.add(ped1);
+  const ped2=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.55,0.55,8),M.red));
+  ped2.position.y=0.78;grp.add(ped2);
+  const lotus=shadowed(new THREE.Mesh(new THREE.TorusGeometry(2.05,0.2,8,8),M.buddha));
+  lotus.rotation.x=Math.PI/2;lotus.position.y=1.12;grp.add(lotus);
+  // 身
+  const prof=[[1.5,0],[1.45,0.25],[1.05,0.6],[0.82,1.3],[0.68,2.0],[0.74,2.55],[0.98,2.95],[0.6,3.2],[0.4,3.3]]
+    .map(p=>new THREE.Vector2(p[0],p[1]));
+  const body=shadowed(new THREE.Mesh(new THREE.LatheGeometry(prof,14),M.buddha));
+  body.position.y=1.15;grp.add(body);
+  // 袈裟带
+  const sash=new THREE.Mesh(new THREE.TorusGeometry(0.62,0.1,6,12),M.buddhaR);
+  sash.rotation.x=Math.PI/2;sash.position.y=3.6;grp.add(sash);
+  // 臂
+  [-1,1].forEach(s=>{
+    const arm=new THREE.Mesh(new THREE.TorusGeometry(0.62,0.17,6,10,Math.PI*1.1),M.buddha);
+    arm.position.set(s*0.72,2.75,0.15);
+    arm.rotation.set(0.3,s*0.5,s>0?-1.9:1.9);
+    grp.add(arm);
+  });
+  const hands=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,8),M.buddha);
+  hands.position.set(0,1.6,1.15);grp.add(hands);
+  // 首
+  const head=shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.52,12,10),M.buddha));
+  head.position.y=3.95;grp.add(head);
+  const ushn=new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8),M.gold);
+  ushn.position.y=4.45;grp.add(ushn);
+  [-1,1].forEach(s=>{
+    const ear=new THREE.Mesh(new THREE.SphereGeometry(0.13,6,6),M.buddha);
+    ear.scale.set(0.6,1.6,0.8);ear.position.set(s*0.52,3.92,0);grp.add(ear);
+  });
+  // 头光
+  const halo=new THREE.Mesh(new THREE.CircleGeometry(1.1,16),
+    new THREE.MeshStandardMaterial({color:0xd8a94f,metalness:.6,roughness:.4,side:THREE.DoubleSide,emissive:0x6a4a10,emissiveIntensity:.5}));
+  reg(halo.material);
+  halo.position.set(0,4.0,-0.75);grp.add(halo);
+  const haloRing=new THREE.Mesh(new THREE.TorusGeometry(1.1,0.05,6,20),M.gold);
+  haloRing.position.copy(halo.position);grp.add(haloRing);
+  // 胁侍
+  [-1,1].forEach(s=>{
+    const att=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.5,0.4,8),M.stone);
+    b.position.y=0.2;att.add(b);
+    const prof2=[[0.5,0],[0.34,0.5],[0.26,1.2],[0.3,1.7],[0.2,1.85]].map(p=>new THREE.Vector2(p[0],p[1]));
+    const bd=new THREE.Mesh(new THREE.LatheGeometry(prof2,10),M.buddha);
+    bd.position.y=0.4;att.add(bd);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(0.24,8,8),M.buddha);
+    hd.position.y=2.15;att.add(hd);
+    att.position.set(s*4.6,0,1.6);att.rotation.y=-s*0.3;
+    att.traverse(o=>{if(o.isMesh)o.castShadow=true});
+    grp.add(att);
+  });
+  return grp;
+}
+function buildCaisson(){
+  const grp=new THREE.Group();
+  const top=new THREE.Mesh(new THREE.CircleGeometry(5.4,8),M.caisson);
+  top.rotation.x=Math.PI/2;top.position.y=7.05;grp.add(top);
+  [[4.9,6.92],[3.9,6.64],[3.0,6.38],[2.2,6.14]].forEach(([r,y])=>{
+    const ring=new THREE.Mesh(new THREE.CylinderGeometry(r,r,0.28,8,1,true),M.caisson);
+    ring.position.y=y;grp.add(ring);
+  });
+  const center=new THREE.Mesh(new THREE.CircleGeometry(1.9,8),M.gold);
+  center.rotation.x=Math.PI/2;center.position.y=6.0;grp.add(center);
+  const ceil=new THREE.Mesh(new THREE.CylinderGeometry(11.4,11.4,0.5,8),M.dark);
+  ceil.position.y=7.25;grp.add(ceil);
+  return grp;
+}
+function buildFinial(){
+  const grp=new THREE.Group();
+  const bowl=shadowed(new THREE.Mesh(new THREE.SphereGeometry(1.7,10,8),M.iron));
+  bowl.scale.y=0.55;bowl.position.y=D.finialY+0.9;grp.add(bowl);
+  const pole=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,8.6,8),M.iron));
+  pole.position.y=D.finialY+5.4;grp.add(pole);
+  [[4.3,1.05],[5.6,0.9],[6.8,0.75],[7.8,0.6]].forEach(([y,r])=>{
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,0.09,6,18),M.iron);
+    ring.rotation.x=Math.PI/2;ring.position.y=D.finialY+y;grp.add(ring);
+  });
+  const pearl=new THREE.Mesh(new THREE.SphereGeometry(0.48,8,8),M.gold);
+  pearl.position.y=D.finialY+10.0;grp.add(pearl);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.12,0.9,6),M.gold);
+  tip.position.y=D.finialY+10.7;grp.add(tip);
+  // 铁链
+  const pts=[];
+  const quad=(a,b,c,t)=>{const u=1-t;return V3(
+    u*u*a.x+2*u*t*b.x+t*t*c.x, u*u*a.y+2*u*t*b.y+t*t*c.y, u*u*a.z+2*u*t*b.z+t*t*c.z)};
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    const end=V3(Math.cos(a)*9.3,D.finialY+0.5,Math.sin(a)*9.3);
+    const start=V3(0,D.finialY+7.3,0);
+    const mid=start.clone().lerp(end,0.5);mid.y-=1.4;
+    for(let i=0;i<9;i++){
+      const p0=quad(start,mid,end,i/9),p1=quad(start,mid,end,(i+1)/9);
+      pts.push(p0.x,p0.y,p0.z,p1.x,p1.y,p1.z);
+    }
+  }
+  const cg=new THREE.BufferGeometry();
+  cg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+  grp.add(new THREE.LineSegments(cg,new THREE.LineBasicMaterial({color:0x2c313c})));
+  return grp;
+}
+function buildTower(){
+  const g=T.tower;
+  // 台基
+  D.steps.forEach((s,i)=>{
+    const m=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(s.r,s.r,s.h,8),M.stone));
+    m.position.y=-(i+1)*s.h+s.h/2;g.add(m);
+  });
+  for(let i=0;i<6;i++){
+    const st=shadowed(new THREE.Mesh(new THREE.BoxGeometry(4.5,0.4,0.95),M.stone));
+    st.position.set(0,-0.2-i*0.38,17.5+i*0.98);g.add(st);
+  }
+  // 副阶
+  const P=D.porch;
+  const pCol=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3,0.34,1,8),M.wood,P.n);
+  const d=new THREE.Object3D();
+  for(let k=0;k<P.n;k++){
+    const a=k/P.n*Math.PI*2+Math.PI/P.n;
+    d.position.set(Math.cos(a)*P.colR,P.colH/2,Math.sin(a)*P.colR);
+    d.scale.set(1,P.colH,1);d.updateMatrix();pCol.setMatrixAt(k,d.matrix);
+  }
+  pCol.castShadow=true;g.add(pCol);
+  const chord=2*P.colR*Math.sin(Math.PI/P.n)+0.4;
+  for(let k=0;k<P.n;k++){
+    const a=(k+1)/P.n*Math.PI*2+Math.PI/P.n;
+    const b=shadowed(new THREE.Mesh(new THREE.BoxGeometry(chord,0.36,0.32),M.woodD));
+    b.position.set(Math.cos(a)*P.colR,P.colH+0.18,Math.sin(a)*P.colR);
+    b.rotation.y=-a-Math.PI/2;g.add(b);
+  }
+  addEave(g,P.eave,P.dgR,P.dgY,0.8,0.68,false);
+  // 明层
+  D.stories.forEach((S,si)=>{
+    const wall=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(S.r,S.r,S.y1-S.y0,8,1,true),M.wall));
+    wall.position.y=(S.y0+S.y1)/2;g.add(wall);
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(S.r+0.14,S.r+0.14,0.34,8,1,true),M.woodD);
+    band.position.y=S.y1+0.1;g.add(band);
+    addEave(g,S.eave,S.dgR,S.dgY,S.dgS,S.dgS*0.9,si===1);
+    if(si>0)addBalcony(g,S);
+    addFloorAndColumns(g,S,S.r*0.58);
+  });
+  // 暗层
+  D.darks.forEach((Dk,i)=>{
+    addDarkLayer(g,Dk,D.stories[i+1].r);
+  });
+  // 首层佛像 / 藻井 / 刹
+  const buddha=buildBuddha();
+  buddha.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  g.add(buddha);
+  g.add(buildCaisson());
+  g.add(buildFinial());
+  // 檐角风铃
+  const bells=new THREE.InstancedMesh(new THREE.ConeGeometry(0.11,0.32,6),M.gold,bellPos.length);
+  bellPos.forEach((p,i)=>{
+    d.position.set(p[0],p[1],p[2]);d.rotation.set(0,0,0);
+    d.scale.set(1,1,1);d.updateMatrix();bells.setMatrixAt(i,d.matrix);
+  });
+  g.add(bells);
+  T.scene.add(g);
+}
+/* ================= 标签 ================= */
+const labelBox=document.getElementById('labels');
+function addLabel(txt,getPos,views,screen){
+  const el=document.createElement('div');
+  el.className='lbl';el.textContent=txt;el.style.display='none';
+  labelBox.appendChild(el);
+  T.labels.push({el,getPos,views,screen});
+  return el;
+}
+const tmpV=new THREE.Vector3();
+/* 剖视九层 —— 屏幕左侧纵向图例 */
+const CUT_ITEMS=[
+  ['塔刹',0.085],['明层五',0.16],['暗层四',0.225],['明层四',0.29],['暗层三',0.355],
+  ['明层三',0.42],['暗层二',0.485],['明层二',0.55],['暗层一',0.615],
+  ['明层一',0.68],['副阶廊檐',0.745],['台基',0.82],
+];
+CUT_ITEMS.forEach(([name,p])=>addLabel(name,null,['cut'],[0.012,p]));
+/* 斗拱部件（惰性求值，待建模后取转角铺作坐标） */
+function dgCorner(){
+  return T.cornerPos.find(c=>Math.abs(c.ang-Math.PI)<0.01)||T.cornerPos[T.cornerPos.length-1];
+}
+addLabel('栌斗 · 坐于柱头',()=>{const p=dgCorner().pos;return tmpV.set(p.x-1.3,p.y+0.2,p.z)},['dougong']);
+addLabel('华拱 · 外挑出檐',()=>{const p=dgCorner().pos;return tmpV.set(p.x-1.0,p.y+1.05,p.z)},['dougong']);
+addLabel('下昂 · 杠杆内压',()=>{const p=dgCorner().pos;return tmpV.set(p.x-1.8,p.y+1.55,p.z)},['dougong']);
+addLabel('耍头 · 榫接枋木',()=>{const p=dgCorner().pos;return tmpV.set(p.x-0.9,p.y+2.1,p.z)},['dougong']);
+/* 首层 */
+addLabel('释迦牟尼坐像',()=>tmpV.set(-1.6,2.4,0),['inner']);
+addLabel('八角藻井',()=>tmpV.set(1.4,6.5,0),['inner']);
+/* 归位动画步骤 */
+const bayStepEl=addLabel('① 立柱',()=>tmpV.set(34,11.5,26),['assembly']);
+
+/* ================= 视角系统 ================= */
+const VIEWS={
+  overview:{theta:-0.7,phi:1.04,radius:105,target:[0,16,0],auto:0.14,clip:false,
+    kicker:'佛宫寺释迦塔',title:'应县宝塔 · 木构屹立近千年',
+    desc:'万千木构彼此咬合，共同撑起塔身',
+    stats:'高 67.31 m · 辽 · 1056 年 · 纯木结构 · 无一根铁钉'},
+  cut:{theta:-Math.PI/2,phi:1.18,radius:62,target:[0,15,0],auto:0,clip:true,
+    kicker:'明层与暗层',title:'外观仅有五层 · 塔内实藏九层',
+    desc:'四个暗层嵌入五个明层，内外两圈柱网加斜撑，加固整座木塔',
+    stats:'明层 × 5 · 暗层 × 4 · 内外两槽 · 斜撑束筒'},
+  inner:{theta:0.8,phi:1.24,radius:5.5,target:[0,3.0,0.4],auto:0,clip:false,
+    kicker:'首层佛像之上',title:'八角藻井 · 梁枋向心收拢',
+    desc:'佛像上方，木构如伞骨般汇向中心',
+    stats:'释迦牟尼坐像 · 八角形藻井 · 内槽八柱'},
+  dougong:{theta:-Math.PI/2,phi:1.22,radius:8.5,target:null,auto:0.1,clip:false,
+    kicker:'斗拱与榫卯',title:'主体不靠铁钉 · 斗拱榫接托起飞檐',
+    desc:'上部重量经斗拱与梁枋传向立柱',
+    stats:'斗拱 54 种 · 480 朵 · 五铺作双杪偷心'},
+  assembly:{theta:0.55,phi:1.12,radius:24,target:[34,5,26],auto:0,clip:false,
+    kicker:'搭建合拢',title:'万千木构归位 · 重新合拢成塔',
+    desc:'看懂整座塔，从亲手合上一处榫卯开始',
+    stats:'立柱 → 承枋 → 压枋 → 锁楔 → 合檐'},
+};
+const infoKicker=document.getElementById('kicker'),
+      infoTitle=document.getElementById('infoTitle'),
+      infoDesc=document.getElementById('infoDesc'),
+      infoStats=document.getElementById('infoStats'),
+      pillText=document.getElementById('pillText'),
+      pillDot=document.getElementById('pillDot');
+function updatePill(){
+  if(T.auto){pillText.textContent='自动导览中…';pillDot.style.display='block'}
+  else{pillText.textContent='自由查看';pillDot.style.display='none'}
+}
+function setClip(on){
+  T.mats.forEach(m=>{m.clippingPlanes=on?[clipPlane]:null;m.needsUpdate=false});
+}
+function setView(name){
+  T.view=name;
+  const V=VIEWS[name];
+  if(name==='dougong'){
+    const cp=T.cornerPos.find(c=>Math.abs(c.ang-Math.PI)<0.01);
+    if(cp)V.target=[cp.pos.x,cp.pos.y+1.2,cp.pos.z];
+  }
+  T.camGoal.theta=V.theta;T.camGoal.phi=V.phi;T.camGoal.radius=V.radius;
+  if(V.target)T.camGoal.target.set(V.target[0],V.target[1],V.target[2]);
+  T.auto=V.auto>0;
+  T.autoSpeed=V.auto;
+  setClip(V.clip);
+  infoKicker.textContent=V.kicker;infoTitle.textContent=V.title;
+  infoDesc.textContent=V.desc;infoStats.textContent=V.stats;
+  document.querySelectorAll('#sideNav button[data-view]').forEach(b=>
+    b.classList.toggle('active',b.dataset.view===name));
+  updatePill();
+  if(name==='assembly'){bay.visible=true;playAssembly()}
+  else{bay.visible=false;bayStepEl.style.display='none'}
+  if(name==='overview')T.shot=towerShot();
+}
+
+/* ================= 相机控制 ================= */
+const camEl=T.renderer.domElement;
+const ptrs=new Map();
+let pinchD=0;
+camEl.addEventListener('contextmenu',e=>e.preventDefault());
+camEl.addEventListener('pointerdown',e=>{
+  T.auto=0;updatePill();
+  camEl.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){const p=[...ptrs.values()];pinchD=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)}
+});
+camEl.addEventListener('pointermove',e=>{
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;
+  p.x=e.clientX;p.y=e.clientY;
+  if(ptrs.size===1){
+    T.camGoal.theta-=dx*0.0052;
+    T.camGoal.phi=clamp(T.camGoal.phi-dy*0.004,0.12,1.52);
+  }else if(ptrs.size===2){
+    const q=[...ptrs.values()];
+    const d=Math.hypot(q[0].x-q[1].x,q[0].y-q[1].y);
+    if(pinchD>0)T.camGoal.radius=clamp(T.camGoal.radius*pinchD/Math.max(d,1),5,170);
+    pinchD=d;
+  }
+});
+const endPtr=e=>{ptrs.delete(e.pointerId);pinchD=0};
+camEl.addEventListener('pointerup',endPtr);
+camEl.addEventListener('pointercancel',endPtr);
+camEl.addEventListener('wheel',e=>{
+  e.preventDefault();T.auto=0;updatePill();
+  T.camGoal.radius=clamp(T.camGoal.radius*Math.exp(e.deltaY*0.0011),5,170);
+},{passive:false});
+
+/* ================= 归位合拢（演示间架） ================= */
+const bay=new THREE.Group();
+const asmParts=[];
+let asmT0=-1;
+function easeOutBack(x){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)}
+function buildBay(){
+  bay.position.set(34,0,26);bay.rotation.y=-0.5;bay.visible=false;
+  const platform=shadowed(new THREE.Mesh(new THREE.CylinderGeometry(7.6,8.2,0.55,8),M.stone));
+  platform.position.y=0.28;bay.add(platform);
+  // ① 立柱（带榫头）
+  const col=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.95,0.55,8),M.stone);base.position.y=0.55;col.add(base);
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,4.4,8),M.wood);shaft.position.y=3.0;col.add(shaft);
+  const tenon=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.55,0.52),M.red);tenon.position.y=5.45;col.add(tenon);
+  col.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  // ② 承枋
+  const beam1=new THREE.Group();
+  const b1=new THREE.Mesh(new THREE.BoxGeometry(4.6,0.55,0.72),M.red);beam1.add(b1);
+  const m1=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.18,0.5),M.dark);m1.position.set(0,-0.3,0);beam1.add(m1);
+  beam1.position.y=5.95;
+  // ③ 压枋
+  const beam2=new THREE.Group();
+  const b2=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.5,0.6),M.woodD);beam2.add(b2);
+  beam2.position.y=6.55;
+  // ④ 锁楔
+  const wedge=new THREE.Group();
+  const w=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.3,0.85,4),M.gold);wedge.add(w);
+  wedge.position.set(1.5,6.2,0);wedge.rotation.z=-0.12;
+  // ⑤ 檐部
+  const roof=new THREE.Mesh(roofRing({rOut:7.4,rIn:1.4,yOut:7.5,yIn:8.2,rise:1.0}),M.tile);
+  const dg=new THREE.Mesh(dougongGeom(),M.wood);dg.scale.set(1.35,1.35,1.35);dg.position.y=6.9;
+  const roofGrp=new THREE.Group();roofGrp.add(roof);roofGrp.add(dg);
+  asmParts.push(
+    {g:col,from:V3(-18,8,5),spin:0.55,final:V3(0,0,0),t0:0.3,dur:1.5,name:'① 立柱入础'},
+    {g:beam1,from:V3(-4,17,9),spin:-0.4,final:V3(0,0,0),t0:1.3,dur:1.5,name:'② 承枋骑榫'},
+    {g:beam2,from:V3(15,11,-7),spin:0.6,final:V3(0,0,0),t0:2.3,dur:1.5,name:'③ 压枋定位'},
+    {g:wedge,from:V3(11,3,-13),spin:-1.3,final:V3(0,0,0),t0:3.3,dur:1.4,name:'④ 锁楔咬合'},
+    {g:roofGrp,from:V3(0,27,-15),spin:0.35,final:V3(0,0,0),t0:4.3,dur:1.7,name:'⑤ 檐部合拢'},
+  );
+  asmParts.forEach(p=>{p.g.position.copy(p.from);bay.add(p.g)});
+  bay.rotation.y=-0.5;
+  T.scene.add(bay);
+}
+const ASM_NAMES=['','① 立柱入础','② 承枋骑榫','③ 压枋定位','④ 锁楔咬合','⑤ 檐部合拢'];
+function playAssembly(){
+  asmT0=T.t;
+  asmParts.forEach(p=>{p.g.position.copy(p.from);p.g.rotation.set(0,p.spin,0)});
+  bay.rotation.y=-0.5;
+}
+function updateAssembly(){
+  const t=T.t-asmT0;
+  let cur='';
+  asmParts.forEach((p,i)=>{
+    const k=clamp((t-p.t0)/p.dur,0,1);
+    const e=easeOutBack(k);
+    p.g.position.lerpVectors(p.from,p.final,e);
+    p.g.rotation.x=p.spin*(1-e);p.g.rotation.z=p.spin*0.4*(1-e);
+    if(k>0&&k<1)cur=p.name;
+    if(k>=1&&!p.landed){p.landed=true;burstAt(p.final)}
+    if(k<1)p.landed=false;
+  });
+  bay.rotation.y+=0.0035;
+  bayStepEl.style.display='block';
+  bayStepEl.textContent=cur||'合拢完成 · 不用一钉';
+}
+/* 尘粒 */
+const P_N=48,P_pos=new Float32Array(P_N*3),P_vel=new Float32Array(P_N*3);
+const P_geo=new THREE.BufferGeometry();
+P_geo.setAttribute('position',new THREE.BufferAttribute(P_pos,3));
+const P_mat=new THREE.PointsMaterial({color:0xd8b98a,size:0.32,transparent:true,opacity:0,depthWrite:false});
+const P_pts=new THREE.Points(P_geo,P_mat);P_pts.frustumCulled=false;T.scene.add(P_pts);
+let P_life=0;
+function burstAt(local){
+  const wp=bay.localToWorld(local.clone());
+  for(let i=0;i<P_N;i++){
+    P_pos[i*3]=wp.x;P_pos[i*3+1]=wp.y;P_pos[i*3+2]=wp.z;
+    P_vel[i*3]=(Math.random()-0.5)*5;P_vel[i*3+1]=Math.random()*4+1;P_vel[i*3+2]=(Math.random()-0.5)*5;
+  }
+  P_life=1;P_geo.attributes.position.needsUpdate=true;
+}
+function updateParticles(dt){
+  if(P_life<=0)return;
+  P_life-=dt*0.85;
+  for(let i=0;i<P_N;i++){
+    P_pos[i*3]+=P_vel[i*3]*dt;P_pos[i*3+1]+=P_vel[i*3+1]*dt;P_pos[i*3+2]+=P_vel[i*3+2]*dt;
+    P_vel[i*3+1]-=6*dt;
+  }
+  P_mat.opacity=Math.max(P_life,0)*0.9;
+  P_geo.attributes.position.needsUpdate=true;
+}
+
+/* ================= 榫卯游戏 ================= */
+const NAMES=['立柱','承枋','压枋','锁楔'];
+const SUBS=['立柱入础','承枋骑榫','压枋定位','锁楔咬合'];
+const GAME={placed:0,started:false,t0:0,timer:0,homes:[],targets:{},pieces:{},built:false};
+const TG={ // 目标区（480×430 坐标系）
+  column:{x:205,y:250,w:70,h:150},
+  beam1:{x:150,y:216,w:160,h:34},
+  beam2:{x:158,y:186,w:144,h:30},
+  wedge:{x:128,y:212,w:22,h:44},
+};
+const SVG={
+  column:`<svg viewBox="0 0 70 150" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="wc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a5a36"/><stop offset=".5" stop-color="#cf9f66"/><stop offset="1" stop-color="#7a4c2c"/></linearGradient></defs><rect x="10" y="30" width="50" height="120" rx="3" fill="url(#wc)" stroke="#3f2412" stroke-width="2"/><rect x="24" y="0" width="22" height="34" fill="#c69a63" stroke="#3f2412" stroke-width="2" stroke-dasharray="4 3"/><line x1="24" y1="30" x2="46" y2="30" stroke="#3f2412" stroke-dasharray="3 3"/><path d="M18 50 q6 60 0 100 M35 50 q-6 60 0 100 M52 50 q6 60 0 100" stroke="#6a4023" stroke-width="1.5" fill="none" opacity=".5"/></svg>`,
+  beam1:`<svg viewBox="0 0 160 34" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="wb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b05a40"/><stop offset="1" stop-color="#7c3524"/></linearGradient></defs><rect x="0" y="0" width="160" height="34" rx="4" fill="url(#wb)" stroke="#3f1a10" stroke-width="2"/><rect x="52" y="22" width="16" height="12" fill="#2a0f08"/><rect x="92" y="22" width="16" height="12" fill="#2a0f08"/><path d="M6 6 h148 M6 28 h148" stroke="#5e2418" stroke-width="1.4" opacity=".7"/></svg>`,
+  beam2:`<svg viewBox="0 0 144 30" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="wd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8763f"/><stop offset="1" stop-color="#7c5027"/></linearGradient></defs><rect x="0" y="0" width="144" height="30" rx="4" fill="url(#wd)" stroke="#3f2412" stroke-width="2"/><rect x="56" y="20" width="32" height="10" fill="#241206"/><path d="M10 6 h124 M10 24 h124" stroke="#5e3a1c" stroke-width="1.3" opacity=".7"/></svg>`,
+  wedge:`<svg viewBox="0 0 22 44" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ww" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d8b98a"/><stop offset="1" stop-color="#a8814e"/></linearGradient></defs><path d="M3 0 H19 L13.5 44 H8.5 Z" fill="url(#ww)" stroke="#3f2412" stroke-width="2"/><path d="M6 12 l3 6 M13 12 l-3 6" stroke="#6a4a26" stroke-width="1.4" opacity=".7"/></svg>`,
+};
+function stageBgSVG(){
+  const r=(x,y,w,h,n)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#e0b36a" stroke-width="1.6" stroke-dasharray="7 6" opacity=".65"/>`;
+  const t=(x,y,s)=>`<text x="${x}" y="${y}" fill="#e0b36a" font-size="15" letter-spacing="2" opacity=".9">${s}</text>`;
+  document.getElementById('stageBg').innerHTML=
+    `<line x1="20" y1="418" x2="460" y2="418" stroke="#e0b36a" stroke-width="1.4" opacity=".35"/>`+
+    `<path d="M190 400 h100 l10 18 h-120 z" fill="#5b5f6a" stroke="#3a3e48" stroke-width="2"/>`+
+    r(205,250,70,150)+r(150,216,160,34)+r(158,186,144,30)+r(128,212,22,44)+
+    t(212,244,'①')+t(156,210,'②')+t(164,180,'③')+t(132,206,'④')+
+    `<text x="216" y="414" fill="#b3a68c" font-size="11" letter-spacing="2">柱础</text>`;
+}
+function buildGame(){
+  GAME.built=true;
+  stageBgSVG();
+  const order=document.getElementById('tenonOrder');
+  order.innerHTML=NAMES.map((n,i)=>`<span data-i="${i}">${i+1} ${n}</span>`).join('');
+  const wrap=document.getElementById('tenonWrap');
+  ['column','beam1','beam2','wedge'].forEach((k,i)=>{
+    const el=document.createElement('div');
+    el.className='piece';el.dataset.idx=i;
+    el.innerHTML=SVG[k];
+    el.style.display='none';
+    wrap.appendChild(el);
+    GAME.pieces[k]=el;
+    el.addEventListener('pointerdown',e=>onDown(e,el,i));
+    el.addEventListener('pointermove',e=>onMove(e,el));
+    el.addEventListener('pointerup',e=>onUp(e,el,i));
+    el.addEventListener('pointercancel',e=>onUp(e,el,i));
+  });
+}
+function layoutGame(){
+  if(!GAME.built)return;
+  const wrap=document.getElementById('tenonWrap');
+  const stage=document.getElementById('tenonStage');
+  const wr=wrap.getBoundingClientRect(),sr=stage.getBoundingClientRect();
+  GAME.offX=sr.left-wr.left;GAME.offY=sr.top-wr.top;
+  GAME.kw=sr.width/480;GAME.kh=sr.height/430;
+  const order=['column','beam1','beam2','wedge'];
+  order.forEach((k,i)=>{
+    const t=TG[k],el=GAME.pieces[k];
+    const px={x:t.x*GAME.kw,y:t.y*GAME.kh,w:t.w*GAME.kw,h:t.h*GAME.kh};
+    GAME.targets[k]=px;
+    el.style.width=px.w+'px';el.style.height=px.h+'px';
+    if(!el.classList.contains('done')){
+      const hx=wr.width*(0.13+i*0.245)-px.w/2, hy=wr.height-132;
+      GAME.homes[i]={x:hx,y:hy};
+      el.style.left=hx+'px';el.style.top=hy+'px';
+    }
+  });
+}
+function onDown(e,el,i){
+  if(el.classList.contains('done'))return;
+  if(i!==GAME.placed){
+    toast(`先安放「${NAMES[GAME.placed]}」`);
+    el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');
+    return;
+  }
+  e.preventDefault();
+  el.setPointerCapture(e.pointerId);
+  el.classList.add('drag');
+  const r=el.getBoundingClientRect();
+  GAME.grab={dx:e.clientX-r.left,dy:e.clientY-r.top};
+  if(!GAME.started){
+    GAME.started=true;GAME.t0=performance.now();
+    GAME.timer=setInterval(()=>{
+      document.getElementById('tTime').textContent=((performance.now()-GAME.t0)/1000).toFixed(1);
+    },100);
+  }
+}
+function onMove(e,el){
+  if(!el.classList.contains('drag'))return;
+  const wr=document.getElementById('tenonWrap').getBoundingClientRect();
+  el.style.left=(e.clientX-wr.left-GAME.grab.dx)+'px';
+  el.style.top=(e.clientY-wr.top-GAME.grab.dy)+'px';
+}
+function onUp(e,el,i){
+  if(!el.classList.contains('drag'))return;
+  el.classList.remove('drag');
+  const order=['column','beam1','beam2','wedge'];
+  const k=order[i];
+  const t=GAME.targets[k];
+  const cx=parseFloat(el.style.left)+t.w/2, cy=parseFloat(el.style.top)+t.h/2;
+  const hit=cx>t.x-14&&cx<t.x+t.w+14&&cy>t.y-14&&cy<t.y+t.h+14;
+  if(hit&&i===GAME.placed){
+    el.style.left=t.x+'px';el.style.top=t.y+'px';
+    el.classList.add('done');
+    GAME.placed++;
+    updateGameUI();
+    if(GAME.placed===4){
+      clearInterval(GAME.timer);
+      document.getElementById('tStep').textContent='合拢完成';
+      document.getElementById('tenonHint').textContent='四木归位 · 榫卯咬合';
+      setTimeout(showCard,800);
+    }else{
+      document.getElementById('tStep').textContent=SUBS[GAME.placed];
+      document.getElementById('tenonHint').textContent=`继续安放「${NAMES[GAME.placed]}」`;
+    }
+  }else{
+    el.style.left=GAME.homes[i].x+'px';
+    el.style.top=GAME.homes[i].y+'px';
+  }
+}
+function updateGameUI(){
+  document.getElementById('tenonCount').textContent=
+    String(Math.min(GAME.placed+1,4)).padStart(2,'0')+' / 04';
+  document.getElementById('progFill').style.width=(GAME.placed/4*100)+'%';
+  document.getElementById('progText').textContent=`归位 ${GAME.placed} / 4`;
+  document.querySelectorAll('#tenonOrder span').forEach((s,i)=>{
+    s.classList.toggle('done',i<GAME.placed);
+    s.classList.toggle('now',i===GAME.placed);
+  });
+}
+let toastTimer=0;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),1400);
+}
+function openGame(){
+  if(!GAME.built)buildGame();
+  document.getElementById('tenonOverlay').classList.add('show');
+  requestAnimationFrame(()=>{layoutGame();resetGame();});
+}
+function resetGame(){
+  GAME.placed=0;GAME.started=false;clearInterval(GAME.timer);
+  document.getElementById('tTime').textContent='0.0';
+  document.getElementById('tStep').textContent=SUBS[0];
+  document.getElementById('tenonHint').textContent='按顺序拖拽木构：立柱 → 承枋 → 压枋 → 锁楔';
+  Object.values(GAME.pieces).forEach(el=>el.classList.remove('done'));
+  updateGameUI();layoutGame();
+}
+function closeGame(){
+  document.getElementById('tenonOverlay').classList.remove('show');
+  clearInterval(GAME.timer);
+}
+
+/* ================= 纪念卡 ================= */
+function towerShot(){
+  T.renderer.render(T.scene,T.camera);
+  const src=T.renderer.domElement;
+  const c=document.createElement('canvas');c.width=480;c.height=300;
+  c.getContext('2d').drawImage(src,0,0,480,300);
+  return c.toDataURL('image/jpeg',0.72);
+}
+function showCard(){
+  const secs=((performance.now()-GAME.t0)/1000).toFixed(1);
+  document.getElementById('cardImg').src=T.shot||towerShot();
+  document.getElementById('cardTime').textContent=
+    `用时 ${secs} 秒 · ${new Date().toLocaleDateString('zh-CN')}`;
+  document.getElementById('cardOverlay').classList.add('show');
+}
+
+/* ================= 主循环 ================= */
+function camPos(){
+  const c=T.camCur;
+  return V3(
+    c.target.x+c.radius*Math.sin(c.phi)*Math.sin(c.theta),
+    c.target.y+c.radius*Math.cos(c.phi),
+    c.target.z+c.radius*Math.sin(c.phi)*Math.cos(c.theta)
+  );
+}
+function updateLabels(){
+  const w=innerWidth,h=innerHeight;
+  for(const L of T.labels){
+    if(L===bayStepEl){continue}
+    if(!L.views.includes(T.view)){L.el.style.display='none';continue}
+    if(L.screen){
+      L.el.style.display='block';
+      L.el.style.left=(L.screen[0]*w)+'px';
+      L.el.style.top=(L.screen[1]*h)+'px';
+      continue;
+    }
+    const p=L.getPos().project(T.camera);
+    if(p.z>1){L.el.style.display='none';continue}
+    L.el.style.display='block';
+    L.el.style.left=((p.x*0.5+0.5)*w)+'px';
+    L.el.style.top=((-p.y*0.5+0.5)*h)+'px';
+  }
+}
+let last=performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now();
+  const dt=Math.min((now-last)/1000,0.05);last=now;T.t+=dt;
+  if(T.auto)T.camGoal.theta+=dt*(T.autoSpeed||0.14);
+  const k=1-Math.exp(-dt*4.5);
+  T.camCur.theta+=(T.camGoal.theta-T.camCur.theta)*k;
+  T.camCur.phi+=(T.camGoal.phi-T.camCur.phi)*k;
+  T.camCur.radius+=(T.camGoal.radius-T.camCur.radius)*k;
+  T.camCur.target.lerp(T.camGoal.target,k);
+  const p=camPos();p.y=Math.max(p.y,2.4);
+  T.camera.position.copy(p);T.camera.lookAt(T.camCur.target);
+  T.innerLight.intensity+=(T.innerLightTarget-T.innerLight.intensity)*k;
+  if(bay.visible)updateAssembly();
+  updateParticles(dt);
+  T.clouds.forEach((c,i)=>{c.position.x+=dt*(1.5+i*0.4);if(c.position.x>340)c.position.x=-340});
+  updateLabels();
+  T.renderer.render(T.scene,T.camera);
+}
+
+/* ================= 事件绑定 ================= */
+document.querySelectorAll('#sideNav button[data-view]').forEach(b=>
+  b.addEventListener('click',()=>setView(b.dataset.view)));
+document.getElementById('navGameBtn').addEventListener('click',openGame);
+document.getElementById('tenonBtn').addEventListener('click',()=>{T.shot=towerShot();openGame();});
+document.getElementById('backBtn').addEventListener('click',closeGame);
+document.getElementById('againBtn').addEventListener('click',()=>{
+  document.getElementById('cardOverlay').classList.remove('show');
+  layoutGame();resetGame();
+});
+document.getElementById('closeCardBtn').addEventListener('click',()=>{
+  document.getElementById('cardOverlay').classList.remove('show');
+  closeGame();
+});
+document.getElementById('srcBtn').addEventListener('click',()=>
+  toast('资料说明：形制数据整理自公开文保资料 · 辽清宁二年（1056）'));
+addEventListener('resize',()=>{
+  T.camera.aspect=innerWidth/innerHeight;
+  T.camera.updateProjectionMatrix();
+  T.renderer.setSize(innerWidth,innerHeight);
+  if(GAME.built&&document.getElementById('tenonOverlay').classList.contains('show'))layoutGame();
+});
+
+/* ================= 启动 ================= */
+try{
+  initScene();
+  buildTower();
+  buildBay();
+  T.innerLightTarget=0.7;
+  setView('overview');
+  T.shot=towerShot();
+  loop();
+  setTimeout(()=>{
+    document.getElementById('loading').classList.add('hide');
+  },600);
+}catch(err){
+  console.error(err);
+  document.querySelector('#loading p').textContent='初始化失败，请刷新重试';
+}
+/* 调试钩子 */
+window.DBG={setView,openGame,showCard,towerShot,closeGame};
+</script>
+</body>
+</html>

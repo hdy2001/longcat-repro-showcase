@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>扫雷 · Kimi K3 风格</title>
+<style>
+  /* Kimi K3 风格：功能优先、干净直接、无多余装饰 */
+  :root { --cell: 30px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(1200px 600px at 50% -10%, #1b2740, #0c1220 60%);
+    color: #dbe4f5;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 12px 56px;
+    user-select: none;
+  }
+  header { text-align: center; margin-bottom: 18px; }
+  h1 { font-size: 26px; letter-spacing: 6px; font-weight: 600; }
+  .tag {
+    font-size: 12px; vertical-align: middle; letter-spacing: 1px;
+    color: #7dd3fc; border: 1px solid #155e75; border-radius: 4px;
+    padding: 2px 8px; margin-left: 10px; font-weight: 400;
+  }
+  .sub { font-size: 13px; color: #8fa0bd; margin-top: 8px; letter-spacing: 1px; }
+  .levels { display: flex; gap: 8px; margin-bottom: 14px; }
+  .levels button {
+    background: #141d33; color: #9db1d4; border: 1px solid #26334f;
+    border-radius: 6px; padding: 7px 16px; font-size: 13px; cursor: pointer;
+    letter-spacing: 1px; transition: all .15s;
+  }
+  .levels button:hover { border-color: #3d5178; color: #dbe4f5; }
+  .levels button.active { background: #1d3a5f; border-color: #38bdf8; color: #7dd3fc; }
+  .status {
+    display: flex; align-items: center; gap: 14px;
+    background: #141d33; border: 1px solid #26334f; border-radius: 8px;
+    padding: 6px 14px; margin-bottom: 14px; min-width: 280px; justify-content: space-between;
+  }
+  .pill { font-size: 14px; color: #9db1d4; font-variant-numeric: tabular-nums; }
+  .pill b { color: #f1f5f9; font-size: 16px; margin-left: 2px; }
+  .face {
+    font-size: 20px; background: none; border: none; cursor: pointer;
+    width: 36px; height: 36px; border-radius: 6px; transition: background .15s;
+  }
+  .face:hover { background: #1d2a45; }
+  .board {
+    display: grid; gap: 2px; background: #0a0f1d;
+    border: 1px solid #26334f; border-radius: 8px; padding: 6px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  }
+  .board.hard { --cell: 24px; }
+  .cell {
+    width: var(--cell); height: var(--cell);
+    background: linear-gradient(180deg, #3b4a63, #2c3850);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: calc(var(--cell) * 0.5);
+    cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+    transition: background .08s;
+  }
+  .cell:not(.open):hover { background: linear-gradient(180deg, #4a5b7a, #36445f); }
+  .cell.open { background: #161f33; box-shadow: inset 0 2px 4px rgba(0,0,0,.5); cursor: default; }
+  .cell.hit { background: #7f1d1d !important; }
+  .cell.mine { background: #2a1420; }
+  .cell.wrong { background: #3a2a10; }
+  .n1 { color: #60a5fa; } .n2 { color: #34d399; } .n3 { color: #f87171; }
+  .n4 { color: #a78bfa; } .n5 { color: #fbbf24; } .n6 { color: #2dd4ee; }
+  .n7 { color: #f472b6; } .n8 { color: #9ca3af; }
+  .best { margin-top: 12px; font-size: 12px; color: #64748b; letter-spacing: 1px; }
+  .best .rec { color: #fbbf24; }
+</style>
+</head>
+<body>
+<header>
+  <h1>扫 雷<span class="tag">Kimi K3 风格</span></h1>
+  <p class="sub">左键翻开 · 右键插旗 · 双击数字快速排雷 · 首次点击必安全</p>
+</header>
+
+<nav class="levels">
+  <button data-level="easy" class="active">初级 9×9</button>
+  <button data-level="normal">中级 16×16</button>
+  <button data-level="hard">高级 16×30</button>
+</nav>
+
+<div class="status">
+  <span class="pill">💣<b id="mineCount">010</b></span>
+  <button id="face" title="重新开始">🙂</button>
+  <span class="pill">⏱<b id="time">000</b></span>
+</div>
+
+<div id="board" class="board"></div>
+<p class="best" id="best">最佳成绩 —</p>
+
+<script>
+'use strict';
+/*
+ * Kimi K3 风格 · 扫雷
+ * 设计取舍：
+ * - 首次点击必安全：雷区在第一次翻开之后才布置，含周围 8 格豁免。
+ * - 泛洪翻开用迭代栈而非递归：逻辑等价，没有爆栈风险。
+ * - 状态与视图分离：board 只存状态，render() 统一刷新 class，改逻辑不碰 DOM。
+ */
+
+const LEVELS = {
+  easy:   { rows: 9,  cols: 9,  mines: 10 },
+  normal: { rows: 16, cols: 16, mines: 40 },
+  hard:   { rows: 16, cols: 30, mines: 99 },
+};
+
+const $ = (s) => document.querySelector(s);
+const boardEl = $('#board'), faceEl = $('#face'),
+      mineEl = $('#mineCount'), timeEl = $('#time'), bestEl = $('#best');
+
+let cfg, mines, opened, flagged, cellEls;
+let state, won, started, seconds, revealed, timerId;
+
+const pad3 = (n) => n < 0
+  ? '-' + String(-n).padStart(2, '0')
+  : String(Math.min(999, n)).padStart(3, '0');
+
+function bestKey() { return 'k3-mine-best-' + currentLevel; }
+let currentLevel = 'easy';
+
+/* ---------- 初始化 ---------- */
+
+function init(level) {
+  currentLevel = level;
+  cfg = LEVELS[level];
+  const n = cfg.rows * cfg.cols;
+  mines   = new Uint8Array(n);
+  opened  = new Uint8Array(n);
+  flagged = new Uint8Array(n);
+  state = 'ready'; won = false; started = false;
+  seconds = 0; revealed = 0;
+  clearInterval(timerId);
+  timeEl.textContent = '000';
+  faceEl.textContent = '🙂';
+  setMineCount();
+  const best = localStorage.getItem(bestKey());
+  bestEl.innerHTML = best
+    ? `最佳 <b>${best}s</b>`
+    : '最佳成绩 —';
+  buildBoard();
+}
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  boardEl.className = 'board' + (currentLevel === 'hard' ? ' hard' : '');
+  boardEl.style.gridTemplateColumns = `repeat(${cfg.cols}, var(--cell))`;
+  cellEls = new Array(cfg.rows * cfg.cols);
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const i = r * cfg.cols + c;
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.addEventListener('click', () => revealAt(r, c));
+      el.addEventListener('contextmenu', (e) => { e.preventDefault(); toggleFlag(i); });
+      el.addEventListener('dblclick', () => chord(r, c));
+      cellEls[i] = el;
+      boardEl.appendChild(el);
+    }
+  }
+}
+
+/* ---------- 布雷：首次翻开后执行 ---------- */
+
+function placeMines(safe) {
+  const forbid = new Set([safe]);
+  for (const [nr, nc] of eachNeighbor(...idx2rc(safe))) {
+    forbid.add(nr * cfg.cols + nc);
+  }
+  let need = cfg.mines;
+  while (need > 0) {
+    const i = Math.floor(Math.random() * cfg.rows * cfg.cols);
+    if (mines[i] || forbid.has(i)) continue;
+    mines[i] = 1; need--;
+  }
+}
+
+function idx2rc(i) { return [Math.floor(i / cfg.cols), i % cfg.cols]; }
+
+function* eachNeighbor(r, c) {
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols) yield [nr, nc];
+    }
+}
+
+function countAroundIdx(i) {
+  const [r, c] = idx2rc(i);
+  let n = 0;
+  for (const [nr, nc] of eachNeighbor(r, c)) if (mines[nr * cfg.cols + nc]) n++;
+  return n;
+}
+
+/* ---------- 翻开 ---------- */
+
+function revealAt(r, c) {
+  if (state === 'over') return;
+  const i = r * cfg.cols + c;
+  if (opened[i] || flagged[i]) return;
+  if (!started) {           // 第一次点击：布雷并启动计时
+    placeMines(i);
+    started = true;
+    timerId = setInterval(() => {
+      seconds++;
+      timeEl.textContent = pad3(seconds);
+    }, 1000);
+  }
+  if (mines[i]) return loseAt(i);
+  floodFill(r, c);
+  render();
+  if (revealed === cfg.rows * cfg.cols - cfg.mines) winGame();
+}
+
+function floodFill(sr, sc) {
+  const stack = [[sr, sc]];
+  while (stack.length) {
+    const [r, c] = stack.pop();
+    const i = r * cfg.cols + c;
+    if (opened[i] || flagged[i] || mines[i]) continue;
+    opened[i] = 1; revealed++;
+    if (countAroundIdx(i) === 0) {
+      for (const [nr, nc] of eachNeighbor(r, c)) {
+        const ni = nr * cfg.cols + nc;
+        if (!opened[ni]) stack.push([nr, nc]);
+      }
+    }
+  }
+}
+
+/* 双击已翻开的数字：周围旗数等于数字时，一次性翻开其余格 */
+function chord(r, c) {
+  if (state === 'over') return;
+  const i = r * cfg.cols + c;
+  const n = opened[i] && !mines[i] ? countAroundIdx(i) : 0;
+  if (!n) return;
+  let flags = 0;
+  for (const [nr, nc] of eachNeighbor(r, c)) if (flagged[nr * cfg.cols + nc]) flags++;
+  if (flags !== n) return;
+  for (const [nr, nc] of eachNeighbor(r, c)) {
+    const ni = nr * cfg.cols + nc;
+    if (!flagged[ni] && !opened[ni]) revealAt(nr, nc);
+  }
+}
+
+/* ---------- 插旗 ---------- */
+
+function toggleFlag(i) {
+  if (state === 'over' || opened[i]) return;
+  flagged[i] = flagged[i] ? 0 : 1;
+  setMineCount();
+  render();
+}
+
+/* ---------- 胜负 ---------- */
+
+function loseAt(i) {
+  state = 'over'; won = false;
+  clearInterval(timerId);
+  faceEl.textContent = '😵';
+  cellEls[i].classList.add('hit');
+  cellEls[i].textContent = '💣';
+  // 揭开本局真相：未插旗的雷全部显示，插错的打叉
+  for (let j = 0; j < mines.length; j++) {
+    if (mines[j] && !flagged[j]) { cellEls[j].classList.add('open', 'mine'); cellEls[j].textContent = '💣'; }
+    else if (!mines[j] && flagged[j]) { cellEls[j].classList.add('wrong'); cellEls[j].textContent = '✖️'; }
+  }
+}
+
+function winGame() {
+  state = 'over'; won = true;
+  clearInterval(timerId);
+  faceEl.textContent = '😎';
+  for (let j = 0; j < mines.length; j++) if (mines[j] && !flagged[j]) flagged[j] = 1;
+  const prev = Number(localStorage.getItem(bestKey())) || Infinity;
+  const rec = seconds < prev;
+  if (rec) localStorage.setItem(bestKey(), seconds);
+  bestEl.innerHTML = rec
+    ? `新纪录 <b>${seconds}s</b> <span class="rec">★</span>`
+    : `最佳 <b>${prev === Infinity ? seconds : prev}s</b>`;
+  setMineCount();
+  render();
+}
+
+/* ---------- 渲染 ---------- */
+
+function setMineCount() {
+  let f = 0;
+  for (let j = 0; j < flagged.length; j++) f += flagged[j];
+  mineEl.textContent = pad3(cfg.mines - f);
+}
+
+function render() {
+  for (let i = 0; i < cellEls.length; i++) {
+    const el = cellEls[i];
+    el.className = 'cell';
+    el.textContent = '';
+    if (opened[i]) {
+      el.classList.add('open');
+      const n = countAroundIdx(i);
+      if (n) { el.textContent = n; el.classList.add('n' + n); }
+    } else if (flagged[i]) {
+      el.textContent = '🚩';
+    }
+  }
+}
+
+/* ---------- 交互入口 ---------- */
+
+document.querySelectorAll('.levels button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.levels button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    init(btn.dataset.level);
+  });
+});
+
+faceEl.addEventListener('click', () => init(currentLevel));
+init('easy');
+</script>
+</body>
+</html>

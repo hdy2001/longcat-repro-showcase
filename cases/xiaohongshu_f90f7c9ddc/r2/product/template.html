@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>小西天 · 大雄宝殿悬塑 3D 复原</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0e0a08;font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+  .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 52%,rgba(8,4,2,.6) 100%);}
+  .card{position:fixed;color:#e8d9b8;text-shadow:0 1px 4px rgba(0,0,0,.85);z-index:10;pointer-events:none;}
+  #title{top:18px;left:22px;}
+  #title h1{margin:0;font-size:21px;letter-spacing:3px;font-weight:600;color:#f0dfae;}
+  #title p{margin:5px 0 0;font-size:12px;opacity:.72;letter-spacing:1px;}
+  #hint{bottom:16px;left:22px;font-size:12px;opacity:.68;line-height:1.8;}
+  #stats{top:18px;right:22px;font-size:12px;text-align:right;opacity:.85;line-height:1.8;}
+  #stats b{color:#f0dfae;font-weight:600;}
+  #panel{bottom:16px;right:22px;display:flex;gap:8px;pointer-events:auto;}
+  #panel button{background:rgba(30,20,12,.78);border:1px solid #8a6d3b;color:#e8d9b8;font-size:12px;padding:7px 14px;border-radius:4px;cursor:pointer;letter-spacing:1px;font-family:inherit;transition:background .2s;}
+  #panel button:hover{background:rgba(90,60,25,.9);}
+  #panel button.on{background:#8a6d3b;color:#fff8e6;}
+  #loading{position:fixed;inset:0;background:#0e0a08;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e8d9b8;transition:opacity .7s;}
+  #loading.hide{opacity:0;pointer-events:none;}
+  #loading .spin{width:34px;height:34px;border:2px solid #8a6d3b;border-top-color:#f0dfae;border-radius:50%;animation:sp 1s linear infinite;margin-bottom:18px;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #loadText{font-size:13px;letter-spacing:2px;opacity:.85;}
+  #loadBar{width:220px;height:2px;background:#3a2c1a;margin-top:14px;}
+  #loadBar i{display:block;height:100%;width:0%;background:#d4af37;transition:width .3s;}
+  #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:#e8d9b8;background:#0e0a08;z-index:200;font-size:14px;text-align:center;line-height:2;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="vignette"></div>
+<div class="card" id="title">
+  <h1>小西天 · 大雄宝殿</h1>
+  <p>山西隰县 千佛庵 · 明代悬塑 · 数字复原</p>
+</div>
+<div class="card" id="stats"></div>
+<div class="card" id="hint">左键拖拽旋转 · 滚轮缩放（相机已锁定于殿内中央安全区，不会穿出墙体）<br>平移已锁定 · 双击画布重置视角</div>
+<div id="panel">
+  <button id="btnSpin" class="on">自动环绕</button>
+  <button id="btnReset">重置视角</button>
+</div>
+<div id="loading"><div class="spin"></div><div id="loadText">正在搭建殿堂…</div><div id="loadBar"><i></i></div></div>
+<div id="err"><div>当前环境不支持 WebGL，无法渲染 3D 场景。<br>请使用最新版 Chrome / Edge / Safari 打开本文件。</div></div>
+
+<script type="module">
+//__THREE__
+//__ORBIT__
+//__BGU__
+//__APP__
+</script>
+</body>
+</html>

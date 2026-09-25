@@ -1,0 +1,19 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.17.3",
+    "@types/three": "^0.160.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

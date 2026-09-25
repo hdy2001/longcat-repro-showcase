@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI社交软件市场竞争格局与未来展望 · 四模型版本对比</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:#E7E7E9;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;color:#1c1c1c;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+/* ============ 应用外壳 ============ */
+#topbar{position:fixed;inset:0 0 auto 0;height:64px;background:#fff;border-bottom:1px solid #E4E4E6;display:flex;align-items:center;gap:18px;padding:0 22px;z-index:50}
+.brand{display:flex;align-items:baseline;gap:11px;white-space:nowrap;flex:none}
+.brand b{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.brand span{font-size:11px;color:#9a9a9a}
+#tabs{display:flex;gap:5px;margin-left:auto;overflow:hidden}
+#tabs button{border:1.5px solid transparent;background:transparent;font-size:12px;font-weight:700;color:#555;padding:6px 11px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+#tabs button i{width:7px;height:7px;border-radius:50%;background:#C8102E;flex:none}
+#tabs button small{color:#aaa;font-weight:600;font-size:10px}
+#tabs button.on{background:#C8102E;color:#fff}
+#tabs button.on small{color:#ffd9de}
+#pagenav{position:fixed;top:64px;left:0;right:0;height:44px;background:rgba(255,255,255,.94);border-bottom:1px solid #EBEBED;display:flex;align-items:center;justify-content:center;gap:6px;z-index:49}
+#pagenav .lbl{font-size:10.5px;color:#bbb;letter-spacing:.18em;margin-right:8px}
+#pagenav button{font-size:12px;font-weight:700;color:#888;background:transparent;border:none;padding:6px 13px;border-radius:8px;cursor:pointer}
+#pagenav button.on{background:#FBE9EC;color:#C8102E}
+#pagenav .sep{width:1px;height:15px;background:#E2E2E5;margin:0 9px}
+#stage{position:fixed;inset:108px 0 0 0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#slideBox{transform-origin:center center;flex:none}
+/* ============ 幻灯片母版 ============ */
+.sl{width:1280px;height:720px;background:#fff;position:relative;box-shadow:0 16px 55px rgba(20,20,30,.18);overflow:hidden}
+.hd{padding:33px 56px 0}
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:800;letter-spacing:.24em;color:#C8102E}
+.eyebrow i{width:26px;height:4px;background:#C8102E;border-radius:2px;flex:none}
+.hd h1{font-size:31px;font-weight:800;letter-spacing:-.015em;margin:9px 0 7px;color:#141414;line-height:1.2}
+.sub{font-size:14px;color:#5a5a5a;line-height:1.5}
+.rule{height:3px;border-radius:2px;background:linear-gradient(90deg,#C8102E 0 84px,#F0CBD2 84px 100%);margin-top:12px}
+.vw{position:absolute;top:37px;right:52px;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:#c9c9cc;text-align:right;line-height:1.6}
+.vw b{color:#C8102E;font-size:11.5px}
+.bd{position:absolute;left:56px;right:56px;top:146px;bottom:116px}
+.src{position:absolute;left:56px;bottom:88px;font-size:10.5px;color:#a2a2a2;line-height:1.45;right:56px}
+.concl{position:absolute;left:56px;right:56px;bottom:20px;height:52px;border-radius:10px;background:linear-gradient(180deg,#FDEEF1,#FBE2E7);border:1px solid #F0C3CB;display:flex;align-items:center;gap:11px;padding:0 18px}
+.concl .ti{flex:none;width:26px;height:26px;border-radius:50%;background:#C8102E;color:#fff;display:flex;align-items:center;justify-content:center}
+.concl p{font-size:14px;font-weight:700;color:#8E0C22;line-height:1.35}
+.concl p b{color:#C8102E}
+/* ============ 通用组件 ============ */
+.card{background:#fff;border:1px solid #EBD3D9;border-radius:12px}
+.card.tint{background:#FDF4F6}
+.acc{border-top:3px solid #C8102E}
+.sl-l{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:800;color:#960C22;letter-spacing:.03em;margin-bottom:9px}
+.sl-l b{min-width:23px;height:23px;padding:0 6px;border-radius:6px;background:#FBE9EC;color:#C8102E;font-size:11.5px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.sl-l .en{font-weight:600;color:#d3a0aa;font-size:10px;letter-spacing:.12em}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:#666;border:1px solid #E7C6CD;border-radius:999px;padding:2.5px 9px;background:#fff;white-space:nowrap}
+.chip b{color:#C8102E}
+.tag{font-size:9.5px;color:#a8a8a8;background:#F5F5F6;border-radius:4px;padding:1.5px 6px;white-space:nowrap}
+.st{font-size:9.5px;font-weight:700;border-radius:4px;padding:2px 6px;white-space:nowrap}
+.st.wait{background:#F0F0F1;color:#888}
+.st.ok{background:#FBE9EC;color:#C8102E}
+.icr{flex:none;border-radius:50%;border:1.6px solid #C8102E;color:#C8102E;display:flex;align-items:center;justify-content:center;background:#fff}
+.icr.sz30{width:30px;height:30px}.icr.sz30 svg{width:15px;height:15px}
+.icr.sz38{width:38px;height:38px}.icr.sz38 svg{width:19px;height:19px}
+.icr.sz44{width:44px;height:44px}.icr.sz44 svg{width:22px;height:22px}
+.nbd{flex:none;min-width:23px;height:23px;padding:0 5px;border-radius:50%;background:#C8102E;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.num{font-weight:800;color:#C8102E;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pts{list-style:none;font-size:12.5px;color:#333;line-height:1.55}
+.pts li{padding-left:14px;position:relative;margin:3px 0}
+.pts li::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:#C8102E}
+.pts.red li::before{content:"";background:#E4572E}
+.hb{display:grid;grid-template-columns:96px 1fr 62px;align-items:center;gap:10px;margin:9px 0}
+.hb .l{font-size:11.5px;color:#555}
+.hb .t{height:12px;background:#F6E8EB;border-radius:6px;overflow:hidden}
+.hb .t i{display:block;height:100%;background:linear-gradient(90deg,#D9384B,#C8102E);border-radius:6px}
+.hb .v{font-size:13px;font-weight:800;color:#960C22;text-align:right;font-variant-numeric:tabular-nums}
+.arr{color:#C8102E;font-weight:800;font-size:15px;flex:none}
+.ring{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ring span{position:absolute;text-align:center;display:flex;flex-direction:column;line-height:1.15}
+.ring b{font-size:13.5px;color:#960C22;font-weight:800}
+.ring i{font-size:8.5px;color:#999;font-style:normal}
+.foot-note{font-size:10.5px;color:#9a9a9a;line-height:1.5;border-left:3px solid #F0C3CB;padding-left:10px}
+.vline{width:1px;background:#F0D5DB;align-self:stretch}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.grow{flex:1;min-width:0}
+/* ============ Luna：简陋版 ============ */
+.v-luna .bd{display:flex;flex-direction:column;gap:24px;padding:4px 2px}
+.ln{border:1px solid #E4E4E4;border-radius:8px;background:#FAFAFA;padding:14px 19px}
+.ln h3{font-size:14.5px;color:#C8102E;font-weight:800;margin-bottom:9px;letter-spacing:.02em}
+.ln ul{list-style:none;font-size:13.5px;color:#3a3a3a;line-height:1.72}
+.ln li{padding-left:15px;position:relative}
+.ln li::before{content:"▪";position:absolute;left:0;color:#C8102E}
+.ln b{color:#C8102E}
+.ln .brow{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:12.5px;color:#555}
+.ln .trk{display:inline-block;width:270px;height:13px;background:#ECECEC;border-radius:3px;overflow:hidden;vertical-align:middle}
+.ln .fl{display:block;height:100%;background:#C8102E}
+.ln .fl2{display:block;height:100%;background:#E9A6B0}
+.ln .plain-line{font-size:13.5px;color:#3a3a3a;line-height:1.8}
+/* ============ 对比页 ============ */
+.cmp .bd{display:flex;flex-direction:column;gap:12px;top:140px;bottom:118px}
+.cmp-panel{background:#fff;border:1px solid #EBD3D9;border-radius:12px;padding:12px 18px}
+.cmp-panel h3{font-size:14px;font-weight:800;color:#141414;display:flex;align-items:baseline;gap:9px}
+.cmp-panel h3 .n{font-size:11px;color:#C8102E;background:#FBE9EC;border-radius:5px;padding:1.5px 7px;font-weight:800}
+.cmp-panel h3 .d{font-size:10.5px;color:#a2a2a2;font-weight:600;margin-left:auto}
+.cbar{display:grid;grid-template-columns:118px 1fr 128px;align-items:center;gap:12px;margin-top:9px}
+.cbar .nm{font-size:12.5px;font-weight:800;color:#333;white-space:nowrap}
+.cbar .nm small{display:block;font-size:9.5px;color:#aaa;font-weight:600}
+.cbar .tk{height:15px;background:#F6E8EB;border-radius:7px;position:relative;overflow:visible}
+.cbar .tk i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:linear-gradient(90deg,#D9384B,#C8102E);min-width:3px}
+.cbar .tk i.base{background:linear-gradient(90deg,#E9A6B0,#D97B8C)}
+.cbar .vl{font-size:12.5px;font-weight:800;color:#960C22;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cbar .vl small{color:#a2a2a2;font-weight:600;margin-left:6px}
+.cbar .x{position:absolute;top:-4px;bottom:-4px;width:2px;background:#EFC3CB;border-radius:1px}
+.qrow{display:grid;grid-template-columns:30px 150px 64px 1fr;gap:12px;align-items:center;background:#fff;border:1px solid #EBD3D9;border-radius:10px;padding:9px 14px}
+.qrow .rk{width:26px;height:26px;border-radius:50%;background:#C8102E;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.qrow .rk.r2{background:#D9384B}.qrow .rk.r3{background:#E0707F}.qrow .rk.r4{background:#E9A6B0}
+.qrow .mn{font-size:13.5px;font-weight:800;color:#141414;white-space:nowrap}
+.qrow .mn small{display:block;font-size:9.5px;color:#aaa;font-weight:600}
+.qrow .mx{font-size:13px;font-weight:800;color:#960C22;font-variant-numeric:tabular-nums}
+.qrow .qc{font-size:11.8px;color:#444;line-height:1.5}
+.qrow .qc b{color:#C8102E}
+/* ============ 封面 ============ */
+.cov{width:1280px;height:720px;background:#fff;position:relative;box-shadow:0 16px 55px rgba(20,20,30,.18);overflow:hidden;padding:64px 72px;display:flex;flex-direction:column}
+.cov .cb{position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FDF0F2,#F8DCE1)}
+.cov .cb2{position:absolute;right:60px;top:60px;width:220px;height:220px;border-radius:50%;border:1.5px dashed #EFC3CB}
+.cov .eyebrow{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:800;letter-spacing:.26em;color:#C8102E}
+.cov .eyebrow i{width:30px;height:4px;background:#C8102E;border-radius:2px}
+.cov h1{font-size:46px;font-weight:800;letter-spacing:-.02em;line-height:1.22;margin-top:22px;color:#141414}
+.cov h1 em{font-style:normal;color:#C8102E}
+.cov .csub{font-size:16px;color:#5a5a5a;margin-top:16px;line-height:1.6;max-width:860px}
+.cov .cmeta{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+.cov .cmeta .chip{font-size:11px;padding:4px 12px}
+.cov .mods{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:auto}
+.cov .mod{border:1px solid #EBD3D9;border-radius:12px;padding:14px 16px;background:#fff;position:relative}
+.cov .mod .mh{display:flex;align-items:center;gap:8px}
+.cov .mod .mh b{font-size:14px;font-weight:800}
+.cov .mod .mh .cf{margin-left:auto;font-size:9.5px;color:#fff;background:#C8102E;border-radius:4px;padding:2px 7px;font-weight:800;letter-spacing:.06em}
+.cov .mod .mm{font-size:10.5px;color:#960C22;font-weight:800;margin-top:8px;font-variant-numeric:tabular-nums}
+.cov .mod .mq{font-size:10.8px;color:#555;line-height:1.5;margin-top:5px}
+.cov .cfoot{margin-top:18px;font-size:10.5px;color:#a2a2a2;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header id="topbar">
+  <div class="brand"><b>AI社交软件市场竞争格局与未来展望</b><span>lw-consulting-ppt · 四模型版本复现对比</span></div>
+  <nav id="tabs">
+    <button data-v="sol" class="on"><i></i>GPT 5.6 Sol high<small>13.12×</small></button>
+    <button data-v="terra"><i></i>GPT 5.6 Terra high<small>5.04×</small></button>
+    <button data-v="luna"><i></i>GPT 5.6 Luna max<small>1.00×</small></button>
+    <button data-v="astra"><i></i>GPT 6 Astra high<small>22.11×</small></button>
+    <button data-v="cmp"><i></i>对比总结<small>1 页</small></button>
+  </nav>
+</header>
+<div id="pagenav" style="display:none">
+  <span class="lbl">页面</span>
+</div>
+<main id="stage"><div id="slideBox"></div></main>
+<script>
+/* ================= 图标库（红色描边小图标，限制在圆点内） ================= */
+const IC={
+ bar:'<path d="M4 20v-7M10 20V5M16 20v-10M3 20h18"/>',
+ users:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.4 2.8-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><circle cx="16.8" cy="9" r="2.5"/><path d="M16 14.6c2.3.4 4 2 4.6 4.4"/>',
+ dl:'<path d="M12 4v9m0 0-3.5-3.5M12 13l3.5-3.5M5 19h14"/>',
+ phone:'<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+ heart:'<path d="M12 20.2S3.6 15.4 3.6 9.9C3.6 7 5.8 4.8 8.3 4.8c1.5 0 2.7.7 3.7 1.9 1-1.2 2.2-1.9 3.7-1.9 2.5 0 4.7 2.2 4.7 5.1 0 5.5-8.4 10.3-8.4 10.3z"/>',
+ mask:'<path d="M4.5 8.5C7 6.9 9.5 6 12 6s5 .9 7.5 2.5V14c0 3.4-3.4 5.7-7.5 5.7S4.5 17.4 4.5 14V8.5z"/><path d="M8.2 10.8h.01M15.8 10.8h.01M9.5 14.5c1.6.8 3.4.8 5 0"/>',
+ globe:'<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.4 2.2 3.6 5 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-5-3.6-8S9.6 6.2 12 4z"/>',
+ chat:'<path d="M4.5 6A2.5 2.5 0 0 1 7 3.5h10A2.5 2.5 0 0 1 19.5 6v7A2.5 2.5 0 0 1 17 15.5H9.5L5 20V6z"/><path d="M8.5 8h7M8.5 11h4.5"/>',
+ shield:'<path d="M12 3.5l6.5 2.6v4.7c0 4.3-2.8 7.4-6.5 9.2-3.7-1.8-6.5-4.9-6.5-9.2V6.1L12 3.5z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+ scale:'<path d="M12 4v15M8 19.5h8M12 6.2 5.8 8m6.2-1.8 6.2 1.8"/><path d="M3.2 10.2l1.7 4.3a2.8 2.8 0 0 0 5.4 0l1.7-4.3M12.8 10.2l1.7 4.3a2.8 2.8 0 0 0 5.4 0l1.7-4.3"/>',
+ link:'<path d="M10 13.5a3.5 3.5 0 0 0 5 .4l2.8-2.8a3.5 3.5 0 1 0-5-5L11.5 7.4"/><path d="M14 10.5a3.5 3.5 0 0 0-5-.4l-2.8 2.8a3.5 3.5 0 1 0 5 5l1.3-1.3"/>',
+ lock:'<rect x="5.5" y="11" width="13" height="8.5" rx="2"/><path d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11"/>',
+ bell:'<path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4.2 1.6 5.4 1.6 5.4H4.9S6.5 14.2 6.5 10z"/><path d="M10 19a2.1 2.1 0 0 0 4 0"/>',
+ cal:'<rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10.5h16M8.5 3.5v3.5M15.5 3.5v3.5"/>',
+ alert:'<path d="M12 4.5L3 19.5h18L12 4.5z"/><path d="M12 10v4M12 17h.01"/>',
+ pen:'<path d="M4.5 19.5l.9-3.6L16.6 4.7a2.05 2.05 0 0 1 2.9 2.9L8.3 18.8l-3.8.7z"/><path d="M14.8 6.5l2.9 2.9"/>',
+ target:'<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
+ rocket:'<path d="M14.5 4.5c2.8-.8 5.2-.5 5.2-.5s.3 2.4-.5 5.2c-1.1 3.7-4 6.7-7 8.2l-3.2 1.5 1.5-3.2c1.5-3 4.5-5.9 8.2-7z"/><path d="M9 11.5c-2 .5-3.5 2-4 4.5 2.5-.5 4-2 4.5-4"/><circle cx="14.5" cy="9.5" r="1.5"/>',
+ book:'<path d="M5.5 4.5h10A1.5 1.5 0 0 1 17 6v13.5H7a1.5 1.5 0 0 1-1.5-1.5V4.5z"/><path d="M5.5 17.5h11.5"/><path d="M9 8.5h5M9 12h3.5"/>',
+ compass:'<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2z"/>',
+ crown:'<path d="M4 17.5h16M4 17.5L2.8 9.5 7.5 12.5 12 6l4.5 6.5 4.7-3L20 17.5"/>',
+ smile:'<circle cx="12" cy="8" r="3.6"/><path d="M8.2 8.2h.01M15.8 8.2h.01M9.5 11.6c1.5.8 3.5.8 5 0"/><path d="M5 20c1-3.6 3.7-5.6 7-5.6s6 2 7 5.6"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.6M12 17.9v2.6M3.5 12h2.6M17.9 12h2.6M6 6l1.8 1.8M16.2 16.2 18 18M18 6l-1.8 1.8M7.8 16.2 6 18"/>',
+ coins:'<ellipse cx="12" cy="6.5" rx="6.5" ry="2.8"/><path d="M5.5 6.5v5c0 1.6 2.9 2.8 6.5 2.8s6.5-1.2 6.5-2.8v-5"/><path d="M5.5 11.5v5c0 1.6 2.9 2.8 6.5 2.8s6.5-1.2 6.5-2.8v-5"/>',
+ up:'<path d="M3.5 16.5l5.5-5.5 3.5 3.5 8-8"/><path d="M15.5 6.5h5v5"/>',
+ down:'<path d="M3.5 7.5l5.5 5.5 3.5-3.5 8 8"/><path d="M20.5 14.5v5h-5"/>',
+ layers:'<path d="M12 4.5 20.5 9 12 13.5 3.5 9 12 4.5z"/><path d="M4.5 13.5 12 17.5l7.5-4M4.5 17.5 12 21.5l7.5-4"/>',
+ star:'<path d="M12 3.5l2.6 5.6 6 .7-4.5 4.1 1.2 5.9L12 16.9l-5.3 2.9 1.2-5.9L3.4 9.8l6-.7L12 3.5z"/>',
+ ucheck:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.4 2.8-5.2 5.5-5.2 1 0 1.9.2 2.7.7"/><path d="M14.5 15.5l1.8 1.8 3.7-3.8"/>',
+ eye:'<path d="M2.8 12S6.3 5.8 12 5.8 21.2 12 21.2 12 17.7 18.2 12 18.2 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.8"/>',
+ scan:'<path d="M4 8.5V6.5A2.5 2.5 0 0 1 6.5 4h2M15.5 4h2A2.5 2.5 0 0 1 20 6.5v2M20 15.5v2a2.5 2.5 0 0 1-2.5 2.5h-2M8.5 20h-2A2.5 2.5 0 0 1 4 17.5v-2M4 12h16"/>',
+ flag:'<path d="M5.5 21V4"/><path d="M5.5 4.8h11.8l-2.4 3.7 2.4 3.7H5.5"/>',
+ anchor:'<circle cx="12" cy="5.5" r="2.3"/><path d="M12 8v12M5 13c0 4.8 3 7.5 7 7.5s7-2.7 7-7.5M5 13l-1.8 2.6M5 13l1.8 2.6M19 13l-1.8 2.6M19 13l1.8 2.6"/>',
+ spark:'<path d="M12 3.5l1.7 4.8 4.8 1.7-4.8 1.7L12 16.5l-1.7-4.8-4.8-1.7 4.8-1.7L12 3.5z"/><path d="M18.5 15.5l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9.9-2.4z"/>',
+ grid:'<rect x="4" y="4" width="7" height="7" rx="1.2"/><rect x="13" y="4" width="7" height="7" rx="1.2"/><rect x="4" y="13" width="7" height="7" rx="1.2"/><rect x="13" y="13" width="7" height="7" rx="1.2"/>',
+ clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+ cash:'<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.2 9.8c0-1 1.2-1.7 2.8-1.7s2.8.7 2.8 1.7c0 2.5-5.6 1.3-5.6 3.9 0 1 1.2 1.7 2.8 1.7s2.8-.7 2.8-1.7"/>',
+ buoy:'<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6"/><path d="M7 7l3.5 3.5M17 7l-3.5 3.5M7 17l3.5-3.5M17 17l-3.5-3.5"/>',
+ play:'<path d="M8 5.5v13l11-6.5L8 5.5z"/>',
+ mic:'<rect x="9" y="3.5" width="6" height="10.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>',
+ img:'<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 16.5l4.5-4 3.5 3 3-2.5 5 4"/>',
+ brief:'<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M4 13h16"/>',
+};
+const ic=(n,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n]}</svg>`;
+const icr=(n,sz=44,isz=22)=>`<span class="icr ${sz===38?'sz38':sz===30?'sz30':'sz44'}">${ic(n,isz)}</span>`;
+const nbd=t=>`<span class="nbd">${t}</span>`;
+const pts=a=>`<ul class="pts">${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+const hb=(l,pct,v)=>`<div class="hb"><div class="l">${l}</div><div class="t"><i style="width:${pct}%"></i></div><div class="v">${v}</div></div>`;
+const ring=(pct,size=72,sw=8,txt='',sub='')=>`<span class="ring" style="width:${size}px;height:${size}px"><svg viewBox="0 0 80 80" width="${size}" height="${size}"><circle cx="40" cy="40" r="32" stroke="#F4DDE2" stroke-width="${sw}" fill="none"/><circle cx="40" cy="40" r="32" stroke="#C8102E" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-dasharray="${(201.06*pct/100).toFixed(1)} 999" transform="rotate(-90 40 40)"/></svg><span><b>${txt}</b>${sub?`<i>${sub}</i>`:''}</span></span>`;
+
+/* ================= 桥型图：缆索1-2px细线 + 桥塔 + 吊杆 ================= */
+function bridge(o){
+  const {w=560,h=258,nodes,tx1,tx2,detail=true}=o;
+  const deckY=h-50, topY=56, mid=(tx1+tx2)/2, half=(tx2-tx1)/2, sagY=deckY-42;
+  const cy=x=>topY+(sagY-topY)*Math.pow((x-mid)/half,2);
+  const cable=`M7,${deckY+5} C${tx1-95},${deckY+3} ${tx1-28},${topY} ${tx1},${topY} Q${mid},${(2*sagY-topY).toFixed(1)} ${tx2},${topY} C${tx2+28},${topY} ${tx2+95},${deckY+3} ${w-7},${deckY+5}`;
+  let hangers='',circles='',labels='',towers='';
+  nodes.forEach((nd,i)=>{
+    const x=nd.x, y=cy(x);
+    hangers+=`<line x1="${x}" y1="${y.toFixed(1)}" x2="${x}" y2="${deckY+3}" stroke="#C8102E" stroke-width="${detail?1.2:1.6}"/>`;
+    circles+=`<circle cx="${x}" cy="${deckY+10}" r="${detail?18:17}" fill="#fff" stroke="#C8102E" stroke-width="1.6"/><g transform="translate(${x-8},${deckY+2})" color="#C8102E">${ic(nd.icon,16)}</g>`;
+    const lines=nd.t.split('/');
+    lines.forEach((ln2,k)=>{
+      labels+=`<text x="${x}" y="${deckY+36+k*12}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#444">${ln2}</text>`;
+    });
+  });
+  [tx1,tx2].forEach(x=>{
+    towers+=`<g stroke="#3a3a3a" fill="none" stroke-linecap="round"><line x1="${x}" y1="${topY}" x2="${x}" y2="${deckY+14}" stroke-width="6"/>${detail?`<line x1="${x-10}" y1="${(topY+deckY)/2-16}" x2="${x+10}" y2="${(topY+deckY)/2+16}" stroke-width="2"/><line x1="${x-10}" y1="${(topY+deckY)/2+16}" x2="${x+10}" y2="${(topY+deckY)/2-16}" stroke-width="2"/>`:''}<line x1="${x-7}" y1="${topY-15}" x2="${x+7}" y2="${topY-15}" stroke-width="2.5"/></g><circle cx="${x}" cy="${topY-19}" r="3.5" fill="#C8102E"/>`;
+  });
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;margin:0 auto">
+    <rect x="7" y="${deckY+4}" width="${w-14}" height="10" rx="2" fill="#3a3a3a"/>
+    <rect x="1" y="${deckY+2}" width="12" height="14" rx="2" fill="#dcdcdc" stroke="#c2c2c2"/>
+    <rect x="${w-13}" y="${deckY+2}" width="12" height="14" rx="2" fill="#dcdcdc" stroke="#c2c2c2"/>
+    ${towers}${hangers}<path d="${cable}" fill="none" stroke="#C8102E" stroke-width="${detail?1.6:2}"/>${circles}${labels}
+  </svg>`;
+}
+
+/* ================= 金字塔 ================= */
+const PALS=[['#E9A3AF','#DB6B7E','#CD3F58','#C8102E','#960C2C'],['#EFC0C9','#DD8896','#C8102E'],['#EFC0C9','#DD8896','#C8102E','#960C2C']];
+function pyr(layers,pi=0,W=380,rh=36,gap=6){
+  const pal=PALS[pi], n=layers.length, totalH=n*rh+(n-1)*gap;
+  let out='',y=0;
+  layers.forEach((L,i)=>{
+    const lw=W*Math.pow(0.6,i);
+    const x=(W-lw)/2, c=pal[Math.min(i,pal.length-1)];
+    out+=`<rect x="${x.toFixed(1)}" y="${y}" width="${lw.toFixed(1)}" height="${rh}" fill="${c}" rx="3"/>`;
+    out+=`<text x="${W/2}" y="${y+15}" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">${i+1} · ${L.t}</text>`;
+    if(lw>170&&L.s){out+=`<text x="${W/2}" y="${y+28}" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,.85)">${L.s}</text>`;}
+    y+=rh+gap;
+  });
+  return {svg:`<svg width="${W}" height="${totalH}" viewBox="0 0 ${W} ${totalH}" style="display:block">${out}</svg>`,h:totalH};
+}
+
+/* ================= 幻灯片框架 ================= */
+function chrome(o){
+  return `<div class="sl ${o.v||''}">
+    <div class="hd">
+      <div class="eyebrow"><i></i>${o.eyebrow}</div>
+      <h1>${o.title}</h1>
+      <div class="sub">${o.sub}</div>
+      <div class="rule"></div>
+    </div>
+    ${o.vw?`<div class="vw"><b>${o.vw}</b><br>${o.vw2||''}</div>`:''}
+    <div class="bd">${o.body}</div>
+    <div class="src">${o.src}</div>
+    <div class="concl"><span class="ti">${ic('target',14)}</span><p>${o.concl}</p></div>
+  </div>`;
+}
+/* ================= LUNA MAX：最简陋版（少图示、少装饰、排版粗糙、留白多） ================= */
+const SRC1='来源：Sensor Tower、Appfigures、Pew、Common Sense Media；移动 IAP 不含广告、Web、平台内嵌和硬件，跨调查定义不可直接比较。';
+const SRC2='来源：Sensor Tower、36Kr、公司材料；筑梦岛为公司口径经媒体转引；Soul 的 AI 收入不可独立拆分；新规于 2026-07-15 施行。';
+const SRC3='来源：Character.AI、CHAI、Replika、Meta、Tinder/Bumble 公开材料；CHAI 为公司自报年化口径，Replika 为累计用户而非 MAU；监管材料截至 2026-08-09。';
+const SRC4='来源：基于 2026Q1 Sensor Tower 移动 IAP 锚点的情景测算；6 亿美元为简单年化运行率，非完整 TAM；不含广告、Web 支付、平台内嵌、硬件与企业收入。';
+
+const LUNA=[
+chrome({v:'v-luna',vw:'GPT 5.6 · LUNA MAX',vw2:'最简陋 · 1.00×',
+ eyebrow:'市场概况 · MARKET',
+ title:'市场已成立，但还没有新的全民社交网络',
+ sub:'收入与下载显示可变现需求，供给与使用场景却仍然高度分化，尚不足以证明新的社交网络已形成。',
+ body:`<div class="ln"><h3>① 经营规模（2026Q1）</h3>
+  <ul>
+    <li>移动 IAP 约 <b>1.5 亿美元</b>（简单年化约 6 亿美元运行率）</li>
+    <li>下载约 <b>8,300 万次</b></li>
+    <li>活跃且产生收入的专门 AI 陪伴 App <b>337 个</b></li>
+  </ul></div>
+ <div class="ln"><h3>② 收入集中度</h3>
+  <div class="brow"><span>头部 10% App</span><span class="trk"><span class="fl" style="width:89%"></span></span><b>89%</b></div>
+  <div class="brow"><span>其余 90% App</span><span class="trk"><span class="fl2" style="width:11%"></span></span><b>11%</b></div></div>
+ <div class="ln"><h3>③ 需求分层（美国口径）</h3>
+  <ul>
+    <li>成人：<b>4%</b> 用聊天机器人获取陪伴，<b>10%</b> 用于情绪支持或建议</li>
+    <li>青少年：近四分之三曾使用</li>
+    <li>定义与样本不同，不可直接比较</li>
+  </ul></div>
+ <div class="ln"><h3>④ 四条竞争路线</h3>
+  <ul>
+    <li>关系深度：长期记忆与人格一致性</li>
+    <li>角色/内容生态：UGC、角色、剧情与 Feed</li>
+    <li>真人社交增益：匹配、破冰、对话与治理</li>
+    <li>平台捆绑：既有社交图谱与跨产品分发</li>
+  </ul></div>`,
+ src:SRC1,concl:'品类已成立；竞争关键是<b>不同关系与分发飞轮</b>能否穿越留存、成本与合规约束。'}),
+chrome({v:'v-luna',vw:'GPT 5.6 · LUNA MAX',vw2:'最简陋 · 1.00×',
+ eyebrow:'中国竞争 · CHINA',
+ title:'玩家不是在争同一张榜单，而是在争不同控制点',
+ sub:'中国的综合平台、垂直社区与真人社交 AI 化，与海外的关系产品、移动平台和社交分发并行。',
+ body:`<div class="ln"><h3>1. 综合 AI 角色平台</h3>
+  <p class="plain-line"><b>猫箱</b>：2026Q1 中国 iOS 生成式 AI 应用收入第 1；累计移动端消费者支出超 2,200 万美元（第三方估算）。<br>
+  <b>星野/Talkie</b>：2025 年前 9 个月合计平均 MAU 2,005.1 万、付费用户 139.04 万、收入 1,875 万美元、广告约占 60%（港交所材料）。</p></div>
+ <div class="ln"><h3>2. 垂直内容/IP 社区</h3>
+  <p class="plain-line"><b>筑梦岛</b>：接近 500 万注册用户、约 80% 年轻女性、逾 50 万创作者（公司口径经媒体转引）。</p></div>
+ <div class="ln"><h3>3. 真人社交 AI 增益</h3>
+  <p class="plain-line"><b>Soul</b>：2025 年前 8 个月平均 DAU 1,100 万；AI Boosters 日均活跃用户 460 万；AI 收入不可独立拆分（港交所材料）。</p></div>
+ <div class="ln"><h3>共同门槛：2026-07-15 新规施行</h3>
+  <p class="plain-line">年龄与分龄、未成年边界 → 连续使用与依赖预警 → 高风险识别与危机干预 → AI 身份、数据复制与删除。所有路线共同面对关系治理门槛。</p></div>`,
+ src:SRC2,concl:'下一轮竞争不只争角色供给或流量；能把<b>非仪式式付费、关系安全与数据权利</b>做成产品能力的团队，才可能规模化。'}),
+chrome({v:'v-luna',vw:'GPT 5.6 · LUNA MAX',vw2:'最简陋 · 1.00×',
+ eyebrow:'海外竞争 · GLOBAL',
+ title:'关系治理正在把增长从“时长游戏”改成“可持续经营”',
+ sub:'年龄、依赖、危机干预、透明度和数据权利，正在与留存、推理成本和商业化一起决定能否规模化。',
+ body:`<div class="ln"><h3>五个控制点</h3>
+  <ul>
+    <li><b>01 AI 娱乐与创作者网络</b>：Character.AI</li>
+    <li><b>02 移动规模与变现</b>：CHAI（自报 1,000 万+用户、年化 8,500 万美元 B2C）</li>
+    <li><b>03 长期关系</b>：Replika / Nomi / Kindroid（累计用户，不是 MAU）</li>
+    <li><b>04 平台分发</b>：Meta AI / AI Studio（嵌入 Instagram、Messenger、WhatsApp 与独立 App）</li>
+    <li><b>05 真人关系结果</b>：Tinder / Bumble（AI 辅助推荐、匹配与表达）</li>
+  </ul></div>
+ <div class="ln"><h3>治理桥梁：6 道待验证门槛</h3>
+  <p class="plain-line">年龄识别 → 依赖与过度使用预警 → 危机干预 → AI 身份透明 → 数据安全 → 安全评估。均尚待验证，需要持续投入与验证。</p></div>
+ <div class="ln"><h3>监管触点</h3>
+  <p class="plain-line">中国规则 2026-07-15 施行 ｜ FTC · 加州 SB 243 ｜ 英国 Ofcom ｜ 欧盟 AI Act 第 50 条 2026-08-02 适用。</p>
+ <p class="plain-line">CHAI 自报实验：广告从每 8 条消息一次降至每 16 条一次，D30 留存相对提升 18.5%。</p></div>`,
+ src:SRC3,concl:'海外没有同一种终局：内容供给、关系深度与既有图谱各自决定获客和留存边界。'}),
+chrome({v:'v-luna',vw:'GPT 5.6 · LUNA MAX',vw2:'最简陋 · 1.00×',
+ eyebrow:'未来展望 · 2026-2029',
+ title:'未来赢家需要复合能力，而不是单点模型优势',
+ sub:'行业仍可能高增长，但更可能由多个垂类分别证明关系、供给、分发、单位经济和安全能力能否同时闭环。',
+ body:`<div class="ln"><h3>2026 锚点</h3>
+  <p class="plain-line">移动 IAP <b>6 亿美元</b>运行率（2026Q1 1.5 亿美元简单年化；不含广告、Web 支付、平台内嵌、硬件和企业收入，不是完整 TAM）。</p></div>
+ <div class="ln"><h3>三种增长情景（假设 CAGR → 2029 结果）</h3>
+  <ul>
+    <li><b>下行</b> CAGR 10%：未成年人口收紧、低留存及平台免费捆绑 → 2029 约 <b>8.0 亿美元</b></li>
+    <li><b>基准</b> CAGR 30%：记忆、语音与角色生态与多元变现改善增长质量 → 2029 约 <b>13.2 亿美元</b></li>
+    <li><b>上行</b> CAGR 50%：实时多模态、UGC 分发、穿戴/agent 与创作者网络效应共同成立 → 2029 约 <b>20.3 亿美元</b></li>
+  </ul></div>
+ <div class="ln"><h3>长期平台可能性（待证明）</h3>
+  <ul>
+    <li>1 关系连续性 → 2 创作者/IP 供给 → 3 真人价值/平台分发</li>
+    <li>4 单位经济/商业模式 → 5 安全治理/全球本地化</li>
+  </ul></div>`,
+ src:SRC4,concl:'北极星指标应从消息数转向<b>“安全关系留存 × 每用户贡献毛利”</b>。'})];
+
+/* ================= TERRA HIGH：中等版 ================= */
+const TERRA=[
+chrome({v:'v-terra',vw:'GPT 5.6 · TERRA HIGH',vw2:'中等 · 5.04×',
+ eyebrow:'市场概况 · MARKET OVERVIEW',
+ title:'市场已成立，但还没有新的全民社交网络',
+ sub:'收入与下载显示可变现需求，供给与使用场景却仍然高度分化，尚不足以证明新的社交网络已形成。',
+ body:`<div style="display:grid;grid-template-columns:400px 1fr 1fr;gap:14px;height:100%">
+  <div class="card acc" style="padding:14px 16px">
+    <div class="sl-l"><b>01</b>可观测商业规模</div>
+    <div class="row" style="margin-bottom:10px">${icr('cash',38,19)}<div><div class="num" style="font-size:26px">1.5<small style="font-size:12px;color:#960C22"> 亿美元</small></div><div style="font-size:10.5px;color:#888">2026Q1 移动 IAP</div></div></div>
+    <div class="row" style="margin-bottom:10px">${icr('dl',38,19)}<div><div class="num" style="font-size:26px">8,300<small style="font-size:12px;color:#960C22"> 万次</small></div><div style="font-size:10.5px;color:#888">2026Q1 下载</div></div></div>
+    <div class="row">${icr('phone',38,19)}<div><div class="num" style="font-size:26px">337<small style="font-size:12px;color:#960C22"> 个</small></div><div style="font-size:10.5px;color:#888">活跃且产生收入的专门 AI 陪伴 App</div></div></div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #EFD3D9;font-size:10.5px;color:#888;line-height:1.7">收入（12个月）：北美 45% · 亚洲 25%<br>下载（12个月）：拉美 21% · 北美/欧洲各 19%</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card" style="padding:14px 16px;flex:1">
+      <div class="sl-l"><b>02</b>需求仍然分层</div>
+      <div class="row">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">${ring(4,86,9,'4%','陪伴')}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">${ring(10,86,9,'10%','情绪支持')}</div>
+        <div style="flex:1;padding-left:14px">
+          <div style="font-size:11.5px;font-weight:700;color:#333;margin-bottom:5px">美国成人（Pew 口径）</div>
+          <div style="font-size:11px;color:#666;line-height:1.55">用聊天机器人获取陪伴 4%；用于情绪支持或建议 10%。</div>
+          <div style="font-size:11.5px;font-weight:700;color:#333;margin:9px 0 5px">青少年（Common Sense）</div>
+          <div style="font-size:11px;color:#666;line-height:1.55">美国近四分之三曾使用；定义与样本不同，不可直接比较。</div>
+        </div>
+      </div>
+    </div>
+    <div class="card tint" style="padding:12px 16px">
+      <div style="font-size:11px;color:#9a9a9a;line-height:1.6"><b style="color:#960C22">口径提示：</b>陪伴、情感支持与青少年使用来自不同调查；估算用途与频率，不代表同一人群比例。</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card" style="padding:14px 16px;flex:1">
+      <div class="sl-l"><b>03</b>收入集中度</div>
+      ${hb('头部 10% App',89,'89% 品类收入')}
+      ${hb('其余 90% App',11,'11% 品类收入')}
+      <div style="font-size:10.5px;color:#9a9a9a;margin-top:8px;line-height:1.55">可变现需求已经出现，但供给端高度分散、收入向少数产品集中。</div>
+    </div>
+    <div class="card" style="padding:14px 16px;flex:1.2">
+      <div class="sl-l"><b>04</b>四条竞争路线</div>
+      <div class="col" style="gap:8px">
+        <div class="row">${icr('heart',30,15)}<div style="font-size:11.5px"><b>关系深度</b><span style="color:#888">｜长期记忆与人格一致性</span></div></div>
+        <div class="row">${icr('mask',30,15)}<div style="font-size:11.5px"><b>角色/内容生态</b><span style="color:#888">｜UGC、角色、剧情与 Feed</span></div></div>
+        <div class="row">${icr('ucheck',30,15)}<div style="font-size:11.5px"><b>真人社交增益</b><span style="color:#888">｜匹配、破冰、对话与治理</span></div></div>
+        <div class="row">${icr('grid',30,15)}<div style="font-size:11.5px"><b>平台捆绑</b><span style="color:#888">｜既有社交图谱与跨产品分发</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>`,
+ src:SRC1,concl:'先证明<b>关系价值与长期留存</b>，再讨论全民网络效应。'}),
+chrome({v:'v-terra',vw:'GPT 5.6 · TERRA HIGH',vw2:'中等 · 5.04×',
+ eyebrow:'中国竞争 · CHINA ROUTES',
+ title:'中国竞争已分化为三条路线，关系治理正在重写增长函数',
+ sub:'产品与经营信号显示路线分化；年龄、依赖、危机与数据权利已成为所有路线的待验证产品门槛。',
+ body:`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;height:318px">
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:8px">${nbd('01')}<div style="font-size:13px;font-weight:800">综合 AI 角色平台</div></div>
+    ${icr('mask',38,19)}
+    <div style="font-size:11.5px;line-height:1.65;margin-top:8px;color:#333"><b style="color:#960C22">猫箱</b>：2026Q1 中国 iOS 生成式 AI 应用收入第 1；累计消费者支出超 2,200 万美元。<br><b style="color:#960C22">星野/Talkie</b>：前 9 个月平均 MAU 2,005.1 万、付费用户 139.04 万、收入 1,875 万美元、广告约 60%。</div>
+    <div style="margin-top:auto"><span class="tag">第三方估算 · 港交所材料</span></div>
+  </div>
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:8px">${nbd('02')}<div style="font-size:13px;font-weight:800">垂直内容/IP 社区</div></div>
+    ${icr('book',38,19)}
+    <div style="font-size:11.5px;line-height:1.65;margin-top:8px;color:#333"><b style="color:#960C22">筑梦岛</b>：接近 500 万注册用户、约 80% 年轻女性、逾 50 万创作者；女性向叙事与创作者的 IP 社区，依靠明确人群与内容供给定位。</div>
+    <div style="margin-top:auto"><span class="tag">公司口径经媒体转引</span></div>
+  </div>
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:8px">${nbd('03')}<div style="font-size:13px;font-weight:800">真人社交 AI 增益</div></div>
+    ${icr('ucheck',38,19)}
+    <div style="font-size:11.5px;line-height:1.65;margin-top:8px;color:#333"><b style="color:#960C22">Soul</b>：2025 年前 8 个月平均 DAU 1,100 万；AI Boosters 日均活跃用户 460 万；AI 收入不可独立拆分。</div>
+    <div style="margin-top:auto"><span class="tag">港交所材料</span></div>
+  </div>
+ </div>
+ <div class="card tint" style="margin-top:14px;padding:12px 16px;display:flex;align-items:center;gap:14px">
+  <div style="flex:none;display:flex;align-items:center;gap:8px">${icr('cal',30,15)}<b style="font-size:12.5px;color:#960C22;white-space:nowrap">2026-07-15 新规施行</b></div>
+  <div style="display:flex;align-items:center;gap:8px;flex:1;font-size:11.5px;color:#444;flex-wrap:wrap">
+    <span class="chip">${ic('smile',12)}年龄与分龄·未成年边界</span><span class="arr">→</span>
+    <span class="chip">${ic('bell',12)}连续使用与依赖预警</span><span class="arr">→</span>
+    <span class="chip">${ic('alert',12)}高风险识别与危机干预</span><span class="arr">→</span>
+    <span class="chip">${ic('scan',12)}AI 身份、数据复制与删除</span>
+  </div>
+  <span class="st ok" style="flex:none">共同门槛</span>
+ </div>`,
+ src:SRC2,concl:'下一轮集中度更可能由<b>关系治理与单位经济</b>共同推动。'}),
+chrome({v:'v-terra',vw:'GPT 5.6 · TERRA HIGH',vw2:'中等 · 5.04×',
+ eyebrow:'海外竞争 · GLOBAL CONTROL POINTS',
+ title:'海外胜负取决于控制点：内容网络、长期关系与既有分发并行',
+ sub:'同一模型能力服务三种不同的获客与留存逻辑；行业正在从聊天产品走向内容网络和可持续关系。',
+ body:`<div style="display:grid;grid-template-columns:1.15fr 1fr;gap:14px;height:100%">
+  <div class="card" style="padding:14px 16px">
+    <div class="sl-l"><b>01</b>AI 社交的三种控制点</div>
+    <div class="col" style="gap:9px;margin-top:2px">
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:8px 11px">${icr('play',38,19)}
+        <div class="grow"><div style="font-size:12px;font-weight:800">1. 内容网络与移动变现 <span class="tag">Character.AI · CHAI</span></div>
+        <div style="font-size:11px;color:#666;line-height:1.5">Characters、Scenes、Streams 形成 AI-native Feed；CHAI 自报 1,000 万+用户、年化 8,500 万美元 B2C。</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:8px 11px">${icr('heart',38,19)}
+        <div class="grow"><div style="font-size:12px;font-weight:800">2. 长期关系与成人订阅心智</div>
+        <div style="font-size:11px;color:#666;line-height:1.5">Replika / Nomi / Kindroid：长期陪伴、记忆与人格；Replika 4,200 万+为累计用户，不等同 MAU。</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:8px 11px">${icr('users',38,19)}
+        <div class="grow"><div style="font-size:12px;font-weight:800">3. 既有社交图谱与真人关系结果</div>
+        <div style="font-size:11px;color:#666;line-height:1.5">Meta AI / AI Studio 嵌入 Instagram、Messenger、WhatsApp；Tinder / Bumble 用 AI 辅助匹配与表达。</div></div></div>
+      <div style="text-align:center;font-size:11px;color:#960C22;font-weight:700;padding:2px 0">时長 → 可持续关系</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card tint" style="padding:12px 14px;flex:1;display:flex;flex-direction:column">
+      <div class="sl-l"><b>02</b>关系治理桥梁</div>
+      <div style="font-size:10px;color:#9a9a9a;margin-bottom:2px">6 道待验证的治理门槛 ｜ 尚待验证，需持续投入与验证</div>
+      ${bridge({w:470,h:252,tx1:120,tx2:360,detail:false,nodes:[
+        {x:150,icon:'smile',t:'年龄识别'},{x:196,icon:'bell',t:'依赖预警'},{x:242,icon:'alert',t:'危机干预'},
+        {x:318,icon:'scan',t:'AI身份/透明'},{x:364,icon:'lock',t:'数据安全'},{x:410,icon:'shield',t:'安全评估'}]})}
+    </div>
+    <div class="card" style="padding:10px 14px">
+      <div class="col" style="gap:6px">
+        <div class="row" style="font-size:11px;color:#555"><span style="flex:none">${icr('link',30,15)}</span><span><b>中国规则</b> 2026-07-15 施行</span><span style="flex:none" class="tag">年龄·依赖·危机干预</span></div>
+        <div class="row" style="font-size:11px;color:#555"><span style="flex:none">${icr('link',30,15)}</span><span><b>FTC · 加州 SB 243</b></span><span style="flex:none" class="tag">儿童风险与自伤响应</span></div>
+        <div class="row" style="font-size:11px;color:#555"><span style="flex:none">${icr('link',30,15)}</span><span><b>英国 Ofcom</b></span><span style="flex:none" class="tag">年龄验证</span></div>
+        <div class="row" style="font-size:11px;color:#555"><span style="flex:none">${icr('link',30,15)}</span><span><b>欧盟 AI Act 第 50 条</b> 2026-08-02 适用</span><span style="flex:none" class="tag">AI 互动与生成内容透明度</span></div>
+      </div>
+    </div>
+  </div>
+</div>`,
+ src:SRC3,concl:'海外没有同一种终局：内容供给、关系深度与既有图谱各自决定获客和留存边界。'}),
+chrome({v:'v-terra',vw:'GPT 5.6 · TERRA HIGH',vw2:'中等 · 5.04×',
+ eyebrow:'未来展望 · 2026-2029',
+ title:'2026-2029 的赢家不是更长聊天时长，而是可持续的“关系操作系统”',
+ sub:'行业仍可能高增长，但更可能由多个垂类分别证明关系、供给、分发、单位经济和安全能力能否同时闭环。',
+ body:`<div class="card" style="padding:14px 18px;display:flex;align-items:center;gap:16px">
+  <div class="row" style="flex:none">${icr('coins',44,22)}
+    <div><div class="num" style="font-size:30px">6 亿美元</div><div style="font-size:10.5px;color:#888">2026 移动 IAP 运行率（2026Q1 1.5 亿美元简单年化）</div></div></div>
+  <span class="arr" style="font-size:22px">→</span>
+  <div class="grow" style="display:flex;align-items:center;gap:10px">
+    <div class="card tint" style="flex:1;padding:10px 13px"><div style="font-size:11.5px;font-weight:800;color:#960C22">下行 ｜ CAGR 10%</div><div class="num" style="font-size:22px">8.0 亿美元</div><div style="font-size:10px;color:#9a9a9a">2029 · 未成年收紧·低留存·平台免费捆绑</div></div>
+    <span class="arr">→</span>
+    <div class="card tint" style="flex:1;padding:10px 13px;border-color:#E7C6CD"><div style="font-size:11.5px;font-weight:800;color:#960C22">基准 ｜ CAGR 30%</div><div class="num" style="font-size:22px">13.2 亿美元</div><div style="font-size:10px;color:#9a9a9a">2029 · 记忆、语音与角色生态·多元变现</div></div>
+    <span class="arr">→</span>
+    <div class="card tint" style="flex:1;padding:10px 13px"><div style="font-size:11.5px;font-weight:800;color:#960C22">上行 ｜ CAGR 50%</div><div class="num" style="font-size:22px">20.3 亿美元</div><div style="font-size:10px;color:#9a9a9a">2029 · 实时多模态·UGC 分发·穿戴/agent</div></div>
+  </div>
+  <span class="arr" style="font-size:22px">→</span>
+  <div style="flex:none;font-size:11px;color:#960C22;font-weight:800;text-align:center">2029<br>三情景</div>
+ </div>
+ <div style="display:grid;grid-template-columns:430px 1fr;gap:14px;margin-top:14px;flex:1">
+  <div class="card acc" style="padding:13px 16px">
+    <div class="sl-l"><b>01</b>长期平台可能性（待证明）</div>
+    ${pyr([{t:'安全治理/全球本地化'},{t:'单位经济/商业模式'},{t:'真人价值/平台分发'},{t:'创作者/IP 供给'},{t:'关系连续性'}],0,400,40,7).svg}
+  </div>
+  <div class="card" style="padding:13px 16px">
+    <div class="sl-l"><b>02</b>关系操作系统 · 六项复合能力</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px">
+      <div class="row" style="font-size:11.5px;color:#444"><span style="flex:none">${icr('link',30,15)}</span>关系连续性：30/90 日关系留存、人格稳定性</div>
+      <div class="row" style="font-size:11.5px;color:#444"><span style="flex:none">${icr('pen',30,15)}</span>创作者供给：优质角色、Remix 发布率、分成透明</div>
+      <div class="row" style="font-size:11.5px;color:#444"><span style="flex:none">${icr('coins',30,15)}</span>单位经济：推理与审核成本、每用户贡献毛利</div>
+      <div class="row" style="font-size:11.5px;color:#444"><span style="flex:none">${icr('shield',30,15)}</span>安全治理：年龄识别、危机干预、AI 标识与全球本地化</div>
+    </div>
+    <div class="foot-note" style="margin-top:12px">三种增长情景都不改变长期胜负逻辑：增长不等于平台化，能力组合才决定谁能穿越留存、成本与安全约束。</div>
+  </div>
+ </div>`,
+ src:SRC4,concl:'北极星指标应从消息数转向<b>“安全关系留存 × 每用户贡献毛利”</b>。'})];
+/* ================= SOL HIGH：最精致版（图表最丰富、排版最精细、信息密度最高） ================= */
+const SOL=[
+chrome({v:'v-sol',vw:'GPT 5.6 · SOL HIGH',vw2:'最精致 · 13.12×',
+ eyebrow:'市场概况 · MARKET OVERVIEW',
+ title:'AI社交已成为付费品类，但尚未形成统一的全民网络',
+ sub:'规模、集中度与需求口径共同说明：这是一个已商业化、仍处于结构分化期的消费市场。',
+ body:`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:11px">
+  <div class="card acc" style="padding:11px 13px">
+    <div class="row">${icr('cash',38,19)}<div><div class="num" style="font-size:27px">1.5<i style="font-style:normal;font-size:12px;color:#960C22"> 亿美元</i></div></div></div>
+    <div style="font-size:11px;font-weight:800;color:#333;margin-top:5px">2026Q1 移动 IAP</div>
+    <div style="font-size:9.5px;color:#a2a2a2;margin-top:2px;line-height:1.45">简单年化约 6 亿美元运行率；不含广告与 Web 支付</div>
+  </div>
+  <div class="card acc" style="padding:11px 13px">
+    <div class="row">${icr('dl',38,19)}<div><div class="num" style="font-size:27px">8,300<i style="font-style:normal;font-size:12px;color:#960C22"> 万次</i></div></div></div>
+    <div style="font-size:11px;font-weight:800;color:#333;margin-top:5px">2026Q1 下载</div>
+    <div style="font-size:9.5px;color:#a2a2a2;margin-top:2px;line-height:1.45">过去 12 个月拉美占 21%，北美/欧洲各 19%</div>
+  </div>
+  <div class="card acc" style="padding:11px 13px">
+    <div class="row">${icr('phone',38,19)}<div><div class="num" style="font-size:27px">337<i style="font-style:normal;font-size:12px;color:#960C22"> 个</i></div></div></div>
+    <div style="font-size:11px;font-weight:800;color:#333;margin-top:5px">活跃且产生收入的专门 AI 陪伴 App</div>
+    <div style="font-size:9.5px;color:#a2a2a2;margin-top:2px;line-height:1.45">Sensor Tower 口径；平台内嵌 AI 不计入</div>
+  </div>
+  <div class="card acc" style="padding:11px 13px">
+    <div class="row">${icr('crown',38,19)}<div><div class="num" style="font-size:27px">89<i style="font-style:normal;font-size:12px;color:#960C22">%</i></div></div></div>
+    <div style="font-size:11px;font-weight:800;color:#333;margin-top:5px">头部 10% App 获取品类收入</div>
+    <div style="font-size:9.5px;color:#a2a2a2;margin-top:2px;line-height:1.45">其余 90% 仅分享约 11%——结构性分化</div>
+  </div>
+ </div>
+ <div style="display:grid;grid-template-columns:1.08fr .92fr 1.06fr;gap:11px;margin-top:11px;flex:1;min-height:0">
+  <div class="card" style="padding:11px 14px">
+    <div class="sl-l"><b>01</b>需求仍然分层<span class="en">SEGMENTATION</span></div>
+    <div class="row" style="align-items:flex-start">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:none">${ring(4,80,9,'4%','陪伴')}<span style="font-size:9.5px;color:#9a9a9a">美国成人·Pew</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:none;margin-left:16px">${ring(10,80,9,'10%','情绪支持')}<span style="font-size:9.5px;color:#9a9a9a">美国成人·Pew</span></div>
+      <div style="flex:1;padding-left:14px;font-size:10.8px;color:#555;line-height:1.6">
+        用聊天机器人获取陪伴 4%，用于情绪支持或建议 10%——<b style="color:#960C22">美国成人的陪伴用途仍属少数</b>。<br>
+        青少年：美国近四分之三曾使用（Common Sense）。<br>
+        <span style="color:#a2a2a2">定义与样本不同，不可直接比较。</span>
+      </div>
+    </div>
+    <div style="margin-top:9px;padding-top:8px;border-top:1px dashed #EFD3D9;font-size:10.5px;color:#666;line-height:1.6"><b style="color:#960C22">地区分布（12 个月估算）：</b>收入北美 45% · 亚洲 25%；下载拉美 21%，北美/欧洲各 19%。</div>
+  </div>
+  <div class="card" style="padding:11px 14px">
+    <div class="sl-l"><b>02</b>收入集中度<span class="en">CONCENTRATION</span></div>
+    ${hb('头部 10% App',89,'89% 品类收入')}
+    ${hb('其余 90% App',11,'11% 品类收入')}
+    <div style="margin-top:9px;font-size:10.5px;color:#555;line-height:1.6">以 337 个活跃 App 为分母的收入估算：<b style="color:#960C22">供给分散而收入集中</b>，新产品仍可能凭单一切入点突围，但网络效应未成形。</div>
+    <div style="margin-top:8px;background:#FDF4F6;border:1px solid #F0D5DB;border-radius:8px;padding:7px 10px;font-size:10.5px;color:#8E0C22;font-weight:700">判断：品类成立 ≠ 全民网络成立</div>
+  </div>
+  <div class="card" style="padding:11px 14px">
+    <div class="sl-l"><b>03</b>四条竞争路线<span class="en">ROUTES</span></div>
+    <div class="col" style="gap:7px">
+      <div class="row">${icr('heart',30,15)}<div class="grow" style="font-size:11.3px"><b>关系深度</b><span style="color:#888">｜长期记忆与人格一致性</span></div><span class="tag">猫箱 · Replika</span></div>
+      <div class="row">${icr('mask',30,15)}<div class="grow" style="font-size:11.3px"><b>角色/内容生态</b><span style="color:#888">｜UGC、角色、剧情与 Feed</span></div><span class="tag">星野 · Character.AI</span></div>
+      <div class="row">${icr('ucheck',30,15)}<div class="grow" style="font-size:11.3px"><b>真人社交增益</b><span style="color:#888">｜匹配、破冰、对话与治理</span></div><span class="tag">Soul · Tinder</span></div>
+      <div class="row">${icr('grid',30,15)}<div class="grow" style="font-size:11.3px"><b>平台捆绑</b><span style="color:#888">｜既有社交图谱与跨产品分发</span></div><span class="tag">Meta AI · AI Studio</span></div>
+    </div>
+    <div style="margin-top:auto;padding-top:7px;border-top:1px dashed #EFD3D9;font-size:10px;color:#a2a2a2">路线分化详见 P02（中国）与 P03（海外）</div>
+  </div>
+ </div>`,
+ src:SRC1,concl:'品类成立意味着值得进入研究，不意味着新的全民网络已经出现——<b>先证明关系价值与长期留存</b>，再讨论全民网络效应。'}),
+chrome({v:'v-sol',vw:'GPT 5.6 · SOL HIGH',vw2:'最精致 · 13.12×',
+ eyebrow:'中国竞争 · CHINA ROUTES',
+ title:'中国竞争已分化为三条价值路线，关系治理正在重写增长函数',
+ sub:'猫箱/星野、筑梦岛与 Soul 争夺不同价值池；新规把年龄、依赖、危机与数据权利变成共同的产品门槛。',
+ body:`<div style="display:grid;grid-template-columns:1fr 1fr 1.12fr;gap:11px;height:262px">
+  <div class="card acc" style="padding:11px 14px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:7px">${nbd('01')}<b style="font-size:13px">综合 AI 角色平台</b><span class="st ok" style="margin-left:auto">角色供给 + 变现</span></div>
+    <div class="row" style="margin-bottom:6px">${icr('mask',38,19)}<div style="font-size:11px;line-height:1.5"><b style="color:#960C22">猫箱</b>｜2026Q1 中国 iOS 生成式 AI 应用收入 <b style="color:#C8102E">第 1</b>；累计消费者支出超 <b style="color:#C8102E">2,200 万美元</b></div></div>
+    <div style="font-size:10.8px;color:#555;line-height:1.6"><b style="color:#960C22">星野/Talkie</b>｜前 9 个月合计平均 MAU <b>2,005.1 万</b>、付费用户 <b>139.04 万</b>、收入 <b>1,875 万美元</b>、广告约占 <b>60%</b>（合并口径）</div>
+    <div class="row" style="margin-top:auto"><span class="tag">第三方估算</span><span class="tag">港交所材料</span><span style="margin-left:auto;font-size:9.5px;color:#a2a2a2">以角色供给与持续互动为基础</span></div>
+  </div>
+  <div class="card acc" style="padding:11px 14px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:7px">${nbd('02')}<b style="font-size:13px">垂直内容/IP 社区</b><span class="st ok" style="margin-left:auto">人群 + 内容定位</span></div>
+    <div class="row" style="margin-bottom:6px">${icr('book',38,19)}<div style="font-size:11px;line-height:1.5"><b style="color:#960C22">筑梦岛</b>｜接近 <b style="color:#C8102E">500 万</b>注册用户、约 <b style="color:#C8102E">80%</b> 年轻女性、逾 <b style="color:#C8102E">50 万</b>创作者</div></div>
+    <div style="font-size:10.8px;color:#555;line-height:1.6">女性向叙事与创作者的 IP 社区：依靠明确人群与内容供给定位，由内容供给与创作者驱动，而非通用模型能力。</div>
+    <div class="row" style="margin-top:auto"><span class="tag">公司口径经媒体转引</span><span style="margin-left:auto;font-size:9.5px;color:#a2a2a2">付费与社区治理待验证</span></div>
+  </div>
+  <div class="card acc" style="padding:11px 14px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:7px">${nbd('03')}<b style="font-size:13px">真人社交 AI 增益</b><span class="st ok" style="margin-left:auto">图谱 + 匹配增益</span></div>
+    <div class="row" style="margin-bottom:6px">${icr('ucheck',38,19)}<div style="font-size:11px;line-height:1.5"><b style="color:#960C22">Soul</b>｜2025 年前 8 个月平均 DAU <b style="color:#C8102E">1,100 万</b>；AI Boosters 日均活跃用户 <b style="color:#C8102E">460 万</b></div></div>
+    <div style="font-size:10.8px;color:#555;line-height:1.6">在既有真人社交关系上叠加 AI 匹配与沟通能力，提升连接效率；核心关系仍由真人承担，AI 收入不可独立拆分。</div>
+    <div class="row" style="margin-top:auto"><span class="tag">港交所材料</span><span style="margin-left:auto;font-size:9.5px;color:#a2a2a2">平台型公司口径</span></div>
+  </div>
+ </div>
+ <div style="position:relative;height:26px;margin-top:2px">
+  <div style="position:absolute;left:0;right:0;top:12px;border-top:2px dotted #E7B9C3"></div>
+  <div style="position:absolute;left:16%;top:2px;color:#C8102E;font-size:13px">↓</div>
+  <div style="position:absolute;left:49%;top:2px;color:#C8102E;font-size:13px">↓</div>
+  <div style="position:absolute;left:82%;top:2px;color:#C8102E;font-size:13px">↓</div>
+  <div style="position:absolute;left:50%;top:3px;transform:translateX(-50%);font-size:10.5px;color:#960C22;font-weight:800;background:#fff;padding:0 10px">三条路线 → 共同治理门槛</div>
+ </div>
+ <div class="card tint" style="padding:10px 14px;display:grid;grid-template-columns:170px 1fr 1fr 1fr 1fr;gap:10px;align-items:center">
+  <div class="row" style="flex:none">${icr('cal',34,17)}<div><div style="font-size:12px;font-weight:800;color:#960C22">2026-07-15</div><div style="font-size:9.5px;color:#a2a2a2">新规施行</div></div></div>
+  <div class="row">${icr('smile',34,17)}<div style="font-size:10.8px"><b>年龄与分龄</b><br><span style="color:#888">未成年边界</span></div></div>
+  <div class="row">${icr('bell',34,17)}<div style="font-size:10.8px"><b>连续使用与依赖预警</b><br><span style="color:#888">时长/频次提醒</span></div></div>
+  <div class="row">${icr('alert',34,17)}<div style="font-size:10.8px"><b>高风险识别与危机干预</b><br><span style="color:#888">自伤响应机制</span></div></div>
+  <div class="row">${icr('scan',34,17)}<div style="font-size:10.8px"><b>AI 身份、数据复制与删除</b><br><span style="color:#888">透明与可携带</span></div></div>
+ </div>`,
+ src:SRC2,concl:'下一轮集中度更可能由<b>关系治理与单位经济</b>共同推动——能把非仪式式付费、关系安全与数据权利做成产品能力的团队，才可能规模化。'}),
+chrome({v:'v-sol',vw:'GPT 5.6 · SOL HIGH',vw2:'最精致 · 13.12×',
+ eyebrow:'海外竞争 · GLOBAL CONTROL POINTS',
+ title:'海外没有稳定通吃者，竞争围绕五个控制点分工',
+ sub:'Character.AI、CHAI、Replika、Meta 与 Tinder/Bumble 分别占据内容、变现、关系、分发与真人结果控制点，尚无玩家闭合全部优势。',
+ body:`<div style="display:grid;grid-template-columns:1.08fr .92fr;gap:11px;height:100%">
+  <div style="display:flex;flex-direction:column;gap:9px;min-height:0">
+    <div class="card tint" style="padding:10px 14px;flex:1;display:flex;flex-direction:column">
+      <div class="sl-l"><b>01</b>关系治理桥梁<span class="en">GOVERNANCE BRIDGE</span></div>
+      <div style="font-size:9.5px;color:#a2a2a2;margin:-3px 0 2px">6 道待验证的治理门槛 ｜ 尚待验证，需持续投入与验证</div>
+      ${bridge({w:600,h:238,tx1:122,tx2:478,detail:true,nodes:[
+        {x:158,icon:'smile',t:'年龄识别'},{x:206,icon:'bell',t:'依赖预警'},{x:254,icon:'buoy',t:'危机干预'},
+        {x:398,icon:'scan',t:'AI身份/透明'},{x:446,icon:'lock',t:'数据安全'},{x:494,icon:'shield',t:'安全评估'}]})}
+      <div style="margin-top:2px;font-size:10px;color:#888;text-align:center">中国规则 2026-07-15 施行 ｜ FTC·加州 SB 243 ｜ 英国 Ofcom ｜ 欧盟 AI Act §50 2026-08-02 适用</div>
+    </div>
+    <div class="card" style="padding:9px 14px;display:flex;align-items:center;gap:10px">
+      ${icr('bar',30,15)}
+      <div style="font-size:10.8px;color:#444;line-height:1.5"><b style="color:#960C22">CHAI 自报实验：</b>广告从每 8 条消息一次降至每 16 条一次，D30 留存相对提升 <b style="color:#C8102E">18.5%</b>——时长让步可换留存。</div>
+      <span class="st wait" style="margin-left:auto">公司口径</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:7px;min-height:0">
+    ${[['01','AI 娱乐与创作者网络','play','Character.AI','Characters、Scenes、Remix 形成 AI-native Feed，网络效应仍待验证'],
+       ['02','移动规模与变现','cash','CHAI','自报 1,000 万+用户、年化 8,500 万美元 B2C；Zeta 在日本增长突出'],
+       ['03','长期关系','heart','Replika / Nomi / Kindroid','长期陪伴、记忆与人格；Replika 4,200 万+为累计用户，不是 MAU'],
+       ['04','平台分发','globe','Meta AI / AI Studio','嵌入 Instagram、Messenger、WhatsApp 与独立 App，入口优势显著'],
+       ['05','真人关系结果','users','Tinder / Bumble','AI 辅助推荐、匹配与表达，最终关系仍由真人承担']]
+      .map(r=>`<div class="card" style="padding:7px 11px;display:flex;align-items:center;gap:9px;flex:1">
+        ${icr(r[2],32,16)}
+        <div class="grow" style="min-width:0"><div style="font-size:11.3px;font-weight:800">${r[0]} ${r[1]} <span class="tag">${r[3]}</span></div>
+        <div style="font-size:10px;color:#777;line-height:1.4">${r[4]}</div></div>
+        <span class="st wait" style="flex:none">待验证</span>
+      </div>`).join('')}
+  </div>
+ </div>`,
+ src:SRC3,concl:'独立 App 需要把一个控制点闭合为关系或网络优势，才能抵消平台的分发优势——<b>关系治理不是合规尾项，而是增长函数的一部分</b>。'}),
+chrome({v:'v-sol',vw:'GPT 5.6 · SOL HIGH',vw2:'最精致 · 13.12×',
+ eyebrow:'未来展望 · 2026-2029',
+ title:'未来更可能多强垂类并存，「关系操作系统」是长期平台门槛',
+ sub:'三种增长情景都不改变长期胜负逻辑：增长不等于平台化，能力组合才决定谁能穿越留存、成本与安全约束。',
+ body:`<div style="display:flex;align-items:stretch;gap:9px;height:238px">
+  <div class="card tint" style="width:196px;flex:none;padding:11px 13px;display:flex;flex-direction:column">
+    <div style="font-size:10px;font-weight:800;color:#960C22;letter-spacing:.08em">2026 锚点</div>
+    <div class="num" style="font-size:27px;margin-top:5px">6 亿美元</div>
+    <div style="font-size:10px;color:#666;line-height:1.55;margin-top:4px">移动 IAP 运行率 = 2026Q1 1.5 亿美元简单年化</div>
+    <div style="margin-top:auto"><span class="tag">历史锚点 → 假设推演（非预测）</span></div>
+  </div>
+  <div class="arr" style="align-self:center;font-size:19px">→</div>
+  <div class="card" style="flex:1;padding:10px 13px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">上行情景 <span class="chip" style="border-style:dashed">假设 CAGR 50%</span></b><span class="st wait" style="margin-left:auto">条件成立</span></div>
+    <div class="num" style="font-size:24px">2029 约 20.3 亿美元</div>
+    <div style="font-size:10.3px;color:#666;line-height:1.55;margin-top:auto">实时多模态、UGC 分发、穿戴/agent 与创作者网络效应共同成立</div>
+  </div>
+  <div class="card" style="flex:1;padding:10px 13px;display:flex;flex-direction:column;border-color:#E7C6CD">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">基准情景 <span class="chip" style="border-style:dashed">假设 CAGR 30%</span></b><span class="st ok" style="margin-left:auto">概率最高</span></div>
+    <div class="num" style="font-size:24px">2029 约 13.2 亿美元</div>
+    <div style="font-size:10.3px;color:#666;line-height:1.55;margin-top:auto">记忆、语音与角色生态与多元变现改善增长质量</div>
+  </div>
+  <div class="card" style="flex:1;padding:10px 13px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">下行情景 <span class="chip" style="border-style:dashed">假设 CAGR 10%</span></b><span class="st wait" style="margin-left:auto">条件成立</span></div>
+    <div class="num" style="font-size:24px">2029 约 8.0 亿美元</div>
+    <div style="font-size:10.3px;color:#666;line-height:1.55;margin-top:auto">未成年人口收紧、低留存及平台免费捆绑</div>
+  </div>
+  <div class="arr" style="align-self:center;font-size:19px">→</div>
+  <div class="card acc" style="width:172px;flex:none;padding:10px 13px;display:flex;flex-direction:column">
+    <div style="font-size:10px;font-weight:800;color:#960C22;letter-spacing:.08em">2029 结局</div>
+    <div style="font-size:11px;line-height:2;margin-top:6px"><b style="color:#C8102E">20.3 亿</b> 上行<br><b style="color:#C8102E">13.2 亿</b> 基准<br><b style="color:#C8102E">8.0 亿</b> 下行</div>
+    <div style="margin-top:auto;font-size:9.5px;color:#a2a2a2">三情景并存，多强垂类格局</div>
+  </div>
+ </div>
+ <div style="display:grid;grid-template-columns:400px 1fr;gap:11px;margin-top:11px;flex:1;min-height:0">
+  <div class="card acc" style="padding:10px 14px;display:flex;flex-direction:column">
+    <div class="sl-l"><b>01</b>长期平台可能性<span class="en">CAPABILITY LADDER</span></div>
+    ${pyr([{t:'安全治理 / 全球本地化'},{t:'单位经济 / 商业模式'},{t:'真人价值 / 平台分发'},{t:'创作者 / IP 供给'},{t:'关系连续性'}],0,380,31,6).svg}
+    <div style="font-size:9.5px;color:#a2a2a2;margin-top:6px">五层能力均为待验证门槛，自下而上逐级解锁</div>
+  </div>
+  <div class="card" style="padding:10px 14px;display:flex;flex-direction:column">
+    <div class="sl-l"><b>02</b>经营跟踪指标<span class="en">TRACKING METRICS</span><span class="tag" style="margin-left:auto">持续观察，尚待验证</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:2px;flex:1">
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('link',34,17)}<div><div style="font-size:11.3px;font-weight:800">关系连续性</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">30/90 日关系留存、记忆命中率、人格稳定性</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('pen',34,17)}<div><div style="font-size:11.3px;font-weight:800">内容供给</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">优质角色、活跃创作者与分成、Remix 发布率</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('coins',34,17)}<div><div style="font-size:11.3px;font-weight:800">单位经济</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">推理/审核成本、每用户贡献毛利、退款率</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('shield',34,17)}<div><div style="font-size:11.3px;font-weight:800">关系治理</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">年龄识别、危机干预与依赖预警覆盖</div></div></div>
+    </div>
+    <div class="foot-note" style="margin-top:9px">2029 情景为本报告测算，置信度中低；不是机构预测或完整 TAM，不含广告、Web 支付、平台内嵌、硬件和企业收入。</div>
+  </div>
+ </div>`,
+ src:SRC4,concl:'北极星指标应从消息数转为<b>「安全关系留存 × 每用户贡献毛利」</b>。'})];
+/* ================= ASTRA HIGH：较精致版（GPT 6） ================= */
+const ASTRA=[
+chrome({v:'v-astra',vw:'GPT 6 · ASTRA HIGH',vw2:'较精致 · 22.11×',
+ eyebrow:'市场概况 · MARKET OVERVIEW',
+ title:'AI 陪伴已形成付费品类，但尚未成为全民社交网络',
+ sub:'移动收入与下载已具规模，但收入集中于少数产品，美国成人的陪伴用途仍属少数。',
+ body:`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px">
+  <div class="card acc" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('1')}<b style="font-size:12.5px">移动变现 ｜ 2026Q1</b></div>
+    <div class="num" style="font-size:24px">1.5 亿美元</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.55;margin-top:4px">全球 AI Companion 移动 IAP；季度收入较 2023Q1 超过 <b style="color:#C8102E">12 倍</b>。</div>
+  </div>
+  <div class="card acc" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('2')}<b style="font-size:12.5px">获客规模 ｜ 2026Q1</b></div>
+    <div class="num" style="font-size:24px">8,300 万次</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.55;margin-top:4px">全球下载量，表明新增获取仍在扩张；过去 12 个月拉美占 21%。</div>
+  </div>
+  <div class="card acc" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('3')}<b style="font-size:12.5px">收入集中 ｜ 2025 年中口径</b></div>
+    <div class="num" style="font-size:24px">337 个 · 89%</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.55;margin-top:4px">仍活跃且产生收入的专门陪伴 App；头部 10% 获取约 89% 品类收入。</div>
+  </div>
+  <div class="card" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('4')}<b style="font-size:12.5px">成人用途 ｜ 美国, 2026</b></div>
+    <div class="row" style="gap:14px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${ring(4,66,8,'4%','陪伴')}</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${ring(10,66,8,'10%','情绪')}</div>
+      <div style="font-size:10.5px;color:#666;line-height:1.55">4% 用聊天机器人获取陪伴，10% 用于情绪支持或建议；青少年近四分之三曾使用。定义与样本不同，不可直接比较。</div>
+    </div>
+  </div>
+  <div class="card" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('5')}<b style="font-size:12.5px">核心讨论范围</b></div>
+    <div style="font-size:10.8px;color:#444;line-height:1.75">${ic('spark',12)} AI 原生关系<br>${ic('mask',12)} AI 内容社区<br>${ic('ucheck',12)} AI 增强真人社交</div>
+  </div>
+  <div class="card" style="padding:12px 15px">
+    <div class="row" style="margin-bottom:6px">${nbd('6')}<b style="font-size:12.5px">外部替代与分发</b></div>
+    <div style="font-size:10.8px;color:#444;line-height:1.75">${ic('grid',12)} 平台内嵌 AI<br><span style="color:#a2a2a2">不计入核心陪伴市场规模</span></div>
+    <div style="margin-top:auto;padding-top:8px;border-top:1px dashed #EFD3D9;font-size:10px;color:#960C22;font-weight:700">先评估具体关系场景与付费能力，再判断平台化空间</div>
+  </div>
+ </div>`,
+ src:SRC1,concl:'先评估<b>具体关系场景与付费能力</b>，再判断平台化空间。'}),
+chrome({v:'v-astra',vw:'GPT 6 · ASTRA HIGH',vw2:'较精致 · 22.11×',
+ eyebrow:'中国竞争 · CHINA ROUTES',
+ title:'中国玩家分争综合角色平台、垂直社区与真人社交增益',
+ sub:'关系类型、内容供给与变现路径各不相同，应先选择竞争路线，再确定对标对象。',
+ body:`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;height:300px">
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:9px">${icr('mask',40,20)}<div><b style="font-size:13.5px">综合角色平台</b><div style="font-size:10.5px;color:#888">提供多样化角色与沉浸式体验</div></div></div>
+    <div class="col" style="gap:8px;font-size:11.3px;color:#333;line-height:1.6">
+      <div class="row">${icr('mask',30,15)}<span><b style="color:#960C22">猫箱</b>｜2026Q1 中国 iOS 生成式 AI 应用收入第 1；累计消费者支出超 2,200 万美元</span><span class="tag" style="margin-left:auto;flex:none">第三方估算</span></div>
+      <div class="row">${icr('globe',30,15)}<span><b style="color:#960C22">星野 / Talkie</b>｜前 9 个月平均 MAU 2,005.1 万、付费用户 139.04 万、收入 1,875 万美元、广告约 60%</span><span class="tag" style="margin-left:auto;flex:none">港交所材料</span></div>
+    </div>
+    <div style="margin-top:auto;font-size:10px;color:#a2a2a2">以角色供给与持续互动为基础</div>
+  </div>
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:9px">${icr('book',40,20)}<div><b style="font-size:13.5px">垂直叙事 / IP 社区</b><div style="font-size:10.5px;color:#888">聚焦特定叙事与 IP 圈层</div></div></div>
+    <div class="col" style="gap:8px;font-size:11.3px;color:#333;line-height:1.6">
+      <div class="row">${icr('users',30,15)}<span><b style="color:#960C22">筑梦岛</b>｜接近 500 万注册用户、约 80% 年轻女性、逾 50 万创作者</span><span class="tag" style="margin-left:auto;flex:none">公司口径</span></div>
+      <div style="font-size:10.8px;color:#666;background:#FDF4F6;border-radius:8px;padding:8px 10px">由内容供给与创作者驱动，依靠明确人群与内容供给定位。</div>
+    </div>
+    <div style="margin-top:auto;font-size:10px;color:#a2a2a2">付费与社区治理待验证</div>
+  </div>
+  <div class="card acc" style="padding:13px 15px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:9px">${icr('ucheck',40,20)}<div><b style="font-size:13.5px">真人社交增益</b><div style="font-size:10.5px;color:#888">在既有真人社交上叠加 AI</div></div></div>
+    <div class="col" style="gap:8px;font-size:11.3px;color:#333;line-height:1.6">
+      <div class="row">${icr('chat',30,15)}<span><b style="color:#960C22">Soul</b>｜平均 DAU 1,100 万；AI Boosters 日均活跃用户 460 万</span><span class="tag" style="margin-left:auto;flex:none">港交所材料</span></div>
+      <div style="font-size:10.8px;color:#666;background:#FDF4F6;border-radius:8px;padding:8px 10px">AI 匹配与沟通能力提升连接效率，核心关系仍由真人承担。</div>
+    </div>
+    <div style="margin-top:auto;font-size:10px;color:#a2a2a2">AI 收入不可独立拆分</div>
+  </div>
+ </div>
+ <div class="card tint" style="margin-top:13px;padding:11px 16px;display:flex;align-items:center;gap:12px">
+  <div style="flex:none;display:flex;align-items:center;gap:8px">${icr('cal',32,16)}<b style="font-size:12.5px;color:#960C22">2026-07-15 新规施行</b><span style="font-size:10px;color:#a2a2a2">（各产品落实情况待验证）</span></div>
+  <div style="display:flex;align-items:center;gap:8px;flex:1;font-size:11.5px;color:#444">
+    <span class="chip">${ic('smile',12)}年龄与分龄</span><span class="arr">→</span>
+    <span class="chip">${ic('bell',12)}依赖与过度使用</span><span class="arr">→</span>
+    <span class="chip">${ic('alert',12)}高风险危机干预</span><span class="arr">→</span>
+    <span class="chip">${ic('scan',12)}AI 标识与数据权利</span>
+  </div>
+  <span class="st ok" style="flex:none">所有路线共同面对的关系治理门槛</span>
+ </div>`,
+ src:SRC2,concl:'综合平台看关系留存，垂类社区看优质供给，真人社交看<b>真实关系结果</b>。'}),
+chrome({v:'v-astra',vw:'GPT 6 · ASTRA HIGH',vw2:'较精致 · 22.11×',
+ eyebrow:'海外竞争 · GLOBAL CONTROL POINTS',
+ title:'海外竞争围绕五个控制点展开，尚无稳定通吃者',
+ sub:'长期记忆、创作者供给、既有入口和真实关系，分别支撑不同产品路线；长期效果仍需检验。',
+ body:`<div style="display:grid;grid-template-columns:1.05fr .95fr;gap:12px;height:100%">
+  <div class="col" style="gap:9px">
+    ${[['关系深度','heart','Replika / Nomi / Kindroid','已有动作：长期记忆、人格与持续陪伴，让价值从单次回答转向关系连续性。','待验证：长期留存、心理安全和高推理成本能否兼容。'],
+       ['内容生态','mask','Character.AI；CHAI / PolyBuzz','已有动作：角色、场景、视频与 Remix / Feed 纳入产品；CHAI 与 PolyBuzz 推进移动端广告和订阅变现。','待验证：观看和创作能否形成稳定网络，变现强度是否损害连续互动。'],
+       ['平台分发','globe','Meta AI / AI Studio','已有动作：把 AI 人格嵌入既有社交产品与独立 App，以社交图谱和跨产品入口降低获客摩擦。','待验证：平台品牌与监管边界下，深度角色体验能否持续。'],
+       ['真人关系','users','Tinder / Bumble','已有动作：推荐、Chemistry 与 AI Photo Feedback 辅助匹配和表达，最终关系仍由真人承担。','待验证：AI 增益如何归因，并守住身份真实性与隐私边界。']]
+      .map(r=>`<div class="card" style="padding:9px 13px;flex:1;display:flex;gap:11px;align-items:flex-start">
+        ${icr(r[1],38,19)}
+        <div class="grow" style="min-width:0">
+          <div style="font-size:12.5px;font-weight:800;color:#141414">${r[0]} <span class="tag">${r[2]}</span></div>
+          <div style="font-size:10.8px;color:#444;line-height:1.55;margin-top:3px"><b style="color:#333">已有动作：</b>${r[3].replace('已有动作：','')}</div>
+          <div style="font-size:10.8px;color:#960C22;line-height:1.55;margin-top:2px"><b>待验证：</b>${r[4].replace('待验证：','')}</div>
+        </div>
+        <span class="st wait" style="flex:none;margin-top:2px">待验证</span>
+      </div>`).join('')}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:11px;min-height:0">
+    <div class="card tint" style="padding:11px 14px;flex:1;display:flex;flex-direction:column">
+      <div class="sl-l"><b>01</b>关系治理桥梁<span class="en">GOVERNANCE</span></div>
+      ${bridge({w:460,h:246,tx1:122,tx2:352,detail:true,nodes:[
+        {x:152,icon:'smile',t:'年龄识别'},{x:200,icon:'bell',t:'依赖预警'},{x:282,icon:'buoy',t:'危机干预'},{x:330,icon:'lock',t:'数据安全/透明'}]})}
+      <div style="font-size:9.5px;color:#a2a2a2;text-align:center">4 道门槛尚待验证，需持续投入与验证</div>
+    </div>
+    <div class="card" style="padding:10px 14px">
+      <div class="col" style="gap:6px">
+        <div class="row" style="font-size:11px;color:#555">${icr('link',30,15)}<span><b>中国规则</b> 2026-07-15 施行</span><span class="tag" style="margin-left:auto">年龄识别·危机干预</span></div>
+        <div class="row" style="font-size:11px;color:#555">${icr('link',30,15)}<span><b>FTC · 加州 SB 243</b></span><span class="tag" style="margin-left:auto">儿童风险与自伤响应</span></div>
+        <div class="row" style="font-size:11px;color:#555">${icr('link',30,15)}<span><b>英国 Ofcom</b></span><span class="tag" style="margin-left:auto">年龄验证</span></div>
+        <div class="row" style="font-size:11px;color:#555">${icr('link',30,15)}<span><b>欧盟 AI Act 第 50 条</b> 2026-08-02 适用</span><span class="tag" style="margin-left:auto">AI 互动与生成内容透明度</span></div>
+      </div>
+    </div>
+    <div class="card" style="padding:9px 14px;display:flex;align-items:center;gap:9px">
+      ${icr('bar',30,15)}
+      <div style="font-size:10.8px;color:#444;line-height:1.5"><b style="color:#960C22">CHAI 自报实验：</b>广告从每 8 条消息一次降至每 16 条一次，D30 留存相对提升 <b style="color:#C8102E">18.5%</b>。</div>
+    </div>
+  </div>
+ </div>`,
+ src:SRC3,concl:'独立产品要验证自身优势，能否<b>抵御平台分发与免费能力的挤压</b>。'}),
+chrome({v:'v-astra',vw:'GPT 6 · ASTRA HIGH',vw2:'较精致 · 22.11×',
+ eyebrow:'未来展望 · 2026-2029',
+ title:'未来增长取决于关系价值、单位经济与安全能否同时成立',
+ sub:'三种增长情景取决于不同条件，长期经营仍需同时验证关系连续性、内容供给、盈利与治理。',
+ body:`<div style="display:flex;align-items:stretch;gap:9px;height:246px">
+  <div class="card tint" style="width:192px;flex:none;padding:11px 13px;display:flex;flex-direction:column">
+    <div style="font-size:10px;font-weight:800;color:#960C22;letter-spacing:.08em">2026 锚点</div>
+    <div class="num" style="font-size:26px;margin-top:5px">6 亿美元</div>
+    <div style="font-size:10px;color:#666;line-height:1.55;margin-top:4px">移动 IAP 运行率 = 2026Q1 1.5 亿美元简单年化；非完整 TAM</div>
+    <div style="margin-top:auto"><span class="tag">历史锚点 → 假设推演</span></div>
+  </div>
+  <div class="arr" style="align-self:center;font-size:18px">→</div>
+  <div class="card" style="flex:1;padding:11px 13px;display:flex;flex-direction:column;border-color:#E7C6CD">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">基准情景 <span class="chip" style="border-style:dashed">假设 CAGR 30%</span></b><span class="st ok" style="margin-left:auto">概率最高</span></div>
+    <div class="num" style="font-size:25px">2029 约 13.2 亿美元</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.6;margin-top:auto">记忆、语音与角色生态与多元变现改善增长质量</div>
+  </div>
+  <div class="card" style="flex:1;padding:11px 13px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">上行情景 <span class="chip" style="border-style:dashed">假设 CAGR 50%</span></b><span class="st wait" style="margin-left:auto">条件成立</span></div>
+    <div class="num" style="font-size:25px">2029 约 20.3 亿美元</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.6;margin-top:auto">实时多模态、UGC 分发、穿戴/agent 与创作者网络效应共同成立</div>
+  </div>
+  <div class="card" style="flex:1;padding:11px 13px;display:flex;flex-direction:column">
+    <div class="row" style="margin-bottom:5px"><b style="font-size:12px;color:#960C22">下行情景 <span class="chip" style="border-style:dashed">假设 CAGR 10%</span></b><span class="st wait" style="margin-left:auto">条件成立</span></div>
+    <div class="num" style="font-size:25px">2029 约 8.0 亿美元</div>
+    <div style="font-size:10.5px;color:#666;line-height:1.6;margin-top:auto">未成年人口收紧、低留存及平台免费捆绑</div>
+  </div>
+  <div class="arr" style="align-self:center;font-size:18px">→</div>
+  <div class="card acc" style="width:178px;flex:none;padding:10px 13px;display:flex;flex-direction:column">
+    <div style="font-size:10px;font-weight:800;color:#960C22;letter-spacing:.08em">2029 结局</div>
+    <div style="font-size:11px;line-height:2.1;margin-top:6px"><b style="color:#C8102E">20.3 亿</b> 上行<br><b style="color:#C8102E">13.2 亿</b> 基准<br><b style="color:#C8102E">8.0 亿</b> 下行</div>
+    <div style="margin-top:auto;font-size:9.5px;color:#a2a2a2">2029 情景为本报告测算，置信度中低</div>
+  </div>
+ </div>
+ <div style="display:grid;grid-template-columns:390px 1fr;gap:11px;margin-top:11px;flex:1;min-height:0">
+  <div class="card acc" style="padding:10px 14px;display:flex;flex-direction:column">
+    <div class="sl-l"><b>01</b>长期平台可能性（待证明）</div>
+    ${pyr([{t:'安全治理 / 全球本地化'},{t:'单位经济 / 商业模式'},{t:'真人价值 / 平台分发'},{t:'创作者 / IP 供给'},{t:'关系连续性'}],0,368,30,5).svg}
+  </div>
+  <div class="card" style="padding:10px 14px;display:flex;flex-direction:column">
+    <div class="sl-l"><b>02</b>经营跟踪指标（持续观察，尚待验证）</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px;flex:1">
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('link',34,17)}<div><div style="font-size:11.3px;font-weight:800">关系连续性</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">30/90 日关系留存、记忆命中率、人格稳定性</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('pen',34,17)}<div><div style="font-size:11.3px;font-weight:800">内容供给</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">优质角色、活跃创作者与分成、Remix 发布率</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('coins',34,17)}<div><div style="font-size:11.3px;font-weight:800">单位经济</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">推理与审核成本、每用户贡献毛利、退款率</div></div></div>
+      <div class="row" style="background:#FDF4F6;border-radius:9px;padding:9px 11px">${icr('shield',34,17)}<div><div style="font-size:11.3px;font-weight:800">关系治理</div><div style="font-size:10px;color:#777;line-height:1.45;margin-top:2px">年龄识别、危机干预与依赖预警覆盖</div></div></div>
+    </div>
+    <div class="foot-note" style="margin-top:9px">假设 CAGR 10% / 30% / 50%（下行/基准/上行）；仅移动 IAP，非完整 TAM，不是机构预测。</div>
+  </div>
+ </div>`,
+ src:SRC4,concl:'用<b>“安全关系留存 × 每用户贡献毛利”</b>检验增长质量。'})];
+
+/* ================= 对比总结页 ================= */
+const CMP=chrome({v:'cmp',vw:'对比总结 · COMPARISON',vw2:'1 页',
+ eyebrow:'同一份研究 · 同一个 Skill · 每组 4 页',
+ title:'做同一份 PPT，模型用量差多少？',
+ sub:'四组配置对同一份 4 页研究的复现对比：credits 折算与运行历时来自执行日志；质量评点基于 16 页成品的逐页检查（图示丰富度、排版精细度、信息密度）。',
+ body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+  <div class="cmp-panel">
+    <h3><span class="n">01</span>模型 credits 折算<span class="d">标准费率 ｜ Luna max = 1×</span></h3>
+    <div class="cbar"><div class="nm">Luna max<small>GPT 5.6 · 基准</small></div><div class="tk"><i class="base" style="width:4.5%"></i></div><div class="vl">1.00×<small>10.62 credits</small></div></div>
+    <div class="cbar"><div class="nm">Terra high<small>GPT 5.6</small></div><div class="tk"><i style="width:22.8%"></i></div><div class="vl">5.04×<small>53.53 credits</small></div></div>
+    <div class="cbar"><div class="nm">Sol high<small>GPT 5.6</small></div><div class="tk"><i style="width:59.3%"></i></div><div class="vl">13.12×<small>139.26 credits</small></div></div>
+    <div class="cbar"><div class="nm">Astra high<small>GPT 6</small></div><div class="tk"><i style="width:100%"></i></div><div class="vl">22.11×<small>234.68 credits</small></div></div>
+    <div style="font-size:10px;color:#a2a2a2;margin-top:8px">仅统计制作模型；不含图片生成与主线程统筹检查。</div>
+  </div>
+  <div class="cmp-panel">
+    <h3><span class="n">02</span>本次运行历时<span class="d">从子任务启动到完成 ｜ Luna max = 1×</span></h3>
+    <div class="cbar"><div class="nm">Terra high<small>GPT 5.6</small></div><div class="tk"><i style="width:29.7%"></i></div><div class="vl">0.40×<small>24.14 分</small></div></div>
+    <div class="cbar"><div class="nm">Luna max<small>GPT 5.6 · 基准</small></div><div class="tk"><i class="base" style="width:73.8%"></i></div><div class="vl">1.00×<small>59.99 分</small></div></div>
+    <div class="cbar"><div class="nm">Astra high<small>GPT 6</small></div><div class="tk"><i style="width:76.1%"></i></div><div class="vl">1.03×<small>61.80 分</small></div></div>
+    <div class="cbar"><div class="nm">Sol high<small>GPT 5.6</small></div><div class="tk"><i style="width:100%"></i></div><div class="vl">1.35×<small>81.27 分</small></div></div>
+    <div style="font-size:10px;color:#a2a2a2;margin-top:8px">含出图、等待审批、改稿及排队；不是纯模型速度。</div>
+  </div>
+ </div>
+ <div class="sl-l" style="margin-top:2px"><b>03</b>质量差在哪里<span class="en">QUALITY REVIEW · 按成品质量排序</span></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:1;min-height:0">
+  <div class="qrow"><span class="rk">1</span><div class="mn">Sol high<small>GPT 5.6</small></div><div class="mx">13.12×</div><div class="qc"><b>图表最丰富、排版最精细、信息密度最高：</b>五节点关系图、六塔桥型、情景流与五层金字塔齐备，编号体系、数据标签与脚注完整——咨询级完成度，边际质量最优。</div></div>
+  <div class="qrow"><span class="rk r2">2</span><div class="mn">Astra high<small>GPT 6</small></div><div class="mx">22.11×</div><div class="qc"><b>元素最多、版面最满：</b>图标卡片与多类示意图齐备，但部分装饰冗余，对齐与留白控制略逊 Sol——用量最高，完成度次之。</div></div>
+  <div class="qrow"><span class="rk r3">3</span><div class="mn">Terra high<small>GPT 5.6</small></div><div class="mx">5.04×</div><div class="qc"><b>图标卡片加简版示意</b>（双环图、简化桥型、阶梯金字塔）；结构清楚，但注解、数据标签与脚注不足——能看懂，未到咨询级。</div></div>
+  <div class="qrow"><span class="rk r4">4</span><div class="mn">Luna max<small>GPT 5.6</small></div><div class="mx">1.00×</div><div class="qc"><b>纯文字卡片、无图标图示、留白最大：</b>仅完成内容罗列与粗略条形，排版粗糙——只传达结论，不支持决策讨论。</div></div>
+ </div>`,
+ src:'数据：执行日志 ｜ 费率：OpenAI 标准 credits ｜ 每个配置仅测 1 次，修改轮次不同，效果请看成品 ｜ 2026-09-24',
+ concl:'用量与质量非线性：<b>Sol 以 13× 达成最高完成度，Astra 22× 仍未反超</b>——密度来自结构与校验，而非堆料。'});
+
+/* ================= 封面 ================= */
+const COV=`<div class="cov">
+  <div class="cb"></div><div class="cb2"></div>
+  <div class="eyebrow"><i></i>CONSULTING DECK · 咨询级演示复现实验</div>
+  <h1>AI社交软件市场<br>竞争格局与<em>未来展望</em></h1>
+  <div class="csub">同一份 4 页研究、同一个 lw-consulting-ppt Skill，由四个模型配置各复现一版：白底红主色、圆形图标、数据卡片、流程图、金字塔与桥型示意图，逐页对比用量与质量差异。</div>
+  <div class="cmeta">
+    <span class="chip"><b>4</b> 个模型配置</span><span class="chip"><b>4</b> 页 / 组</span><span class="chip"><b>17</b> 页成品</span><span class="chip">lw-consulting-ppt 风格</span><span class="chip">数据：执行日志 · Sensor Tower 等公开材料</span>
+  </div>
+  <div class="mods">
+    <div class="mod"><div class="mh"><b>GPT 5.6 Sol high</b><span class="cf">最精致</span></div><div class="mm">13.12× credits ｜ 81.27 分</div><div class="mq">图表最丰富、排版最精细、信息密度最高</div></div>
+    <div class="mod"><div class="mh"><b>GPT 5.6 Terra high</b><span class="cf">中等</span></div><div class="mm">5.04× credits ｜ 24.14 分</div><div class="mq">图标卡片 + 简版示意，注解不足</div></div>
+    <div class="mod"><div class="mh"><b>GPT 5.6 Luna max</b><span class="cf">最简陋</span></div><div class="mm">1.00× credits ｜ 59.99 分</div><div class="mq">纯文字卡片、无图示、留白最大</div></div>
+    <div class="mod"><div class="mh"><b>GPT 6 Astra high</b><span class="cf">较精致</span></div><div class="mm">22.11× credits ｜ 61.80 分</div><div class="mq">元素最多最满，细节略逊 Sol</div></div>
+  </div>
+  <div class="cfoot"><span>AI社交软件市场竞争格局与未来展望 · 四模型版本复现对比</span><span>2026-09-24 ｜ 白色底 · 红色主色调 · 咨询杂志风</span></div>
+</div>`;
+
+/* ================= 应用逻辑 ================= */
+const VIEWS={
+  sol:{pages:SOL,labels:['市场概况','中国路线','海外控制点','未来展望']},
+  terra:{pages:TERRA,labels:['市场概况','中国路线','海外控制点','未来展望']},
+  luna:{pages:LUNA,labels:['市场概况','中国路线','海外控制点','未来展望']},
+  astra:{pages:ASTRA,labels:['市场概况','中国路线','海外控制点','未来展望']},
+};
+let cur='cov', pg=0;
+const slideBox=document.getElementById('slideBox');
+const pagenav=document.getElementById('pagenav');
+function fit(){
+  const st=document.getElementById('stage');
+  const s=Math.min((st.clientWidth-48)/1280,(st.clientHeight-36)/720);
+  slideBox.style.transform=`scale(${s})`;
+}
+function render(){
+  document.querySelectorAll('#tabs button').forEach(b=>{
+    const v=b.dataset.v;
+    b.classList.toggle('on',(v===cur)||(cur==='cov'&&v==='cov'));
+  });
+  if(cur==='cov'){slideBox.innerHTML=COV;pagenav.style.display='none';}
+  else if(cur==='cmp'){slideBox.innerHTML=CMP;pagenav.style.display='none';}
+  else{
+    const V=VIEWS[cur];
+    slideBox.innerHTML=V.pages[pg];
+    pagenav.style.display='flex';
+    let html='<span class="lbl">页面</span>';
+    V.pages.forEach((_,i)=>{
+      html+=`<button data-p="${i}" class="${i===pg?'on':''}">0${i+1}</button>`;
+      if(i<V.pages.length-1)html+='<span class="sep"></span>';
+    });
+    html+='<span class="lbl" style="margin-left:14px">版本</span>';
+    V.labels.forEach((l,i)=>html+=`<button data-p="${i}" class="${i===pg?'on':''}" style="color:#bbb">${l}</button>`);
+    pagenav.innerHTML=html;
+  }
+  fit();
+}
+document.getElementById('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  cur=b.dataset.v;pg=0;render();
+});
+pagenav.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-p]');if(!b)return;
+  pg=+b.dataset.p;render();
+});
+window.addEventListener('resize',fit);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>小西天 · 大雄宝殿悬塑 — 3D 复原</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0705; }
+  body { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+  #scene { position: fixed; inset: 0; }
+  #scene canvas { display: block; }
+
+  .panel {
+    position: fixed; z-index: 10; color: #e8d9b8;
+    background: rgba(16, 11, 7, 0.78);
+    border: 1px solid rgba(202, 162, 79, 0.35);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  #info { top: 16px; left: 16px; max-width: 330px; padding: 14px 16px; }
+  #info h1 { font-size: 17px; font-weight: 600; color: #f0d488; letter-spacing: 1px; }
+  #info .sub { font-size: 11px; color: #b09a6c; margin-top: 3px; letter-spacing: 0.5px; }
+  #info details { margin-top: 9px; font-size: 12px; line-height: 1.75; color: #cbb98e; }
+  #info summary { cursor: pointer; color: #e8c26a; outline: none; font-size: 12.5px; }
+  #info summary:hover { color: #ffe9a8; }
+  #statLine { margin-top: 9px; font-size: 11px; color: #93a88e; border-top: 1px dashed rgba(202,162,79,0.3); padding-top: 8px; }
+
+  #ctrl { top: 16px; right: 16px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; max-width: 220px; }
+  #ctrl .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    font-family: inherit; font-size: 12px; color: #d8c491;
+    background: rgba(60, 42, 22, 0.65); border: 1px solid rgba(202,162,79,0.4);
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; transition: all .18s;
+  }
+  button:hover { background: rgba(120, 84, 36, 0.75); color: #ffe9a8; }
+  button.on { background: #8a6428; color: #ffe9a8; border-color: #e8c26a; }
+  #ctrl .lbl { font-size: 10.5px; color: #a8915f; letter-spacing: 1px; }
+
+  #hint {
+    bottom: 14px; left: 50%; transform: translateX(-50%);
+    padding: 7px 18px; font-size: 12px; color: #c9b586;
+    white-space: nowrap; border-radius: 999px;
+  }
+  #hint b { color: #f0d488; font-weight: 600; }
+
+  #tip {
+    display: none; position: fixed; z-index: 20; pointer-events: none;
+    background: rgba(30, 20, 10, 0.92); color: #ffe9a8;
+    border: 1px solid #caa24f; border-radius: 6px;
+    font-size: 12.5px; padding: 5px 10px; letter-spacing: 1px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.6);
+  }
+
+  #loading {
+    position: fixed; inset: 0; z-index: 100; background: #0a0705;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    transition: opacity .6s;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  #loading .t { color: #e8c26a; font-size: 18px; letter-spacing: 6px; }
+  #loading .bar { width: 180px; height: 2px; background: rgba(202,162,79,0.25); overflow: hidden; border-radius: 2px; }
+  #loading .bar i { display: block; height: 100%; width: 40%; background: #e8c26a; animation: ld 1.1s infinite ease-in-out; }
+  @keyframes ld { 0% { transform: translateX(-100%);} 100% { transform: translateX(450%);} }
+
+  @media (max-width: 720px) {
+    #info { max-width: 250px; padding: 10px 12px; }
+    #info details { font-size: 11px; }
+    #ctrl { max-width: 178px; padding: 8px; }
+    button { font-size: 11px; padding: 5px 7px; }
+    #hint { font-size: 10.5px; padding: 6px 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="info" class="panel">
+  <h1>小西天 · 大雄宝殿悬塑</h1>
+  <div class="sub">隰县千佛庵 · 明末彩塑 · 程序化三维复原</div>
+  <details>
+    <summary>殿堂简介</summary>
+    小西天（千佛庵）位于山西隰县城西凤凰山，始建于明崇祯二年（1629年）。大雄宝殿内四壁及梁架满布悬塑，自地面层叠而上，大小佛龛、楼阁、宝塔与三千余尊小佛、菩萨、金刚相间罗列，如云似海，被誉为「中国悬塑艺术之绝响」。本模型依据殿内公开影像资料程序化推演重建，非精密测绘数据；此处亦为《黑神话·悟空》取景地之一。
+  </details>
+  <div id="statLine"></div>
+</div>
+
+<div id="ctrl" class="panel">
+  <div class="row">
+    <button id="btnRotate" class="on">自动旋转</button>
+    <button id="btnRoof" class="on">屋顶·显</button>
+  </div>
+  <div class="lbl">视角</div>
+  <div class="row">
+    <button data-p="overview">全景</button>
+    <button data-p="altar">主佛</button>
+    <button data-p="lookUp">仰视</button>
+  </div>
+  <div class="row">
+    <button data-p="closeup">悬塑特写</button>
+    <button data-p="top">俯瞰</button>
+  </div>
+</div>
+
+<div id="hint" class="panel"><b>拖拽</b> 旋转 · <b>滚轮</b> 缩放 · <b>右键</b> 平移 · 悬停金点查看标注 · 快捷键 1-5 切换视角 / R 旋转 / T 屋顶</div>
+<div id="tip"></div>
+
+<div id="loading">
+  <div class="t">小西天</div>
+  <div class="bar"><i></i></div>
+</div>
+
+<script>/*__THREE__*/</script>
+<script>/*__CONTROLS__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

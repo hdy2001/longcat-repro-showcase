@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>佛光寺东大殿 · 木构图志 | Foguang Temple East Hall</title>
+<style>
+  :root{
+    --bg:#ece7db; --panel:rgba(250,247,239,.93); --ink:#26312b; --green:#2f4f3e;
+    --red:#a83226; --line:#c9c2b0; --shadow:0 6px 24px rgba(38,49,43,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:var(--ink);}
+  #scene{position:fixed;inset:0;display:block;cursor:grab}
+  #scene:active{cursor:grabbing}
+  .panel{position:fixed;background:var(--panel);backdrop-filter:blur(8px);
+    border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);z-index:10}
+  /* 标题 */
+  #title{top:18px;left:18px;padding:14px 20px;max-width:340px}
+  #title h1{font-size:20px;letter-spacing:2px;color:var(--green);font-weight:700}
+  #title h1 small{display:block;font-size:11px;letter-spacing:3px;color:#7a7466;margin-top:4px;font-weight:400}
+  #title p{font-size:12px;color:#6d675c;margin-top:8px;line-height:1.6}
+  .badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;
+    padding:2px 8px;border-radius:20px;letter-spacing:1px;margin-top:8px}
+  /* 右上控制 */
+  #ctrl{top:18px;right:18px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:230px}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .lbl{font-size:11px;color:#8a8474;letter-spacing:1px;white-space:nowrap}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;
+    color:var(--ink);border-radius:9px;padding:6px 12px;font-size:12px;transition:all .18s;letter-spacing:1px}
+  button:hover{border-color:var(--green);color:var(--green)}
+  button.on{background:var(--green);color:#fff;border-color:var(--green)}
+  button.red.on{background:var(--red);border-color:var(--red)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .sep{height:1px;background:var(--line)}
+  /* 底部提示 */
+  #hint{bottom:16px;left:50%;transform:translateX(-50%);padding:8px 22px;
+    font-size:12px;color:#8a8474;letter-spacing:1px;border-radius:30px;white-space:nowrap}
+  #hint b{color:var(--green);font-weight:600}
+  /* 斗拱拆解面板 */
+  #dugong{left:18px;bottom:64px;width:300px;padding:16px 18px;display:none}
+  #dugong h2{font-size:15px;color:var(--green);letter-spacing:2px;margin-bottom:2px}
+  #dugong .sub{font-size:11px;color:#8a8474;margin-bottom:10px}
+  #partName{font-size:17px;color:var(--red);font-weight:700;margin:6px 0 2px;min-height:24px}
+  #partEn{font-size:11px;color:#8a8474;letter-spacing:1px;min-height:14px}
+  #partDesc{font-size:12px;color:#5c574c;line-height:1.7;margin:8px 0;min-height:40px}
+  #stepBar{display:flex;gap:4px;margin:10px 0}
+  #stepBar i{flex:1;height:5px;border-radius:3px;background:#ddd5c2;transition:background .3s}
+  #stepBar i.done{background:var(--green)}
+  #stepBar i.cur{background:var(--red)}
+  /* 图例 */
+  #legend{right:18px;bottom:16px;padding:10px 14px;font-size:11px;color:#6d675c;line-height:1.9}
+  #legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  #loading{position:fixed;inset:0;background:var(--bg);z-index:99;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .6s}
+  #loading .t{font-size:22px;letter-spacing:8px;color:var(--green);font-weight:700}
+  #loading .s{font-size:11px;letter-spacing:3px;color:#8a8474}
+  #loading .bar{width:180px;height:2px;background:#ddd5c2;overflow:hidden}
+  #loading .bar i{display:block;height:100%;width:40%;background:var(--red);animation:ld 1.1s infinite}
+  @keyframes ld{0%{margin-left:-40%}100%{margin-left:100%}}
+  @media (max-width:760px){
+    #title{max-width:220px;padding:10px 14px}#title h1{font-size:16px}#title p{display:none}
+    #dugong{width:250px;bottom:56px}#legend{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="loading"><div class="t">佛光寺东大殿</div><div class="s">FOGUANG TEMPLE · EAST HALL · 857</div><div class="bar"><i></i></div></div>
+
+<div class="panel" id="title">
+  <h1><span data-i18n="title">佛光寺东大殿</span><small data-i18n="subtitle">单檐庑殿顶 · 面阔七间 · 进深四间</small></h1>
+  <p data-i18n="desc">唐大中十一年（857）遗构，中国现存最早木构殿堂之一。七铺作双杪双下昂斗拱，出檐深远，雄浑疏朗。</p>
+  <span class="badge" data-i18n="badge">木构图志 · TIMBER ATLAS</span>
+</div>
+
+<div class="panel" id="ctrl">
+  <div class="row"><span class="lbl" data-i18n="lblView">视图</span>
+    <button id="btnExplode" data-i18n="btnExplode">爆炸拆解</button>
+    <button id="btnAssemble" data-i18n="btnAssemble">合拢</button>
+  </div>
+  <div class="row"><span class="lbl" data-i18n="lblClip">剖切</span>
+    <button id="btnCutV" data-i18n="btnCutV">纵向剖切</button>
+    <button id="btnCutH" data-i18n="btnCutH">横向剖切</button>
+    <button id="btnCutY" data-i18n="btnCutY">水平剖切</button>
+  </div>
+  <div class="row"><span class="lbl" data-i18n="lblBracket">斗拱</span>
+    <button id="btnBracket" class="red" data-i18n="btnBracket">斗拱拆解</button>
+  </div>
+  <div class="sep"></div>
+  <div class="row"><span class="lbl" data-i18n="lblColor">配色</span>
+    <button id="cCurrent" class="on" data-i18n="cCurrent">现状色</button>
+    <button id="cPainted" data-i18n="cPainted">彩绘色</button>
+    <button id="cWood" data-i18n="cWood">原木色</button>
+  </div>
+  <div class="row"><span class="lbl" data-i18n="lblLang">语言</span>
+    <button id="btnLang">EN / 中</button>
+  </div>
+</div>
+
+<div class="panel" id="dugong">
+  <h2 data-i18n="dgTitle">外檐柱头铺作 · 七铺作双杪双下昂</h2>
+  <div class="sub" data-i18n="dgSub">逐件拆解 · 步骤引导拼装</div>
+  <div id="partName">—</div><div id="partEn"></div><div id="partDesc"></div>
+  <div id="stepBar"></div>
+  <div class="row">
+    <button id="btnPrev" data-i18n="btnPrev">← 上一步</button>
+    <button id="btnNext" data-i18n="btnNext">下一步 →</button>
+    <button id="btnSpin" data-i18n="btnSpin">旋转展示</button>
+    <button id="btnExit" data-i18n="btnExit">退出</button>
+  </div>
+</div>
+
+<div class="panel" id="legend">
+  <div><i style="background:#8a3324"></i><span data-i18n="lgRed">木构件（柱·梁·斗拱）</span></div>
+  <div><i style="background:#4a5054"></i><span data-i18n="lgRoof">屋面瓦作</span></div>
+  <div><i style="background:#c8a86b"></i><span data-i18n="lgWall">墙体</span></div>
+  <div><i style="background:#3f7d6b"></i><span data-i18n="lgChi">鸱吻 · 脊饰</span></div>
+</div>
+
+<div class="panel" id="hint"><b data-i18n="hint1">拖拽</b><span data-i18n="hint1u">旋转</span> · <b data-i18n="hint2">滚轮</b><span data-i18n="hint2u">缩放</span> · <b data-i18n="hint3">右键</b><span data-i18n="hint3u">平移</span></div>
+
+<script type="importmap">
+{"imports":{"three":"./vendor/three.module.js","three/addons/controls/OrbitControls.js":"./vendor/OrbitControls.js"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ================= 基础：渲染器 / 场景 / 相机 ================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xece7db);
+scene.fog = new THREE.Fog(0xece7db, 90, 220);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 500);
+camera.position.set(30, 20, 34);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 5.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 2; controls.maxDistance = 120;
+
+/* 灯光 */
+const hemi = new THREE.HemisphereLight(0xf7f2e6, 0xcfc7b2, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.6);
+sun.position.set(28, 42, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
+sun.shadow.camera.top = 34; sun.shadow.camera.bottom = -34;
+sun.shadow.camera.far = 120; sun.shadow.bias = -0.0008;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xdfe8dd, 0.35);
+fill.position.set(-25, 15, -20); scene.add(fill);
+
+/* 地面 */
+{
+  const g = new THREE.Mesh(
+    new THREE.CircleGeometry(70, 64),
+    new THREE.MeshStandardMaterial({ color:0xe3ddcb, roughness:1 })
+  );
+  g.rotation.x = -Math.PI/2; g.receiveShadow = true; scene.add(g);
+}
+
+/* ================= 配色方案 ================= */
+const PALETTES = {
+  current:{ roof:0x3d4348, tile:0x454b50, ridge:0x33383c, chiwen:0x3f7d6b, wood:0x8a3324,
+            woodDark:0x6e2a1e, wall:0xc8a86b, wallSide:0xbfa065, platform:0x9a958c, door:0x5c2a1a },
+  painted:{ roof:0x4a5a63, tile:0x54646d, ridge:0x3c484f, chiwen:0x3f7d6b, wood:0xb03a2a,
+            woodDark:0x93301f, wall:0xe8dfc9, wallSide:0xe0d5bc, platform:0xb0a894, door:0x7c2d1c,
+            pattern:true },
+  wood:   { roof:0x6b7568, tile:0x75806f, ridge:0x5a6357, chiwen:0x7d8a7a, wood:0xb08a58,
+            woodDark:0x9a7848, wall:0xcbb37f, wallSide:0xc2aa75, platform:0xa39d92, door:0x7d5a34 }
+};
+
+/* 卷草纹样（唐风）画布纹理 */
+function makeScrollTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = '#b03a2a'; x.fillRect(0,0,512,512);
+  x.strokeStyle = '#e8c87a'; x.lineWidth = 5; x.lineCap = 'round';
+  for(let row=0; row<2; row++) for(let col=0; col<2; col++){
+    const ox = col*256, oy = row*256;
+    x.save(); x.translate(ox,oy);
+    // 卷草主茎
+    x.beginPath(); x.moveTo(10,200);
+    x.bezierCurveTo(80,120, 150,260, 220,170); x.stroke();
+    x.beginPath(); x.moveTo(60,230);
+    x.bezierCurveTo(120,300, 190,160, 246,240); x.stroke();
+    // 卷须
+    for(const [cx,cy,r,dir] of [[70,140,34,1],[180,220,30,-1],[120,90,26,1],[200,90,24,-1]]){
+      x.beginPath(); x.arc(cx,cy,r, dir>0?Math.PI*0.2:Math.PI*1.1, dir>0?Math.PI*1.6:Math.PI*0.4, dir<0);
+      x.stroke();
+      x.beginPath(); x.arc(cx+dir*r*0.5, cy-r*0.35, r*0.45, 0, Math.PI*2);
+      x.fillStyle = '#e8c87a'; x.fill(); x.fillStyle = '#b03a2a';
+    }
+    // 叶片
+    x.fillStyle = 'rgba(232,200,122,.85)';
+    for(const [lx,ly,rot] of [[100,180,0.6],[160,150,-0.5],[50,260,0.4],[210,120,-0.7]]){
+      x.save(); x.translate(lx,ly); x.rotate(rot);
+      x.beginPath(); x.ellipse(0,0,26,10,0,0,Math.PI*2); x.fill(); x.restore();
+    }
+    x.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3,1);
+  return t;
+}
+/* 木纹画布纹理 */
+function makeWoodTexture(){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#b08a58'; x.fillRect(0,0,256,256);
+  for(let i=0;i<60;i++){
+    x.strokeStyle = `rgba(120,85,45,${0.08+Math.random()*0.12})`;
+    x.lineWidth = 1+Math.random()*2;
+    const y = Math.random()*256;
+    x.beginPath(); x.moveTo(0,y);
+    x.bezierCurveTo(85,y+Math.random()*8-4, 170,y+Math.random()*8-4, 256,y);
+    x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2);
+  return t;
+}
+const scrollTex = makeScrollTexture();
+const woodTex = makeWoodTexture();
+
+/* ================= 材质工厂（每次调用新建，避免共享状态；按角色注册便于配色切换） ================= */
+const MATS = (() => {
+  const reg = { roof:[], tile:[], ridge:[], chiwen:[], wood:[], woodDark:[], wall:[], wallSide:[], platform:[], door:[] };
+  function mk(key, make){ return () => { const m = make(); m.userData.role = key; reg[key].push(m); return m; }; }
+  return {
+    roof:  mk('roof',  () => new THREE.MeshStandardMaterial({ color:PALETTES.current.roof, roughness:.92, side:THREE.DoubleSide })),
+    tile:  mk('tile',  () => new THREE.MeshStandardMaterial({ color:PALETTES.current.tile, roughness:.9 })),
+    ridge: mk('ridge', () => new THREE.MeshStandardMaterial({ color:PALETTES.current.ridge, roughness:.85 })),
+    chiwen:mk('chiwen',() => new THREE.MeshStandardMaterial({ color:PALETTES.current.chiwen, roughness:.55, metalness:.08 })),
+    wood:  mk('wood',  () => new THREE.MeshStandardMaterial({ color:PALETTES.current.wood, roughness:.72 })),
+    woodDark:mk('woodDark',() => new THREE.MeshStandardMaterial({ color:PALETTES.current.woodDark, roughness:.75 })),
+    wall:  mk('wall',  () => new THREE.MeshStandardMaterial({ color:PALETTES.current.wall, roughness:.95 })),
+    wallSide:mk('wallSide',() => new THREE.MeshStandardMaterial({ color:PALETTES.current.wallSide, roughness:.95 })),
+    platform:mk('platform',() => new THREE.MeshStandardMaterial({ color:PALETTES.current.platform, roughness:.95 })),
+    door:  mk('door',  () => new THREE.MeshStandardMaterial({ color:PALETTES.current.door, roughness:.7 })),
+    pattern:() => new THREE.MeshStandardMaterial({ map:scrollTex, color:0xffffff, roughness:.72 }),
+    grain: () => new THREE.MeshStandardMaterial({ map:woodTex, color:0xffffff, roughness:.8 }),
+    _reg: reg
+  };
+})();
+
+/* ================= 小工具 ================= */
+const F = 0.03; // 1分 = 0.03m（斗拱测绘单位）
+function box(w,h,d,mat,x=0,y=0,z=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+/* 斜切昂嘴臂：主体 box + 端部斜切片 */
+function angTip(len,h,ang){
+  const g = new THREE.Group();
+  const main = box(len, h, 0.36, MATS.wood());
+  const tip = box(h*1.15, h, 0.36, MATS.wood());
+  tip.position.set(len/2 + h*0.28, -Math.tan(ang)*h*0.5, 0);
+  tip.rotation.z = -ang;
+  g.add(main, tip);
+  return g;
+}
+/* 蚂蚱头耍头头部曲线 */
+function mantisHead(len,h){
+  const g = new THREE.Group();
+  const main = box(len, h, 0.3, MATS.wood());
+  const nose = box(h*1.3, h*0.9, 0.3, MATS.wood());
+  nose.position.set(len/2 + h*0.3, h*0.28, 0); nose.rotation.z = 0.5;
+  const lip = box(h*0.9, h*0.45, 0.3, MATS.wood());
+  lip.position.set(len/2 + h*0.72, -h*0.05, 0); lip.rotation.z = 0.9;
+  g.add(main, nose, lip);
+  return g;
+}
+
+/* ================= 斗拱铺作工厂 =================
+   每组铺作独立构建（全新几何体 + 全新材质），绝不复用 mesh/累积矩阵。
+   局部坐标：原点=柱心柱顶，+Z=朝外（出檐方向），+Y=上。            */
+function buildPuzuo(kind){ // kind: 'col7' 外檐柱头七铺作 | 'inter5' 补间五铺作 | 'inner5' 内槽
+  const g = new THREE.Group();
+  const parts = []; // {node, part, zh, en, desc, home, off}
+  const W = MATS.wood(), WD = MATS.woodDark();
+  function add(node, part, zh, en, desc, off){
+    node.userData.home = node.position.clone();
+    node.userData.off = off;
+    parts.push({ node, part, zh, en, desc });
+    g.add(node); return node;
+  }
+
+  /* 1 栌斗 */
+  {
+    const n = new THREE.Group();
+    n.add(box(0.9,0.62,0.9,W, 0,0.31,0));
+    n.add(box(1.0,0.14,1.0,WD, 0,0.68,0)); // 斗耳沿
+    n.position.set(0,0,0);
+    add(n,'ludou','栌斗','Ludou · Cap Block',
+      '坐于柱头之上，全铺作之基座。耳、平、欹三分，承托华拱与泥道拱。',
+      new THREE.Vector3(0,0,0));
+  }
+  /* 2 华拱第一跳（出跳21分） */
+  {
+    const n = new THREE.Group();
+    const arm = box(0.36,0.42,1.7,W, 0,0,0); arm.position.z = -0.17; // 外端0.63(21分) 里转-1.03
+    n.add(arm);
+    n.position.set(0,0.83,0);
+    add(n,'huagong','华拱','Huagong · Perpendicular Arm',
+      '垂直于墙面出跳，第一跳出21分。外承交互斗，里转入梁架。',
+      new THREE.Vector3(0,0.55,0.12));
+  }
+  /* 3 交互斗 */
+  {
+    const n = new THREE.Group();
+    n.add(box(0.3,0.2,0.3,W, 0,0.08,0));
+    n.position.set(0,1.06,0.63);
+    add(n,'jiaohu','交互斗','Jiaohu Dou · Bearing Block',
+      '坐于华拱外跳之交，承托第一下昂。',
+      new THREE.Vector3(0,0.92,0.3));
+  }
+  /* 4 下昂第一跳（出跳47分，昂嘴斜切） */
+  {
+    const n = new THREE.Group();
+    const arm = new THREE.Group();
+    const main = box(0.34,0.4,2.6,W, 0,0,0);
+    arm.add(main);
+    const tip = box(0.5,0.4,0.34,W, 1.32,-0.1,0); tip.rotation.z = -0.42; // 昂嘴斜切
+    arm.add(tip);
+    arm.position.set(0,1.02,0.32); arm.rotation.x = -0.18; // 外低内高（下昂杠杆）
+    n.add(arm);
+    n.position.set(0,0,0);
+    add(n,'xiaang1','下昂 · 一跳','Xia\'ang I · Descending Lever',
+      '第一下昂，出跳47分。尾端伸入梁架受压，昂嘴下斜切，如杠杆出挑。',
+      new THREE.Vector3(0,1.2,0.62));
+  }
+  /* 5 瓜子拱（横拱，位于47分处） */
+  {
+    const n = new THREE.Group();
+    n.add(box(1.35,0.36,0.36,W, 0,0,0));
+    n.position.set(0,1.32,1.41);
+    add(n,'guazi','瓜子拱','Guazigong · Melon-seed Arm',
+      '横拱（顺墙面），位于第一下昂跳上47分处，承散斗与第二跳。',
+      new THREE.Vector3(0,1.52,0.66));
+  }
+  /* 5b 散斗 */
+  {
+    const n = new THREE.Group();
+    n.add(box(0.28,0.16,0.28,W, 0,0.06,0));
+    n.position.set(0,1.58,1.41);
+    add(n,'sandou','散斗','Sandou · Small Block',
+      '瓜子拱背上之垫斗，隔垫下昂第二跳。',
+      new THREE.Vector3(0,1.78,0.72));
+  }
+  /* 6 下昂第二跳（出跳94分，昂嘴斜切） */
+  {
+    const n = new THREE.Group();
+    const arm = new THREE.Group();
+    const main = box(0.34,0.4,4.4,W, 0,0,0);
+    arm.add(main);
+    const tip = box(0.52,0.4,0.34,W, 1.98,-0.12,0); tip.rotation.z = -0.46; // 昂嘴斜切
+    arm.add(tip);
+    arm.position.set(0,1.86,0.1); arm.rotation.x = -0.2;
+    n.add(arm);
+    n.position.set(0,0,0);
+    add(n,'xiaang2','下昂 · 二跳','Xia\'ang II · Long Lever',
+      '第二下昂，出跳94分，为全铺作最远出挑。昂嘴斜切，曲线雄浑。',
+      new THREE.Vector3(0,2.05,1.0));
+  }
+  /* 7 耍头（蚂蚱头） */
+  {
+    const n = new THREE.Group();
+    const body = mantisHead(3.9,0.34);
+    body.position.set(0,0,-1.35); body.rotation.x = 0.13;
+    n.add(body);
+    n.position.set(0,1.62,0);
+    add(n,'shuatou','耍头','Shuatou · Mantis Head',
+      '横贯铺作之枋木，外端雕作蚂蚱头，尾端压于第二下昂之下，与下昂杠杆相平衡。',
+      new THREE.Vector3(0,2.35,1.25));
+  }
+  /* 8 令拱（横拱，位于94分处） */
+  {
+    const n = new THREE.Group();
+    n.add(box(1.55,0.34,0.34,W, 0,0,0));
+    n.position.set(0,1.98,2.82);
+    add(n,'ling','令拱','Linggong · Ordering Arm',
+      '最外一跳横拱，承替木与撩檐枋，直接托住檐口。',
+      new THREE.Vector3(0,2.62,1.34));
+  }
+  /* 9 替木 */
+  {
+    const n = new THREE.Group();
+    n.add(box(1.45,0.16,0.24,W, 0,0,0));
+    const mid = box(0.3,0.1,0.24,WD, 0,0.06,0);
+    n.add(mid);
+    n.position.set(0,2.23,2.82);
+    add(n,'timu','替木','Timu · Sill Strip',
+      '贴于令拱之上之短木，承撩檐枋，使枋木传力均匀。',
+      new THREE.Vector3(0,2.88,1.42));
+  }
+  /* 里转（外檐铺作华拱里端上承内跳横拱，简化可见） */
+  if(kind !== 'inner5'){
+    const n = new THREE.Group();
+    n.add(box(1.1,0.3,0.3,W, 0,0,0));
+    n.position.set(0,0.98,-1.05);
+    g.add(n);
+  }
+  g.userData.parts = parts;
+  g.userData.kind = kind;
+  return g;
+}
+
+/* ================= 建筑布局常量 ================= */
+const PLAT_H = 0.9;                       // 台基高
+const X_LINES = [-15.4,-11,-6.6,-2.2,2.2,6.6,11,15.4]; // 面阔七间（8列）
+const Z_LINES = [-8.8,-4.4,0,4.4,8.8];    // 进深四间（5列）
+const INNER_X = [-6.6,-2.2,2.2,6.6], INNER_Z = [-4.4,4.4]; // 内槽柱
+const COL_H = 4.5, INNER_COL_H = 3.2;     // 外檐柱 / 内槽柱（内柱较低，铺作不穿出屋面）
+const RIDGE_Y = 10.35, RIDGE_HALF = 8.7;  // 正脊
+const EAVE_Z = 12.35, EAVE_HALF = 16.6;   // 檐口
+const EAVE_Y0 = 7.85;                     // 檐口中段标高
+
+/* 分层组（爆炸拆解用） */
+const platformGroup = new THREE.Group();
+const columnGroup   = new THREE.Group();
+const bracketGroup  = new THREE.Group();
+const beamGroup     = new THREE.Group();
+const roofGroup     = new THREE.Group();
+scene.add(platformGroup, columnGroup, bracketGroup, beamGroup, roofGroup);
+const layerGroups = [
+  { g:roofGroup,     dy:5.8 },
+  { g:beamGroup,     dy:4.2 },
+  { g:bracketGroup,  dy:2.6 },
+  { g:columnGroup,   dy:1.2 },
+  { g:platformGroup, dy:0   }
+];
+
+/* ================= 台基 ================= */
+{
+  const P = MATS.platform();
+  platformGroup.add(box(29.8,0.5,20.6,P, 0,0.25,0));
+  platformGroup.add(box(28.6,0.42,19.6,P, 0,0.71,0));
+  // 正面踏道（南）
+  const S = MATS.platform();
+  for(let i=0;i<3;i++)
+    platformGroup.add(box(3.2,0.3,0.46,S, 0,0.15+i*0.3,-10.33+i*0.46));
+}
+
+/* ================= 柱网 ================= */
+const colMat = MATS.wood();
+const colGeo = new THREE.CylinderGeometry(0.26,0.29,1,14);
+const innerColGeo = new THREE.CylinderGeometry(0.24,0.27,1,14);
+const columnTops = []; // 记录柱顶坐标（放铺作）
+for(const x of X_LINES){
+  for(const z of Z_LINES){
+    const onFront = z===-8.8, onBack = z===8.8, onLeft = x===-15.4, onRight = x===15.4;
+    if(!(onFront||onBack||onLeft||onRight)) continue;
+    const corner = (onFront||onBack)&&(onLeft||onRight);
+    const h = COL_H + (corner?0.12:0); // 角柱生起
+    const c = new THREE.Mesh(colGeo, colMat);
+    c.scale.y = h; c.position.set(x, PLAT_H+h/2, z);
+    c.castShadow = true; c.receiveShadow = true;
+    columnGroup.add(c);
+    columnTops.push({ x, z, y: PLAT_H+h, side: onFront?'f':(onBack?'b':(onLeft?'l':'r')), corner });
+  }
+}
+for(const x of INNER_X) for(const z of INNER_Z){
+  const c = new THREE.Mesh(innerColGeo, colMat);
+  c.scale.y = INNER_COL_H; c.position.set(x, PLAT_H+INNER_COL_H/2, z);
+  c.castShadow = true;
+  columnGroup.add(c);
+  columnTops.push({ x, z, y: PLAT_H+INNER_COL_H, side: z<0?'f':'b', inner:true });
+}
+
+/* ================= 铺作层：22组外檐柱头 + 18组补间 + 8组内槽 ================= */
+const sideRot = { f:Math.PI, b:0, l:-Math.PI/2, r:Math.PI/2 };
+let detailSet = null;
+let outerSetCount = 0, interSetCount = 0, innerSetCount = 0;
+for(const c of columnTops){
+  const set = buildPuzuo(c.inner ? 'inner5' : 'col7');
+  set.position.set(c.x, c.y, c.z);          // 全新 position，无累积矩阵
+  set.rotation.y = sideRot[c.side];
+  bracketGroup.add(set);
+  if(c.inner) innerSetCount++;
+  else {
+    outerSetCount++;
+    if(!c.inner && c.x===2.2 && c.z===-8.8) detailSet = set; // 拆解示例：前檐明间柱头铺作
+  }
+}
+/* 补间铺作（每间一组，坐于阑额上） */
+const interY = PLAT_H + COL_H + 0.16;
+for(const z of [-8.8,8.8]) for(let i=0;i<6;i++){
+  const x = (X_LINES[i]+X_LINES[i+1])/2;
+  const s = buildPuzuo('inter5');
+  s.position.set(x, interY, z); s.rotation.y = z<0?Math.PI:0;
+  bracketGroup.add(s); interSetCount++;
+}
+for(const x of [-15.4,15.4]) for(const z of [-4.4,0,4.4]){
+  const s = buildPuzuo('inter5');
+  s.position.set(x, interY, z); s.rotation.y = x<0?-Math.PI/2:Math.PI/2;
+  bracketGroup.add(s); interSetCount++;
+}
+console.log(`铺作统计：外檐柱头 ${outerSetCount} 组 / 补间 ${interSetCount} 组 / 内槽 ${innerSetCount} 组`);
+
+/* ================= 梁架 ================= */
+{
+  const W = MATS.wood(), WD = MATS.woodDark();
+  /* 阑额（柱头联系，沿面阔） */
+  for(const z of [-8.8,8.8]){
+    const a = box(30.2,0.3,0.26,W, 0,PLAT_H+COL_H+0.15,z);
+    beamGroup.add(a);
+  }
+  for(const x of [-15.4,15.4]){
+    const a = box(0.26,0.3,17.2,W, x,PLAT_H+COL_H+0.15,0);
+    beamGroup.add(a);
+  }
+  /* 内槽额枋 */
+  for(const z of INNER_Z)
+    beamGroup.add(box(13.2,0.24,0.22,W, 0,PLAT_H+INNER_COL_H+0.12,z));
+  /* 撩檐枋（檐口，承于替木之上） */
+  for(const z of [-11.85,11.85])
+    beamGroup.add(box(30.4,0.26,0.22,WD, 0,7.75,z));
+  /* 大梁（沿进深，两根，微拱） */
+  for(const x of [-6.6,6.6]){
+    const b1 = box(0.42,0.5,9.6,W, x,7.25,-4.85);
+    const b2 = box(0.42,0.5,9.6,W, x,7.25,4.85);
+    b1.rotation.x =  0.02; b2.rotation.x = -0.02;
+    beamGroup.add(b1,b2);
+  }
+  /* 蜀柱 + 平梁 */
+  for(const x of [-6.6,6.6])
+    beamGroup.add(box(0.34,1.5,0.34,WD, x,8.15,0));
+  beamGroup.add(box(0.4,0.44,13.6,W, 0,8.95,0));
+  /* 叉手（平梁两端斜撑至脊） */
+  for(const x of [-6.6,6.6]){
+    const s = box(0.22,1.9,0.22,WD, x,9.55,0);
+    s.rotation.z = x<0 ? -0.42 : 0.42;
+    beamGroup.add(s);
+  }
+  /* 平槫（金槫） */
+  for(const z of [-4.4,4.4])
+    beamGroup.add(box(14.6,0.3,0.3,WD, 0,8.35,z));
+  /* 托脚（大梁至平槫斜撑） */
+  for(const x of [-6.6,6.6]) for(const z of [-4.4,4.4]){
+    const s = box(0.18,2.2,0.18,WD, x,7.8,z*0.52);
+    s.rotation.x = z>0 ? -0.5 : 0.5;
+    beamGroup.add(s);
+  }
+  /* 脊槫 */
+  beamGroup.add(box(17.6,0.34,0.34,WD, 0,10.15,0));
+  /* 角梁（翼角起翘之骨干：檐柱头→檐角尖） */
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const a = box(0.3,0.36,4.9,WD, 0,0,0);
+    const from = new THREE.Vector3(sx*15.4, PLAT_H+COL_H+0.1, sz*8.8);
+    const to   = new THREE.Vector3(sx*16.55, EAVE_Y0+0.42, sz*12.3);
+    a.position.copy(from).add(to).multiplyScalar(0.5);
+    a.lookAt(to);
+    beamGroup.add(a);
+  }
+}
+
+/* ================= 墙体门窗（归于柱网层） ================= */
+{
+  const W = MATS.wall(), WS = MATS.wallSide(), D = MATS.door();
+  const WT = 5.45, T = 0.26, base = PLAT_H;
+  function wallSeg(x1,x2,y1,y2,z,mat){
+    const w = box(Math.abs(x2-x1), y2-y1, T, mat, (x1+x2)/2, (y1+y2)/2, z);
+    columnGroup.add(w);
+  }
+  function window_(cx,x1,x2,z,ww,wh,mat){
+    const gy = base+1.9; // 窗台高
+    wallSeg(x1, cx-ww/2, base, gy, z, mat); wallSeg(cx+ww/2, x2, base, gy, z, mat);
+    wallSeg(x1, cx-ww/2, gy+wh, WT, z, mat); wallSeg(cx+ww/2, x2, gy+wh, WT, z, mat);
+    wallSeg(cx-ww/2, cx+ww/2, base, gy, z, mat);
+    wallSeg(cx-ww/2, cx+ww/2, gy+wh, WT, z, mat);
+    wallSeg(cx-ww/2, cx-ww/2, gy, gy+wh, z, mat); wallSeg(cx+ww/2, cx+ww/2, gy, gy+wh, z, mat);
+    /* 直棂 */
+    const n = 7;
+    for(let i=0;i<n;i++)
+      columnGroup.add(box(0.07,wh,0.07,D, cx-ww/2+ (i+0.5)*ww/n, gy+wh/2, z));
+    columnGroup.add(box(ww+0.1,0.09,0.1,D, cx, gy+wh+0.05, z));
+    columnGroup.add(box(ww+0.1,0.09,0.1,D, cx, gy+0.05, z));
+  }
+  /* 前檐（南，z=-8.93） */
+  const zf = -8.93;
+  /* 明间大门 */
+  {
+    const cx=0, ww=3.1, wh=3.35;
+    wallSeg(-2.2,-ww/2, base, base+wh, zf, W); wallSeg(ww/2,2.2, base, base+wh, zf, W);
+    wallSeg(-2.2,2.2, base+wh, WT, zf, W);
+    columnGroup.add(box(0.09,wh-0.1,0.3,D, -ww/2, base+wh/2, zf));
+    columnGroup.add(box(0.09,wh-0.1,0.3,D,  ww/2, base+wh/2, zf));
+    columnGroup.add(box(ww,0.09,0.3,D, 0, base+wh, zf));
+    /* 门板两扇 */
+    columnGroup.add(box(ww/2-0.06,wh-0.15,0.06,MATS.door(), -ww/4, base+wh/2, zf-0.05));
+    columnGroup.add(box(ww/2-0.06,wh-0.15,0.06,MATS.door(),  ww/4, base+wh/2, zf-0.05));
+  }
+  /* 次间直棂窗 ×2 / 梢间窗 ×2 / 尽间实墙 ×2 */
+  window_( 4.4, 2.2, 6.6, zf, 1.5, 1.7, W); window_(-4.4, -6.6, -2.2, zf, 1.5, 1.7, W);
+  window_( 8.8, 6.6, 11, zf, 1.2, 1.6, W); window_(-8.8, -11, -6.6, zf, 1.2, 1.6, W);
+  wallSeg(11,15.4, base, WT, zf, W); wallSeg(-15.4,-11, base, WT, zf, W);
+  /* 后檐（北）实壁 + 板门 */
+  const zb = 8.93;
+  wallSeg(-2.2,2.2, base, WT, zb, W);
+  columnGroup.add(box(2.0,2.7,0.07,MATS.door(), 0, base+1.35, zb+0.06));
+  wallSeg(-15.4,-2.2, base, WT, zb, W); wallSeg(2.2,15.4, base, WT, zb, W);
+  /* 山面实壁 */
+  for(const x of [-15.53,15.53]){
+    columnGroup.add(box(T, WT-base, 17.6, WS, x, (base+WT)/2, 0));
+  }
+}
+
+/* ================= 屋顶：单檐庑殿顶 ================= */
+function roofSlope(sign){ // sign: +1 北坡 / -1 南坡；梯形曲面 + 翼角起翘
+  const NX = 26, NY = 8;
+  const pos = [], idx = [];
+  for(let j=0;j<=NY;j++){
+    const v = j/NY;                    // 0=檐口 1=脊
+    const z = sign * (EAVE_Z*(1-v));
+    for(let i=0;i<=NX;i++){
+      const u = i/NX;                 // 0..1 沿面阔
+      const xAbs = EAVE_HALF*(1-v) + RIDGE_HALF*v;   // 该高度处半宽
+      const x = (u*2-1)*xAbs;
+      let y = EAVE_Y0 + (RIDGE_Y-EAVE_Y0)*Math.pow(v,1.3); // 凹曲线
+      /* 翼角起翘：檐口端部上翘 */
+      const corner = Math.max(0, (Math.abs(x)-11.5)/ (EAVE_HALF-11.5));
+      y += Math.pow(Math.min(1,corner),2.2) * 0.62 * (1-v*0.35);
+      pos.push(x,y,z);
+    }
+  }
+  for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
+    const a = j*(NX+1)+i, b = a+1, c = a+NX+1, d = c+1;
+    idx.push(a,c,b, b,c,d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  return geo;
+}
+function gableSlope(sign){ // 山面坡（三角），sign: ±1 东/西
+  const NH = 8, NV = 8;
+  const pos = [], idx = [];
+  for(let j=0;j<=NV;j++){
+    const v = j/NV; // 0=脊端 1=檐口
+    for(let i=0;i<=NH;i++){
+      const t = i/NH; // 0=山面中线(靠脊) 1=山面外缘? 用三角带
+      // 参数：从脊端点 (RIDGE_HALF, RIDGE_Y) 到檐口两角
+      const xAbs = RIDGE_HALF + (EAVE_HALF-RIDGE_HALF)*v;
+      const z = sign * t * EAVE_Z;
+      let y = RIDGE_Y + (EAVE_Y0-RIDGE_Y)*Math.pow(v,1.35);
+      const corner = Math.max(0,(Math.abs(z)-9.2)/(EAVE_Z-9.2));
+      y += Math.pow(Math.min(1,corner),2.2)*0.5*(1-v*0.3);
+      pos.push(xAbs,y,z);
+    }
+  }
+  for(let j=0;j<NV;j++) for(let i=0;i<NH;i++){
+    const a = j*(NH+1)+i, b=a+1, c=a+NH+1, d=c+1;
+    idx.push(a,b,c, b,d,c);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  return geo;
+}
+const tileMat = MATS.tile();
+for(const s of [-1,1]){
+  const roof = new THREE.Mesh(roofSlope(s), MATS.roof());
+  roof.castShadow = true; roof.receiveShadow = true;
+  roofGroup.add(roof);
+  const gable = new THREE.Mesh(gableSlope(s), MATS.roof());
+  gable.castShadow = true; gable.receiveShadow = true;
+  roofGroup.add(gable);
+}
+/* 瓦垄（含山面坡） */
+{
+  const tileRidges = [];
+  const cyl = new THREE.CylinderGeometry(0.055,0.055,1,6,1,true);
+  for(const s of [-1,1]){
+    for(let x=-16.2; x<=16.2; x+=0.34){
+      /* 沿坡方向：檐口→脊 */
+      const y1 = EAVE_Y0 + Math.pow(Math.max(0,(Math.abs(x)-11.5)/(EAVE_HALF-11.5)),2.2)*0.62*0.65;
+      const z1 = s*EAVE_Z, z2 = 0;
+      const y2 = RIDGE_Y, y3 = y2 + 0.15;
+      const len = Math.hypot(z2-y1, z1-z2);
+      const m = new THREE.Mesh(cyl, tileMat);
+      m.scale.y = len;
+      m.position.set(x, (y1+y2)/2 + 0.03, s*EAVE_Z/2);
+      m.rotation.x = s>0 ? -Math.atan2(EAVE_Z, y2-y1) : Math.atan2(EAVE_Z, y2-y1);
+      roofGroup.add(m); tileRidges.push(m);
+    }
+  }
+  for(const s of [-1,1]) for(let i=0;i<=9;i++){
+    const z0 = -EAVE_Z + i*(2*EAVE_Z/10);
+    /* 山面坡瓦垄：脊端→檐口 */
+    const p1 = new THREE.Vector3(RIDGE_HALF, RIDGE_Y+0.05, 0);
+    const p2 = new THREE.Vector3(EAVE_HALF, EAVE_Y0+0.1+Math.pow(Math.max(0,(Math.abs(z0)-9.2)/(EAVE_Z-9.2)),2.2)*0.5, z0);
+    const len = p1.distanceTo(p2);
+    const m = new THREE.Mesh(cyl, tileMat);
+    m.scale.y = len;
+    m.position.copy(p1).add(p2).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), p2.clone().sub(p1).normalize());
+    roofGroup.add(m); tileRidges.push(m);
+  }
+  console.log('瓦垄数量:', tileRidges.length);
+}
+/* 正脊 + 鸱吻（东西两端各一） */
+{
+  const R = MATS.ridge();
+  roofGroup.add(box(18.9,0.72,0.6,R, 0,RIDGE_Y+0.42,0));
+  roofGroup.add(box(19.3,0.3,0.78,R, 0,RIDGE_Y+0.12,0));
+  /* 鸱吻 ×2 */
+  const shape = new THREE.Shape();
+  shape.moveTo(0,0); shape.lineTo(0.34,0); shape.lineTo(0.4,0.5); shape.lineTo(0.3,1.05);
+  shape.lineTo(0.12,1.5); shape.lineTo(-0.06,1.62); shape.lineTo(-0.2,1.35);
+  shape.lineTo(-0.16,0.75); shape.lineTo(-0.04,0.35); shape.lineTo(-0.2,0); shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth:0.5, bevelEnabled:false });
+  for(const s of [-1,1]){
+    const m = new THREE.Mesh(geo, MATS.chiwen());
+    m.position.set(s*(RIDGE_HALF+0.55), RIDGE_Y+0.5, -0.25);
+    m.castShadow = true;
+    roofGroup.add(m);
+    /* 吻座 */
+    roofGroup.add(box(0.7,0.4,0.7,MATS.chiwen(), s*(RIDGE_HALF+0.55), RIDGE_Y+0.2, 0));
+  }
+}
+/* 垂脊（戗脊）四条 + 博风板 */
+{
+  const R = MATS.ridge();
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const p1 = new THREE.Vector3(sx*RIDGE_HALF, RIDGE_Y+0.55, 0);
+    const p2 = new THREE.Vector3(sx*EAVE_HALF, EAVE_Y0+0.75, sz*EAVE_Z);
+    const len = p1.distanceTo(p2);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.17,len,8), R);
+    m.position.copy(p1).add(p2).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), p2.clone().sub(p1).normalize());
+    m.castShadow = true;
+    roofGroup.add(m);
+  }
+  /* 博风板（山面檐口，分段随檐口曲线） */
+  for(const sx of [-1,1]) for(let i=0;i<8;i++){
+    const z1 = -EAVE_Z + i*(2*EAVE_Z/8), z2 = -EAVE_Z + (i+1)*(2*EAVE_Z/8);
+    const y1 = EAVE_Y0 + Math.pow(Math.max(0,(Math.abs(z1)-9.2)/(EAVE_Z-9.2)),2.2)*0.5;
+    const y2 = EAVE_Y0 + Math.pow(Math.max(0,(Math.abs(z2)-9.2)/(EAVE_Z-9.2)),2.2)*0.5;
+    const len = Math.hypot(z2-z1, y2-y1);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.85,len), MATS.woodDark());
+    b.position.set(sx*(EAVE_HALF-0.28), (y1+y2)/2 - 0.25, (z1+z2)/2);
+    b.lookAt(sx*(EAVE_HALF-0.28), y2-0.25, z2);
+    b.castShadow = true;
+    roofGroup.add(b);
+  }
+}
+
+/* ================= 国际化 ================= */
+const I18N = {
+  zh:{ title:'佛光寺东大殿', subtitle:'单檐庑殿顶 · 面阔七间 · 进深四间',
+    desc:'唐大中十一年（857）遗构，中国现存最早木构殿堂之一。七铺作双杪双下昂斗拱，出檐深远，雄浑疏朗。',
+    badge:'木构图志 · TIMBER ATLAS', lblView:'视图', btnExplode:'爆炸拆解', btnAssemble:'合拢',
+    lblClip:'剖切', btnCutV:'纵向剖切', btnCutH:'横向剖切', btnCutY:'水平剖切',
+    lblBracket:'斗拱', btnBracket:'斗拱拆解', lblColor:'配色', cCurrent:'现状色', cPainted:'彩绘色', cWood:'原木色',
+    lblLang:'语言', dgTitle:'外檐柱头铺作 · 七铺作双杪双下昂', dgSub:'逐件拆解 · 步骤引导拼装',
+    btnPrev:'← 上一步', btnNext:'下一步 →', btnSpin:'旋转展示', btnExit:'退出',
+    lgRed:'木构件（柱·梁·斗拱）', lgRoof:'屋面瓦作', lgWall:'墙体', lgChi:'鸱吻 · 脊饰',
+    hint1:'拖拽', hint1u:'旋转', hint2:'滚轮', hint2u:'缩放', hint3:'右键', hint3u:'平移',
+    partNone:'点击「下一步 →」，自栌斗开始逐件拼装。',
+    spinOn:'停止旋转', steps:'步' },
+  en:{ title:'Foguang Temple East Hall', subtitle:'Single-eave Hip Roof · 7 Bays × 4 Bays',
+    desc:'Built in 857 (Tang Dynasty), one of the oldest surviving timber halls in China. 7-puzuo double-hua double-dang brackets with deep overhanging eaves.',
+    badge:'TIMBER ATLAS · 木构图志', lblView:'View', btnExplode:'Explode', btnAssemble:'Assemble',
+    lblClip:'Section', btnCutV:'Longitudinal', btnCutH:'Transverse', btnCutY:'Horizontal',
+    lblBracket:'Bracket', btnBracket:'Bracket Lab', lblColor:'Palette', cCurrent:'Current', cPainted:'Painted', cWood:'Raw Wood',
+    lblLang:'Language', dgTitle:'Eave Column Bracket · 7-Puzuo', dgSub:'Exploded parts · Guided assembly',
+    btnPrev:'← Prev', btnNext:'Next →', btnSpin:'Turntable', btnExit:'Exit',
+    lgRed:'Timber (columns·beams·brackets)', lgRoof:'Roof tiles', lgWall:'Walls', lgChi:'Chiwen · Ridge ornaments',
+    hint1:'Drag', hint1u:'orbit', hint2:'Wheel', hint2u:'Zoom', hint3:'Right', hint3u:'Pan',
+    partNone:'Press "Next →" to assemble, starting from the Ludou cap block.',
+    spinOn:'Stop', steps:'steps' }
+};
+let lang = 'zh';
+function applyLang(){
+  document.documentElement.lang = lang==='zh' ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.dataset.i18n;
+    if(I18N[lang][k]) el.textContent = I18N[lang][k];
+  });
+  updateDetailInfo();
+}
+
+/* ================= 配色切换 ================= */
+let palette = 'current';
+function applyPalette(name){
+  palette = name;
+  const P = PALETTES[name], reg = MATS._reg;
+  const setC = (arr,hex) => arr.forEach(m => { m.color.setHex(hex); m.map = null; });
+  setC(reg.roof,P.roof); setC(reg.tile,P.tile); setC(reg.ridge,P.ridge);
+  setC(reg.chiwen,P.chiwen); setC(reg.wall,P.wall); setC(reg.wallSide,P.wallSide);
+  setC(reg.platform,P.platform); setC(reg.door,P.door);
+  reg.wood.forEach(m => {
+    m.map  = (name==='painted') ? scrollTex : (name==='wood' ? grainTex : null);
+    m.color.setHex(P.wood); m.needsUpdate = true;
+  });
+  reg.woodDark.forEach(m => {
+    m.map  = (name==='painted') ? scrollTex : (name==='wood' ? grainTex : null);
+    m.color.setHex(P.woodDark); m.needsUpdate = true;
+  });
+  document.getElementById('cCurrent').classList.toggle('on', name==='current');
+  document.getElementById('cPainted').classList.toggle('on', name==='painted');
+  document.getElementById('cWood').classList.toggle('on', name==='wood');
+}
+
+/* ================= 爆炸拆解 ================= */
+let explodeTarget = 0;
+function setExplode(on){
+  explodeTarget = on ? 1 : 0;
+  document.getElementById('btnExplode').classList.toggle('on', on);
+  document.getElementById('btnAssemble').classList.toggle('on', !on);
+}
+
+/* ================= 剖切 ================= */
+const cutPlanes = {
+  v: new THREE.Plane(new THREE.Vector3(0,0,1),  0),   // 纵向：去前半，见内部梁架
+  h: new THREE.Plane(new THREE.Vector3(1,0,0),  0.5), // 横向：去左半，见山面斗拱穿插
+  y: new THREE.Plane(new THREE.Vector3(0,-1,0), 6.6)  // 水平：去上部，见平面柱网
+};
+const cutState = { v:false, h:false, y:false };
+function refreshClipping(){
+  renderer.clippingPlanes = Object.keys(cutState).filter(k=>cutState[k]).map(k=>cutPlanes[k]);
+}
+function toggleCut(key){
+  cutState[key] = !cutState[key];
+  const btn = { v:'btnCutV', h:'btnCutH', y:'btnCutY' }[key];
+  document.getElementById(btn).classList.toggle('on', cutState[key]);
+  refreshClipping();
+}
+
+/* ================= 斗拱拆解模式 ================= */
+const detail = { active:false, step:0, parts:[], spin:false, spinBase:0 };
+const partNameEl = document.getElementById('partName');
+const partEnEl = document.getElementById('partEn');
+const partDescEl = document.getElementById('partDesc');
+const stepBarEl = document.getElementById('stepBar');
+const dugongPanel = document.getElementById('dugong');
+
+function clonePartMaterials(){
+  /* 拆解示例铺作：每个构件克隆独立材质，便于逐件高亮 */
+  detailSet.userData.parts.forEach(p => {
+    p.node.traverse(o => { if(o.isMesh) o.material = o.material.clone(); });
+  });
+}
+function dimOthers(op){
+  const keep = new Set();
+  detailSet.traverse(o => { if(o.isMesh) keep.add(o.material); });
+  for(const g of [platformGroup, columnGroup, bracketGroup, beamGroup, roofGroup])
+    g.traverse(o => {
+      if(o.isMesh && !keep.has(o.material)){
+        o.material.transparent = op < 1; o.material.opacity = op;
+      }
+    });
+}
+function updateDetailInfo(){
+  const t = I18N[lang];
+  if(!detail.active){ partNameEl.textContent='—'; partEnEl.textContent=''; partDescEl.textContent=''; return; }
+  if(detail.step === 0){
+    partNameEl.textContent = t.btnBracket==='斗拱拆解' ? '待拆解 · 全部构件' : 'Exploded · All Parts';
+    partEnEl.textContent = detail.parts.length + ' parts';
+    partDescEl.textContent = t.partNone;
+  } else {
+    const p = detail.parts[detail.step-1];
+    partNameEl.textContent = (lang==='zh' ? p.zh : p.en);
+    partEnEl.textContent = (lang==='zh' ? p.en : p.zh);
+    partDescEl.textContent = p.desc;
+  }
+  stepBarEl.innerHTML = '';
+  detail.parts.forEach((_,i) => {
+    const s = document.createElement('i');
+    if(i < detail.step-1) s.className = 'done';
+    else if(i === detail.step-1) s.className = 'cur';
+    stepBarEl.appendChild(s);
+  });
+}
+function setStep(n){
+  detail.step = Math.max(0, Math.min(detail.parts.length, n));
+  updateDetailInfo();
+}
+function enterDetail(){
+  if(detail.active) return;
+  setExplode(false);
+  detail.active = true;
+  clonePartMaterials();
+  /* 收集构件 */
+  detail.parts = detailSet.userData.parts.map(p => ({
+    node:p.node, zh:p.zh, en:p.en, desc:p.desc,
+    home:p.node.userData.home.clone(), off:p.node.userData.off.clone(),
+    cur:p.node.userData.home.clone().add(p.node.userData.off) // 初始=全拆
+  }));
+  detail.spinBase = detailSet.rotation.y;
+  dimOthers(0.12);
+  setStep(0);
+  dugongPanel.style.display = 'block';
+  document.getElementById('btnBracket').classList.add('on');
+  /* 相机对准 */
+  const wp = new THREE.Vector3();
+  detailSet.getWorldPosition(wp);
+  camGoal.copy(wp).add(new THREE.Vector3(4.6, 2.6, -6.2));
+  lookGoal.copy(wp).add(new THREE.Vector3(0, 1.6, 0.6));
+}
+function exitDetail(){
+  if(!detail.active) return;
+  detail.active = false;
+  dimOthers(1);
+  detail.step = 0;
+  updateDetailInfo();
+  dugongPanel.style.display = 'none';
+  document.getElementById('btnBracket').classList.remove('on');
+  camGoal.set(30,20,34); lookGoal.set(0,5.5,0);
+}
+let camGoal = new THREE.Vector3(30,20,34), lookGoal = new THREE.Vector3(0,5.5,0);
+
+/* ================= 拾取 ================= */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let downX = 0, downY = 0;
+renderer.domElement.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if(!detail.active) return;
+  if(Math.hypot(e.clientX-downX, e.clientY-downY) > 5) return; // 拖拽不算点击
+  mouse.set((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(detailSet, true);
+  if(hits.length){
+    let n = hits[0].object;
+    while(n && n.parent !== detailSet) n = n.parent;
+    if(n){
+      const i = detail.parts.findIndex(p => p.node === n);
+      if(i >= 0){ setStep(i+1); }
+    }
+  }
+});
+
+/* ================= UI 绑定 ================= */
+document.getElementById('btnExplode').onclick = () => setExplode(true);
+document.getElementById('btnAssemble').onclick = () => setExplode(false);
+document.getElementById('btnCutV').onclick = () => toggleCut('v');
+document.getElementById('btnCutH').onclick = () => toggleCut('h');
+document.getElementById('btnCutY').onclick = () => toggleCut('y');
+document.getElementById('btnBracket').onclick = () => detail.active ? exitDetail() : enterDetail();
+document.getElementById('btnPrev').onclick = () => setStep(detail.step-1);
+document.getElementById('btnNext').onclick = () => setStep(detail.step+1);
+document.getElementById('btnSpin').onclick = function(){
+  detail.spin = !detail.spin;
+  this.classList.toggle('on', detail.spin);
+  this.textContent = detail.spin ? I18N[lang].spinOn : (lang==='zh'?'旋转展示':'Turntable');
+};
+document.getElementById('btnExit').onclick = () => exitDetail();
+document.getElementById('cCurrent').onclick = () => applyPalette('current');
+document.getElementById('cPainted').onclick = () => applyPalette('painted');
+document.getElementById('cWood').onclick = () => applyPalette('wood');
+document.getElementById('btnLang').onclick = () => { lang = lang==='zh' ? 'en' : 'zh'; applyLang(); };
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+let firstFrame = true;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  controls.update();
+  /* 层级爆炸位移 */
+  for(const l of layerGroups){
+    const target = explodeTarget * l.dy;
+    l.g.position.y += (target - l.g.position.y) * Math.min(1, dt*4.5);
+  }
+  /* 斗拱拆解：构件位移动画 + 当前件高亮脉冲 */
+  if(detail.active){
+    detail.parts.forEach((p,i) => {
+      const target = (i < detail.step) ? p.home : p.home.clone().add(p.off);
+      p.target = target;
+      p.node.position.lerp(target, Math.min(1, dt*5));
+      const isCur = (i === detail.step - 1);
+      p.node.traverse(o => {
+        if(o.isMesh){
+          if(isCur){
+            const k = 0.45 + 0.35*Math.sin(t*5);
+            o.material.emissive.setRGB(k*0.9, k*0.28, k*0.12);
+          } else o.material.emissive.setRGB(0,0,0);
+        }
+      });
+    });
+    if(detail.spin) detailSet.rotation.y += dt*0.6;
+  } else if(detail.parts.length){
+    /* 退出动画：所有构件回 home，到位后清理 */
+    let settled = true;
+    detail.parts.forEach(p => {
+      p.node.position.lerp(p.home, Math.min(1, dt*5));
+      p.node.traverse(o => { if(o.isMesh) o.material.emissive.setRGB(0,0,0); });
+      if(p.node.position.distanceTo(p.home) > 0.02) settled = false;
+    });
+    if(settled) detail.parts = [];
+  }
+  /* 相机目标补间 */
+  if(camGoal){
+    camera.position.lerp(camGoal, Math.min(1, dt*3));
+    controls.target.lerp(lookGoal, Math.min(1, dt*3));
+    if(camera.position.distanceTo(camGoal) < 0.05) camGoal._done = true;
+  }
+  renderer.render(scene, camera);
+  if(firstFrame){
+    firstFrame = false;
+    const ld = document.getElementById('loading');
+    ld.style.opacity = '0';
+    setTimeout(() => ld.remove(), 700);
+  }
+}
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* 启动 */
+applyLang();
+applyPalette('current');
+refreshClipping();
+animate();
+/* 相机定位 hash：#cam=x,y,z&t=tx,ty,tz（便于分享视角/调试） */
+{
+  const m = location.hash.match(/cam=([-\d.,]+)&t=([-\d.,]+)/);
+  if(m){
+    const p = m[1].split(',').map(Number), q = m[2].split(',').map(Number);
+    if(p.length===3 && q.length===3 && p.every(isFinite) && q.every(isFinite)){
+      camGoal.set(p[0],p[1],p[2]); lookGoal.set(q[0],q[1],q[2]);
+      camera.position.copy(camGoal); controls.target.copy(lookGoal);
+    }
+  }
+}
+console.log('佛光寺东大殿 3D 场景已启动');
+</script>
+</body>
+</html>

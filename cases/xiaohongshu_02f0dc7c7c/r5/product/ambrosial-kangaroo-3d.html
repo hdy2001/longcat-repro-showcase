@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>安慕希吉祥物 · 安比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: linear-gradient(180deg, #bfe2f6 0%, #d8edf9 45%, #ecf7fd 100%);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  }
+  #scene-canvas { position: fixed; inset: 0; display: block; touch-action: none; }
+  #banner {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    background: #d62626;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: clamp(18px, 3.2vw, 30px);
+    letter-spacing: 3px;
+    white-space: nowrap;
+    padding: 13px 34px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(150, 20, 20, 0.28);
+    z-index: 10;
+    user-select: none;
+    pointer-events: none;
+  }
+  #hint {
+    position: fixed;
+    left: 18px;
+    top: 16px;
+    color: rgba(30, 60, 90, 0.55);
+    font-size: 13px;
+    letter-spacing: 2px;
+    z-index: 10;
+    user-select: none;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="scene-canvas"></canvas>
+<div id="hint">鼠标拖拽旋转 · 滚轮缩放</div>
+<div id="banner">你的胆子真是肥嘟嘟的</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ---------- renderer / scene / camera ---------- */
+const canvas = document.getElementById('scene-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.06;
+
+const scene = new THREE.Scene();
+
+// light-blue gradient background
+{
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0.0, '#b9dff5');
+  grad.addColorStop(0.45, '#d6ecf9');
+  grad.addColorStop(1.0, '#eef8fd');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+}
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(10.5, 7.6, 15.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 5.1, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 9;
+controls.maxDistance = 34;
+controls.minPolarAngle = 0.18;
+controls.maxPolarAngle = 1.52;
+
+/* ---------- soft natural lighting ---------- */
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const hemi = new THREE.HemisphereLight(0xd9ecff, 0x9a8c7a, 0.55);
+scene.add(hemi);
+
+const keyLight = new THREE.DirectionalLight(0xfff4e0, 1.8);
+keyLight.position.set(6, 11, 7);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 2;
+keyLight.shadow.camera.far = 40;
+keyLight.shadow.camera.left = -10;
+keyLight.shadow.camera.right = 10;
+keyLight.shadow.camera.top = 14;
+keyLight.shadow.camera.bottom = -4;
+keyLight.shadow.bias = -0.0004;
+keyLight.shadow.radius = 5;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xcfe4ff, 0.5);
+fillLight.position.set(-7, 5, -6);
+scene.add(fillLight);
+
+/* ---------- shared clay-like material helper ---------- */
+function clay(color, roughness = 0.58) {
+  const m = new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0.0,
+    envMapIntensity: 0.55,
+  });
+  return m;
+}
+
+const MAT = {
+  yellow:  clay(0xffc92e, 0.55),  // vivid kangaroo yellow
+  shirt:   clay(0x4f94dc, 0.62),  // blue shirt
+  shorts:  clay(0x35418f, 0.62),  // dark navy shorts
+  belt:    clay(0xf5bf3f, 0.5),   // yellow belt
+  collar:  clay(0xffffff, 0.5),   // white collar
+  nose:    clay(0x7a4522, 0.38),  // brown nose
+  iris:    clay(0x6b4423, 0.3),   // brown iris
+  eyeW:    clay(0xffffff, 0.32),  // white of eye
+  cap:     clay(0x1e6fb8, 0.42),  // bottle cap blue
+  bottle:  clay(0xfdfdf8, 0.35),  // bottle body
+};
+
+const character = new THREE.Group();
+scene.add(character);
+
+function addMesh(geo, mat, x = 0, y = 0, z = 0, parent = character) {
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  parent.add(mesh);
+  return mesh;
+}
+
+/* ---------- 大脑袋（约占全身一半） ---------- */
+const headGroup = new THREE.Group();
+character.add(headGroup);
+
+// 主头颅：宽圆蛋形
+const skull = addMesh(new THREE.SphereGeometry(2.1, 64, 48), MAT.yellow, 0, 6.45, -0.15, headGroup);
+skull.scale.set(1.1, 1.04, 0.98);
+
+// 前突的吻部
+const snout = addMesh(new THREE.SphereGeometry(1.35, 48, 36), MAT.yellow, 0, 5.62, 1.28, headGroup);
+snout.scale.set(1.12, 0.72, 0.95);
+
+// 下巴（让头形收成圆润的尖）
+const chin = addMesh(new THREE.SphereGeometry(1.05, 40, 30), MAT.yellow, 0, 5.02, 0.72, headGroup);
+chin.scale.set(0.92, 0.68, 0.88);
+
+/* ---------- 两只粗壮圆润的长条袋鼠耳（竖直微外张） ---------- */
+function makeEar(side) { // side: -1 左 / +1 右
+  const ear = new THREE.Group();
+  const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.52, 3.1, 12, 32), MAT.yellow);
+  capsule.castShadow = true;
+  ear.add(capsule);
+  ear.scale.set(1, 1, 0.78); // 前后略扁
+  ear.position.set(side * 1.56, 9.15, -0.28);
+  ear.rotation.z = side * -0.2;    // 顶端向外张
+  ear.rotation.y = side * 0.18;    // 略微旋开
+  ear.rotation.x = -0.05;          // 微微后仰
+  headGroup.add(ear);
+  return ear;
+}
+makeEar(-1);
+makeEar(1);
+
+/* ---------- 眼睛：白色眼白 + 棕色瞳孔小圆眼 ---------- */
+function makeEye(side) {
+  const eye = new THREE.Group();
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.46, 32, 24), MAT.eyeW);
+  white.scale.set(1, 1.12, 0.55);
+  white.castShadow = true;
+  eye.add(white);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.235, 24, 18), MAT.iris);
+  iris.position.set(0, 0, 0.30);
+  iris.scale.set(1, 1, 0.5);
+  eye.add(iris);
+  const sparkle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.075, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  sparkle.position.set(-0.07, 0.09, 0.44);
+  eye.add(sparkle);
+  eye.position.set(side * 0.82, 6.98, 1.66);
+  eye.rotation.y = side * 0.1;
+  headGroup.add(eye);
+}
+makeEye(-1);
+makeEye(1);
+
+/* ---------- 棕色椭圆大鼻子 ---------- */
+const nose = addMesh(new THREE.SphereGeometry(0.62, 36, 26), MAT.nose, 0, 5.78, 2.2, headGroup);
+nose.scale.set(1.18, 0.72, 0.8);
+
+/* ---------- 脖子 ---------- */
+addMesh(new THREE.CylinderGeometry(0.72, 0.82, 1.2, 32), MAT.yellow, 0, 5.15, 0.05);
+
+/* ---------- 胖乎乎的身体核心 ---------- */
+const bellyCore = addMesh(new THREE.SphereGeometry(1.9, 56, 40), MAT.yellow, 0, 3.4, 0.05);
+bellyCore.scale.set(1.0, 1.06, 0.92);
+
+/* ---------- 手臂 + 手（伸向胸前的瓶子） ---------- */
+function makeArm(side) {
+  const shoulder = new THREE.Vector3(side * 1.5, 4.62, 0.42);
+  // 左手托瓶左侧，右手越过胸前扶瓶右侧
+  const wrist = side < 0
+    ? new THREE.Vector3(-1.62, 3.55, 2.0)
+    : new THREE.Vector3(-0.4, 3.62, 2.02);
+  const dir = wrist.clone().sub(shoulder);
+  const len = dir.length();
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, len, 10, 24), MAT.yellow);
+  arm.castShadow = true;
+  arm.position.copy(shoulder).add(wrist).multiplyScalar(0.5);
+  arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  character.add(arm);
+  // 圆手
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.58, 28, 20), MAT.yellow);
+  hand.castShadow = true;
+  hand.position.copy(wrist).add(new THREE.Vector3(side * 0.1, -0.16, 0.26));
+  hand.scale.set(1, 0.95, 1.05);
+  character.add(hand);
+}
+makeArm(-1);
+makeArm(1);
+
+/* ---------- 坐姿双腿向前张开 ---------- */
+function makeLeg(side) {
+  const hip = new THREE.Vector3(side * 0.95, 2.55, 0.5);
+  const ankle = new THREE.Vector3(side * 1.62, 0.95, 1.7);
+  const dir = ankle.clone().sub(hip);
+  const len = dir.length();
+  const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.72, len, 10, 28), MAT.yellow);
+  leg.castShadow = true;
+  leg.position.copy(hip).add(ankle).multiplyScalar(0.5);
+  leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  character.add(leg);
+  // 大脚丫（椭圆，朝前）
+  const foot = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 24), MAT.yellow);
+  foot.castShadow = true;
+  foot.position.set(side * 1.95, 0.5, 2.2);
+  foot.scale.set(1.0, 0.6, 1.55);
+  foot.rotation.y = side * -0.22; // 八字符外撇
+  character.add(foot);
+}
+makeLeg(-1);
+makeLeg(1);
+
+/* ---------- 身后黄色尾巴（渐细分节球，黏土融合质感） ---------- */
+{
+  const tailPts = [
+    new THREE.Vector3(0, 2.35, -1.55),
+    new THREE.Vector3(0, 1.9, -2.2),
+    new THREE.Vector3(0, 1.35, -2.8),
+    new THREE.Vector3(0, 0.88, -3.35),
+    new THREE.Vector3(0, 0.78, -3.85),
+    new THREE.Vector3(0, 1.02, -4.28),
+    new THREE.Vector3(0, 1.48, -4.52),
+    new THREE.Vector3(0, 1.92, -4.6),
+  ];
+  const tailR = [0.78, 0.74, 0.66, 0.55, 0.44, 0.34, 0.24, 0.14];
+  tailPts.forEach((p, i) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(tailR[i], 24, 18), MAT.yellow);
+    s.castShadow = true;
+    s.position.copy(p);
+    character.add(s);
+  });
+}
+
+/* ---------- 蓝色上衣 ---------- */
+{
+  const pts = [
+    new THREE.Vector2(1.98, 2.78),
+    new THREE.Vector2(1.97, 3.2),
+    new THREE.Vector2(1.9, 4.0),
+    new THREE.Vector2(1.74, 4.62),
+    new THREE.Vector2(1.34, 4.98),
+    new THREE.Vector2(0.82, 5.12),
+    new THREE.Vector2(0.0, 5.14),
+  ];
+  const shirt = new THREE.Mesh(new THREE.LatheGeometry(pts, 56), MAT.shirt);
+  shirt.castShadow = true;
+  shirt.position.z = 0.08;
+  character.add(shirt);
+}
+
+/* ---------- 短袖袖口 ---------- */
+function makeSleeve(side) {
+  const shoulder = new THREE.Vector3(side * 1.52, 4.6, 0.4);
+  const elbow = new THREE.Vector3(side * 1.34, 4.18, 0.78);
+  const dir = elbow.clone().sub(shoulder);
+  const len = dir.length();
+  const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, len, 10, 24), MAT.shirt);
+  sleeve.castShadow = true;
+  sleeve.position.copy(shoulder).add(elbow).multiplyScalar(0.5);
+  sleeve.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  character.add(sleeve);
+}
+makeSleeve(-1);
+makeSleeve(1);
+
+/* ---------- 白色翻领 ---------- */
+{
+  const collarRing = new THREE.Mesh(new THREE.TorusGeometry(0.86, 0.3, 16, 40), MAT.collar);
+  collarRing.rotation.x = Math.PI / 2;
+  collarRing.scale.set(1.05, 0.92, 1);
+  collarRing.position.set(0, 5.14, 0.08);
+  collarRing.castShadow = true;
+  character.add(collarRing);
+
+  // 两片前领
+  function collarFlap(side) {
+    const flap = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), MAT.collar);
+    flap.scale.set(0.62, 0.3, 0.16);
+    flap.position.set(side * 0.44, 5.02, 0.78);
+    flap.rotation.set(-0.25, side * 0.35, side * 0.28);
+    flap.castShadow = true;
+    character.add(flap);
+  }
+  collarFlap(-1);
+  collarFlap(1);
+}
+
+/* ---------- 胸前「安慕希」 ---------- */
+{
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 512, 256);
+  g.fillStyle = '#ffffff';
+  g.font = '800 118px "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('安慕希', 256, 138);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 0.75),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false })
+  );
+  label.position.set(0.6, 4.5, 1.87);
+  label.rotation.x = -0.1;
+  character.add(label);
+}
+
+/* ---------- 黄色腰带 ---------- */
+{
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(1.92, 0.3, 16, 48), MAT.belt);
+  belt.rotation.x = Math.PI / 2;
+  belt.scale.set(1.05, 0.94, 1);
+  belt.position.set(0, 2.82, 0.08);
+  belt.castShadow = true;
+  character.add(belt);
+}
+
+/* ---------- 深蓝色短裤 ---------- */
+{
+  const pts = [
+    new THREE.Vector2(2.02, 1.5),
+    new THREE.Vector2(2.04, 1.9),
+    new THREE.Vector2(2.0, 2.4),
+    new THREE.Vector2(1.94, 2.8),
+    new THREE.Vector2(0.0, 2.86),
+  ];
+  const shorts = new THREE.Mesh(new THREE.LatheGeometry(pts, 56), MAT.shorts);
+  shorts.castShadow = true;
+  shorts.position.z = 0.06;
+  character.add(shorts);
+}
+
+/* ---------- 安慕希整颗蓝莓酸奶瓶（举到胸前偏脸侧） ---------- */
+function drawBlueberry(g, x, y, r) {
+  g.save();
+  g.translate(x, y);
+  // 果体
+  const grad = g.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+  grad.addColorStop(0, '#4a6fc4');
+  grad.addColorStop(0.6, '#2a4d9b');
+  grad.addColorStop(1, '#1d3468');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(0, 0, r, 0, Math.PI * 2);
+  g.fill();
+  // 果蒂星
+  g.fillStyle = '#16294f';
+  g.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+    const a2 = a + Math.PI / 5;
+    g.lineTo(Math.cos(a) * r * 0.34, Math.sin(a) * r * 0.34);
+    g.lineTo(Math.cos(a2) * r * 0.16, Math.sin(a2) * r * 0.16);
+  }
+  g.closePath();
+  g.fill();
+  // 高光
+  g.fillStyle = 'rgba(255,255,255,0.6)';
+  g.beginPath();
+  g.arc(-r * 0.3, -r * 0.32, r * 0.1, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
+function makeBottleLabel() {
+  const W = 512, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+
+  // 蓝白瓶身渐变
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#ffffff');
+  bg.addColorStop(0.45, '#f4f9ff');
+  bg.addColorStop(1, '#d8e9fb');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, W, H);
+
+  // 顶部蓝色装饰带
+  g.fillStyle = '#1c5fa8';
+  g.fillRect(0, 0, W, 26);
+
+  // 在接缝处（canvas x=0，对应瓶身正前方）双画，使文字绕到正面连续
+  const dual = (fn) => {
+    g.save(); g.translate(0, 0); fn(); g.restore();
+    g.save(); g.translate(W, 0); fn(); g.restore();
+  };
+
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+
+  // 安慕希（以接缝为中心双画，绕到正面连续）
+  dual(() => {
+    g.fillStyle = '#1c5fa8';
+    g.font = '700 60px "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+    g.fillText('安慕希', 0, 106);
+  });
+
+  // 整颗蓝莓（主标题）
+  dual(() => {
+    g.fillStyle = '#1c5fa8';
+    g.font = '800 62px "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+    g.fillText('整颗蓝莓', 0, 232);
+  });
+
+  // 小字
+  dual(() => {
+    g.fillStyle = '#7d9cc4';
+    g.font = '400 26px "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+    g.fillText('风味发酵乳', 0, 306);
+  });
+
+  // 蓝莓图案
+  dual(() => {
+    drawBlueberry(g, 0, 430, 60);
+    drawBlueberry(g, -150, 408, 44);
+    drawBlueberry(g, 150, 408, 44);
+  });
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+const bottle = new THREE.Group();
+{
+  // 瓶身
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.74, 1.9, 48), MAT.bottle);
+  body.position.y = 0.95;
+  body.castShadow = true;
+  bottle.add(body);
+
+  // 瓶身标签（正面朝前）
+  const labelTex = makeBottleLabel();
+  const label = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.715, 0.745, 1.7, 48, 1, true),
+    new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.35, metalness: 0, envMapIntensity: 0.5, transparent: true })
+  );
+  label.position.y = 0.95;
+  bottle.add(label);
+
+  // 肩部
+  const shoulderPts = [
+    new THREE.Vector2(0.7, 0),
+    new THREE.Vector2(0.64, 0.2),
+    new THREE.Vector2(0.46, 0.34),
+    new THREE.Vector2(0.36, 0.42),
+    new THREE.Vector2(0.34, 0.46),
+  ];
+  const shoulder = new THREE.Mesh(new THREE.LatheGeometry(shoulderPts, 40), MAT.bottle);
+  shoulder.position.y = 1.9;
+  shoulder.castShadow = true;
+  bottle.add(shoulder);
+
+  // 瓶口环
+  const neckRing = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.1, 32), MAT.bottle);
+  neckRing.position.y = 2.36;
+  bottle.add(neckRing);
+
+  // 蓝色瓶盖（带防滑纹）
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.42, 32), MAT.cap);
+  cap.position.y = 2.58;
+  cap.castShadow = true;
+  bottle.add(cap);
+  [2.44, 2.58, 2.72].forEach((y) => {
+    const ridge = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.028, 10, 36), MAT.cap);
+    ridge.rotation.x = Math.PI / 2;
+    ridge.position.y = y;
+    bottle.add(ridge);
+  });
+  const capTop = new THREE.Mesh(new THREE.SphereGeometry(0.46, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), MAT.cap);
+  capTop.position.y = 2.79;
+  capTop.scale.y = 0.35;
+  bottle.add(capTop);
+
+  bottle.position.set(-1.25, 3.35, 2.15);
+  bottle.rotation.z = 0.1;   // 顶部倾向脸侧
+  bottle.rotation.x = -0.03;
+  character.add(bottle);
+}
+
+/* ---------- 地面（径向渐隐融入背景，承接柔和阴影） ---------- */
+{
+  // 径向 alpha 渐变：中心实色、边缘透明，消除圆盘边线
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(256, 256, 60, 256, 256, 256);
+  grad.addColorStop(0, 'rgb(255,255,255)'); // alphaMap 读取绿色通道，用黑白渐变
+  grad.addColorStop(0.7, 'rgb(110,110,110)');
+  grad.addColorStop(1, 'rgb(0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 512);
+  const alphaTex = new THREE.CanvasTexture(c);
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(34, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0xe9f4fb,
+      roughness: 0.95,
+      metalness: 0,
+      envMapIntensity: 0.4,
+      alphaMap: alphaTex,
+      transparent: true,
+    })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // 远处雾化融入背景渐变
+  scene.fog = new THREE.Fog(0xe4f1fa, 34, 78);
+}
+
+/* ---------- resize & 渲染循环 ---------- */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

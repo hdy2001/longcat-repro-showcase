@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>藻井之舞 · The Dance of the Caisson</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;}
+  #c.drag{cursor:grabbing;}
+
+  /* 暗角：结尾时加深，突出文字 */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:3;
+    background:radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%);
+    opacity:.55;transition:opacity 4s ease;}
+  #vignette.strong{opacity:1;}
+
+  .goldtext{background:linear-gradient(18deg,#f9e7b2 0%,#eec968 42%,#c08c2f 78%,#8f6420 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  #title{position:fixed;top:4.5%;left:0;right:0;text-align:center;z-index:5;pointer-events:none;
+    animation:titleFade 9s ease forwards;}
+  #title h1{margin:0;font-size:clamp(26px,4.2vw,52px);font-weight:600;letter-spacing:.42em;text-indent:.42em;}
+  #title p{margin:.9em 0 0;font-size:clamp(10px,1.1vw,14px);letter-spacing:.58em;text-indent:.58em;
+    color:#a9884e;}
+  @keyframes titleFade{0%{opacity:0}12%{opacity:1}72%{opacity:1}100%{opacity:0;visibility:hidden}}
+
+  #hint{position:fixed;left:3.2%;bottom:4%;z-index:5;pointer-events:none;
+    color:#8d744a;font-size:12px;letter-spacing:.28em;
+    animation:hintFade 12s ease forwards;}
+  @keyframes hintFade{0%{opacity:0}15%{opacity:.9}75%{opacity:.9}100%{opacity:0;visibility:hidden}}
+
+  #forms{position:fixed;right:3%;top:50%;transform:translateY(-50%);z-index:6;display:flex;
+    flex-direction:column;gap:14px;}
+  #forms button{
+    appearance:none;background:rgba(8,6,4,.55);border:1px solid rgba(214,178,94,.42);
+    color:#d9bd7d;font-family:inherit;font-size:15px;letter-spacing:.32em;text-indent:.32em;
+    padding:11px 20px;cursor:pointer;backdrop-filter:blur(4px);
+    transition:all .35s ease;min-width:148px;text-align:center;}
+  #forms button i{display:block;font-style:normal;font-size:10px;letter-spacing:.2em;
+    margin-top:4px;color:#8d744a;}
+  #forms button:hover{border-color:rgba(240,205,120,.9);color:#f4dd9e;
+    box-shadow:0 0 18px rgba(220,180,80,.18);}
+  #forms button.on{background:linear-gradient(180deg,rgba(120,86,28,.55),rgba(60,40,10,.55));
+    border-color:#e8c86a;color:#ffe9ad;box-shadow:0 0 22px rgba(230,190,90,.28);}
+  #forms button:disabled{opacity:.45;cursor:default;}
+
+  #ending{position:fixed;left:0;right:0;top:44%;text-align:center;z-index:5;pointer-events:none;
+    opacity:0;transition:opacity 4.5s ease;}
+  #ending.show{opacity:1;}
+  #ending h2{margin:0;font-size:clamp(24px,3.4vw,44px);font-weight:600;letter-spacing:.3em;text-indent:.3em;
+    filter:drop-shadow(0 0 14px rgba(230,190,90,.35));}
+  #ending p{margin:1.6em 0 0;color:#b3925a;font-size:clamp(11px,1.15vw,15px);
+    letter-spacing:.34em;line-height:2;}
+
+  #fallback{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:#000;color:#c8a869;text-align:center;padding:2em;line-height:2;letter-spacing:.1em;}
+  [hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette"></div>
+
+<div id="title">
+  <h1 class="goldtext">藻井之舞</h1>
+  <p>THE DANCE OF THE CAISSON CEILING</p>
+</div>
+
+<div id="hint">拖 拽 环 视 · 滚 轮 缩 放</div>
+
+<div id="forms">
+  <button data-s="circle" class="on">圆形穹顶</button>
+  <button data-s="square">方形井格</button>
+  <button data-s="hex">六角 · 八角<i id="sub">六边形</i></button>
+</div>
+
+<div id="ending">
+  <h2 class="goldtext">形制坍缩为序，万象重生为诗。</h2>
+  <p>FORM COLLAPSES INTO ORDER,<br>ALL PHENOMENA ARE REBORN AS POETRY.</p>
+</div>
+
+<div id="fallback" hidden>
+  <p>3D 场景未能启动。<br>请通过本地 HTTP 服务访问本页面（例如：python3 -m http.server），<br>并确认 vendor/three.module.js 存在。</p>
+</div>
+
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ================================================================
+   藻井之舞 —— 中国传统藻井 3D 交互
+   结构：外层檐口 → 斗拱层 → 放射梁架 → 中心金龙
+   三种形制由极径函数 Out(θ) 统一驱动：圆形 / 方形 / 六角·八角
+   ================================================================ */
+
+const canvas = document.getElementById('c');
+const fallbackEl = document.getElementById('fallback');
+window.__booted = false;
+setTimeout(() => { if (!window.__booted) fallbackEl.hidden = false; }, 5000);
+
+/* ---------------- 渲染器 / 场景 / 相机 ---------------- */
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias: false, alpha: false, powerPreference: 'high-performance'
+});
+const isGL2 = renderer.capabilities.isWebGL2;
+const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
+renderer.setPixelRatio(pixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.NoToneMapping;          // 色调映射在合成通道完成
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 80);
+
+/* 灯光：环境冷色 + 下方暖金主光 + 井心金龙辉光 */
+scene.add(new THREE.AmbientLight(0x2a3350, 0.85));
+const keyLight = new THREE.PointLight(0xffd9a0, 90, 40, 2);
+keyLight.position.set(0, -2.5, 3.5);
+scene.add(keyLight);
+const rimLight = new THREE.PointLight(0x6f86ff, 26, 30, 2);
+rimLight.position.set(-6, 5, -5);
+scene.add(rimLight);
+const coreLight = new THREE.PointLight(0xffc860, 55, 16, 2);
+coreLight.position.set(0, 2.6, 0);
+scene.add(coreLight);
+
+/* ---------------- 自写轨道控制（拖拽环绕 + 缩放） ---------------- */
+class SimpleOrbit {
+  constructor(cam, dom, target) {
+    this.cam = cam; this.dom = dom;
+    this.target = target.clone();
+    this.dist = 7.5; this.pol = 2.35; this.az = 0.06;      // 初始：藻井正下方仰视
+    this.tDist = this.dist; this.tPol = this.pol; this.tAz = this.az;
+    this.minPol = 0.75; this.maxPol = 2.78; this.minDist = 4.2; this.maxDist = 15;
+    this.dragging = false; this.lastX = 0; this.lastY = 0;
+    this.idleTime = 10; this.autoBlend = 1;                  // 初始即缓慢环绕
+    this.pointers = new Map(); this.pinchD = 0;
+    dom.addEventListener('pointerdown', e => this.onDown(e));
+    window.addEventListener('pointermove', e => this.onMove(e));
+    window.addEventListener('pointerup', e => this.onUp(e));
+    window.addEventListener('pointercancel', e => this.onUp(e));
+    dom.addEventListener('wheel', e => {
+      e.preventDefault();
+      this.tDist = THREE.MathUtils.clamp(this.tDist * (1 + Math.sign(e.deltaY) * 0.09),
+        this.minDist, this.maxDist);
+      this.idleTime = 0;
+    }, { passive: false });
+  }
+  onDown(e) {
+    this.dom.classList.add('drag');
+    this.pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (this.pointers.size === 1) { this.dragging = true; this.lastX = e.clientX; this.lastY = e.clientY; }
+    if (this.pointers.size === 2) {
+      const p = [...this.pointers.values()];
+      this.pinchD = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
+    }
+    this.idleTime = 0;
+  }
+  onMove(e) {
+    if (!this.pointers.has(e.pointerId)) return;
+    this.pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    this.idleTime = 0;
+    if (this.pointers.size === 2) {
+      const p = [...this.pointers.values()];
+      const d = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
+      if (this.pinchD > 0) this.tDist = THREE.MathUtils.clamp(this.tDist * this.pinchD / d,
+        this.minDist, this.maxDist);
+      this.pinchD = d;
+      return;
+    }
+    if (!this.dragging) return;
+    const dx = e.clientX - this.lastX, dy = e.clientY - this.lastY;
+    this.lastX = e.clientX; this.lastY = e.clientY;
+    this.tAz -= dx * 0.0052;
+    this.tPol = THREE.MathUtils.clamp(this.tPol - dy * 0.0052, this.minPol, this.maxPol);
+  }
+  onUp(e) {
+    this.pointers.delete(e.pointerId);
+    if (this.pointers.size === 0) { this.dragging = false; this.dom.classList.remove('drag'); }
+    if (this.pointers.size < 2) this.pinchD = 0;
+  }
+  update(dt) {
+    this.idleTime += dt;
+    const wantAuto = this.idleTime > 4 ? 1 : 0;             // 静置 4 秒后缓慢自动环绕
+    this.autoBlend += (wantAuto - this.autoBlend) * Math.min(1, dt * 1.5);
+    this.tAz += 0.05 * this.autoBlend * dt;
+    const k = Math.min(1, dt * 7.5);
+    this.az += (this.tAz - this.az) * k;
+    this.pol += (this.tPol - this.pol) * k;
+    this.dist += (this.tDist - this.dist) * k;
+    const sp = Math.sin(this.pol);
+    this.cam.position.set(
+      this.target.x + this.dist * sp * Math.sin(this.az),
+      this.target.y + this.dist * Math.cos(this.pol),
+      this.target.z + this.dist * sp * Math.cos(this.az)
+    );
+    this.cam.lookAt(this.target);
+  }
+}
+const TARGET0 = new THREE.Vector3(0, 1.2, 0);
+const orbit = new SimpleOrbit(camera, canvas, TARGET0);
+
+/* ---------------- 形制（极径函数） ---------------- */
+const TAU = Math.PI * 2;
+function shapeRadius(theta, shape, R) {
+  const c = Math.cos(theta), s = Math.sin(theta);
+  if (shape === 'circle') return R;
+  if (shape === 'square') {
+    const p = 4.2;
+    return R / Math.pow(Math.pow(Math.abs(c), p) + Math.pow(Math.abs(s), p), 1 / p);
+  }
+  const k = shape === 'hex' ? Math.PI / 3 : Math.PI / 4;
+  const seg = shape === 'hex' ? 3 : 4;
+  let t = ((theta % k) + k) % k - k / 2;
+  return R * Math.cos(k / 2) / Math.cos(t);
+}
+const OUT_LUT = new Float32Array(512);
+function buildLUT(shape) {
+  for (let i = 0; i < 512; i++) OUT_LUT[i] = shapeRadius(i / 512 * TAU, shape, 1);
+}
+function outOf(theta) {
+  let i = ((theta % TAU) + TAU) % TAU / TAU * 512 | 0;
+  if (i >= 512) i = 511;
+  return OUT_LUT[i];
+}
+function sectorCount(shape) { return shape === 'circle' ? 72 : (shape === 'square' ? 72 : shape === 'hex' ? 72 : 72); }
+
+/* ---------------- 材质 ---------------- */
+function makeMats() {
+  const gold = new THREE.MeshStandardMaterial({
+    color: 0xc9a24a, metalness: 0.88, roughness: 0.34,
+    emissive: 0x9c7420, emissiveIntensity: 0.62, side: THREE.DoubleSide
+  });
+  const goldBright = new THREE.MeshStandardMaterial({
+    color: 0xe9c56a, metalness: 0.9, roughness: 0.26,
+    emissive: 0xffc95e, emissiveIntensity: 1.15, side: THREE.DoubleSide
+  });
+  const red = new THREE.MeshStandardMaterial({
+    color: 0xa5271b, metalness: 0.08, roughness: 0.62,
+    emissive: 0x57100a, emissiveIntensity: 0.55, side: THREE.DoubleSide
+  });
+  const blue = new THREE.MeshStandardMaterial({
+    color: 0x1d3a6e, metalness: 0.12, roughness: 0.58,
+    emissive: 0x0d1f45, emissiveIntensity: 0.6, side: THREE.DoubleSide
+  });
+  const darkWood = new THREE.MeshStandardMaterial({
+    color: 0x38200f, metalness: 0.05, roughness: 0.85,
+    emissive: 0x180b04, emissiveIntensity: 0.4, side: THREE.DoubleSide
+  });
+  const eye = new THREE.MeshStandardMaterial({
+    color: 0xfff3c8, emissive: 0xffe9a0, emissiveIntensity: 2.1, roughness: 0.3
+  });
+  return { gold, goldBright, red, blue, darkWood, eye };
+}
+
+/* 环形扇区几何（带拱起），法线朝下（观者在下方仰视） */
+class GeoBuilder {
+  constructor() { this.p = []; this.uv = []; this.idx = []; this.n = 0; }
+  vert(x, y, z, u, v) { this.p.push(x, y, z); this.uv.push(u, v); return this.n++; }
+  tri(a, b, c) { this.idx.push(a, b, c); }
+  build(mat) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    g.setIndex(this.idx);
+    g.computeVertexNormals();
+    return new THREE.Mesh(g, mat);
+  }
+}
+/* 在 rIn~rOut、a0~a1 之间生成带拱环形带；fn(θ)=外扩系数 */
+function bandInto(gb, rIn, rOut, yBase, arch, a0, a1, angSegs, rs) {
+  for (let i = 0; i < angSegs; i++) {
+    const f0 = i / angSegs, f1 = (i + 1) / angSegs;
+    const aa = a0 + (a1 - a0) * f0, ab = a0 + (a1 - a0) * f1;
+    const rows = [];
+    for (let j = 0; j <= rs; j++) {
+      const fr = j / rs;
+      const row = [];
+      const ths = [aa, ab];
+      for (let q = 0; q < 2; q++) {
+        const th = ths[q];
+        const o = outOf(th);
+        const r = (rIn + (rOut - rIn) * fr) * o;
+        const y = yBase + arch * Math.sin(Math.PI * fr);
+        row.push(gb.vert(r * Math.cos(th), y, r * Math.sin(th), f0 + (f1 - f0) * q, fr));
+      }
+      rows.push(row);
+    }
+    for (let j = 0; j < rs; j++) {
+      gb.tri(rows[j][0], rows[j + 1][0], rows[j][1]);
+      gb.tri(rows[j][1], rows[j + 1][0], rows[j + 1][1]);
+    }
+  }
+}
+
+/* ---------------- 藻井构建 ---------------- */
+const DOME_Y = 1.2;                       // 藻井中心离地高度
+const LAYERS = [                         // 七环层：由内向外、由上到下
+  { rin: 1.12, rout: 1.55, y: 0.88 },
+  { rin: 1.55, rout: 2.05, y: 0.64 },
+  { rin: 2.05, rout: 2.60, y: 0.42 },
+  { rin: 2.60, rout: 3.30, y: 0.16 },
+  { rin: 3.30, rout: 4.00, y: -0.10 },
+  { rin: 4.00, rout: 4.50, y: -0.38 },
+  { rin: 4.50, rout: 5.10, y: -0.72 },    // 外层檐口
+];
+
+function buildCaisson(shape) {
+  buildLUT(shape);
+  const mats = makeMats();
+  const group = new THREE.Group();
+  group.position.y = DOME_Y;
+  const disposables = [mats.gold, mats.goldBright, mats.red, mats.blue, mats.darkWood, mats.eye];
+  const dummy = new THREE.Object3D();
+
+  const nSec = sectorCount(shape);
+  const secStep = TAU / nSec;
+
+  /* --- 彩绘面板（深蓝 / 正红 交替，间以金色开光） --- */
+  const redGb = new GeoBuilder(), blueGb = new GeoBuilder(), goldGb = new GeoBuilder();
+  LAYERS.forEach((L, li) => {
+    for (let k = 0; k < nSec; k++) {
+      const a0 = k * secStep, a1 = a0 + secStep;
+      const gb = (k % 8 === 5) ? goldGb : (k % 2 === (li % 2)) ? redGb : blueGb;
+      bandInto(gb, L.rin + 0.02, L.rout - 0.02, L.y, 0.05, a0 + 0.004, a1 - 0.004, 1, 2);
+    }
+  });
+  group.add(redGb.build(mats.red), blueGb.build(mats.blue), goldGb.build(mats.goldBright));
+
+  /* --- 环形梁（各层交界处金色环梁） --- */
+  const ringGb = new GeoBuilder();
+  LAYERS.forEach(L => {
+    bandInto(ringGb, L.rin - 0.035, L.rin + 0.035, L.y + 0.045, 0, 0, TAU, nSec, 1);
+  });
+  // 外檐外沿加一道亮金环
+  bandInto(ringGb, 5.02, 5.16, -0.68, 0, 0, TAU, nSec, 1);
+  group.add(ringGb.build(mats.goldBright));
+
+  /* --- 放射梁架（内层 48 根 + 主层 72 根） --- */
+  function radialBeams(rIn, rOut, y, count, w, h, mat) {
+    const g = new THREE.BoxGeometry(w, h, 1);
+    const im = new THREE.InstancedMesh(g, mat, count);
+    for (let i = 0; i < count; i++) {
+      const th = i / count * TAU;
+      const o = outOf(th);
+      const r1 = rIn * o, r2 = rOut * o;
+      dummy.position.set((r1 + r2) / 2 * Math.cos(th), y, (r1 + r2) / 2 * Math.sin(th));
+      dummy.rotation.set(0, Math.PI / 2 - th, 0);
+      dummy.scale.set(1, 1, r2 - r1);
+      dummy.updateMatrix();
+      im.setMatrixAt(i, dummy.matrix);
+    }
+    disposables.push(g);
+    return im;
+  }
+  group.add(radialBeams(1.18, 2.58, 0.70, 48, 0.075, 0.12, mats.gold));
+  group.add(radialBeams(2.66, 3.26, 0.34, 72, 0.085, 0.13, mats.gold));
+
+  /* --- 斗拱层：凸出的立体块（坐斗 + 横拱 + 跳头） --- */
+  function dougongRing(rBase, count, mat) {
+    const g = new THREE.BoxGeometry(1, 1, 1);
+    const per = 7;
+    const im = new THREE.InstancedMesh(g, mat, count * per);
+    let idx = 0;
+    for (let i = 0; i < count; i++) {
+      const th = i / count * TAU;
+      const o = outOf(th);
+      const cb = Math.cos(th), sb = Math.sin(th);
+      const y0 = 0.02;
+      // 局部坐标：lx=径向，lz=切向；整体随 θ 转向
+      const put = (lx, ly, lz, sx, sy, sz) => {
+        const wx = rBase * o * cb + lx * cb - lz * sb;
+        const wz = rBase * o * sb + lx * sb + lz * cb;
+        dummy.position.set(wx, y0 + ly, wz);
+        dummy.rotation.set(0, -th - Math.PI / 2, 0);
+        dummy.scale.set(sx, sy, sz);
+        dummy.updateMatrix();
+        im.setMatrixAt(idx++, dummy.matrix);
+      };
+      put(0, 0, 0, 0.36, 0.17, 0.36);                    // 坐斗
+      put(0, 0.22, 0, 0.56, 0.11, 0.17);                 // 横拱（切向）
+      put(0, 0.22, 0, 0.17, 0.11, 0.62);                 // 华拱（径向跳出）
+      put(0, 0.22, 0.30, 0.15, 0.13, 0.15);              // 跳头（外挑）
+      put(0.20, 0.36, 0, 0.15, 0.12, 0.34);              // 小拱 ×2
+      put(-0.20, 0.36, 0, 0.15, 0.12, 0.34);
+      put(0, 0.47, 0, 0.44, 0.12, 0.44);                 // 盖斗
+    }
+    disposables.push(g);
+    return im;
+  }
+  const dgCount = shape === 'circle' ? 36 : shape === 'square' ? 40 : shape === 'hex' ? 36 : 40;
+  group.add(dougongRing(3.55, dgCount, mats.darkWood));
+  group.add(dougongRing(3.62, dgCount, mats.gold));
+
+  /* --- 外层檐口椽子（放射状外挑、微微下倾） --- */
+  {
+    const g = new THREE.BoxGeometry(0.09, 0.11, 1);
+    const im = new THREE.InstancedMesh(g, mats.gold, 72);
+    for (let i = 0; i < 72; i++) {
+      const th = i / 72 * TAU;
+      const o = outOf(th);
+      const r1 = 4.30 * o, r2 = 5.72 * o;
+      dummy.position.set((r1 + r2) / 2 * Math.cos(th), -0.60, (r1 + r2) / 2 * Math.sin(th));
+      dummy.rotation.set(0.17, Math.PI / 2 - th, 0, 'YXZ');
+      dummy.scale.set(1, 1, r2 - r1);
+      dummy.updateMatrix();
+      im.setMatrixAt(i, dummy.matrix);
+    }
+    disposables.push(g);
+    group.add(im);
+  }
+  /* 檐口下方收分（暗色阶梯环） */
+  {
+    const skirt = new GeoBuilder();
+    bandInto(skirt, 5.04, 5.17, -0.90, 0, 0, TAU, nSec, 1);
+    group.add(skirt.build(mats.darkWood));
+  }
+
+  /* --- 井心：圆盘 + 金龙 --- */
+  {
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 0.07, 72), mats.darkWood);
+    plate.position.y = 1.02;
+    const plateTrim = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.06, 12, 72), mats.goldBright);
+    plateTrim.rotation.x = Math.PI / 2;
+    plateTrim.position.y = 1.02;
+    group.add(plate, plateTrim);
+    disposables.push(plate.geometry, plateTrim.geometry);
+
+    // 井口鎏金乳钉
+    const sg = new THREE.SphereGeometry(0.035, 8, 8);
+    const studs = new THREE.InstancedMesh(sg, mats.goldBright, 24);
+    for (let i = 0; i < 24; i++) {
+      const th = i / 24 * TAU;
+      dummy.position.set(1.30 * Math.cos(th), 0.97, 1.30 * Math.sin(th));
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      studs.setMatrixAt(i, dummy.matrix);
+    }
+    disposables.push(sg);
+    group.add(studs);
+  }
+
+  buildDragon(group, mats, disposables);
+  return { group, disposables };
+}
+
+/* --- 中心金龙：悬于井盘之下，多弯曲管状几何拼合 --- */
+function buildDragon(group, mats, disposables) {
+  const gold = mats.goldBright;
+  const Y = 0.70;                          // 龙身盘绕平面（盘面 0.985 之下）
+  const add = mesh => { group.add(mesh); return mesh; };
+  const tube = (pts, r0, r1, mat) => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)), false, 'centripetal');
+    const g = new THREE.TubeGeometry(curve, 42, r0, 10, false);
+    disposables.push(g);
+    return add(new THREE.Mesh(g, mat));
+  };
+  // 龙身：自外向内盘绕 2.6 圈（螺旋，底面可见）
+  const spiral = [];
+  for (let i = 0; i <= 60; i++) {
+    const t = i / 60;
+    const a = t * Math.PI * 2 * 2.6 + 0.6;
+    const r = 0.84 - t * 0.54;
+    spiral.push([Math.cos(a) * r, Y + Math.sin(t * Math.PI) * 0.05, Math.sin(a) * r]);
+  }
+  tube(spiral, 0.080, 0.052, gold);
+  // 龙尾：外端下探收尾
+  const tail0 = spiral[0];
+  tube([tail0,
+        [tail0[0] * 1.06, Y - 0.10, tail0[2] * 1.06],
+        [tail0[0] * 1.14, Y - 0.24, tail0[2] * 1.14]], 0.052, 0.016, gold);
+  // 颈 + 头（内端引向井心，头朝下）
+  const headBase = spiral[spiral.length - 1];
+  tube([[headBase[0], headBase[1], headBase[2]],
+        [0.10, Y - 0.10, 0.06], [0.02, Y - 0.18, 0.12], [-0.04, Y - 0.22, 0.20]],
+       0.062, 0.052, gold);
+  const hy = Y - 0.22;
+  // 龙头（颅 + 吻 + 颌）
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 12), gold);
+  skull.position.set(-0.04, hy, 0.24); skull.scale.set(0.95, 0.85, 1.15);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.07, 0.17), gold);
+  snout.position.set(-0.04, hy - 0.045, 0.36);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.14), gold);
+  jaw.position.set(-0.04, hy - 0.10, 0.34);
+  disposables.push(skull.geometry, snout.geometry, jaw.geometry);
+  group.add(skull, snout, jaw);
+  // 龙角 ×2（向后上方翻卷）
+  [[-1], [1]].forEach(s => {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.20, 8), gold);
+    horn.position.set(-0.04 + s[0] * 0.055, hy + 0.10, 0.20);
+    horn.rotation.set(-0.7, 0, s[0] * 0.5);
+    disposables.push(horn.geometry);
+    group.add(horn);
+  });
+  // 龙目 ×2（高发光 → 泛光）
+  [[-1], [1]].forEach(s => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), mats.eye);
+    eye.position.set(-0.04 + s[0] * 0.095, hy + 0.02, 0.285);
+    disposables.push(eye.geometry);
+    group.add(eye);
+  });
+  // 龙须 ×2（向前下方卷出）
+  [[-1], [1]].forEach(s => {
+    tube([[-0.04 + s[0] * 0.06, hy - 0.06, 0.40],
+          [-0.04 + s[0] * 0.16, hy - 0.02, 0.50],
+          [-0.04 + s[0] * 0.26, hy + 0.10, 0.46]], 0.014, 0.006, gold);
+  });
+  // 龙爪 ×4（自龙身向四方下探，三趾）
+  for (let l = 0; l < 4; l++) {
+    const a = l * Math.PI / 2 + Math.PI / 4 + 0.5;
+    const c0 = Math.cos(a), s0 = Math.sin(a);
+    tube([[c0 * 0.60, Y + 0.02, s0 * 0.60],
+          [c0 * 0.80, Y - 0.10, s0 * 0.80],
+          [c0 * 0.94, Y - 0.16, s0 * 0.94]], 0.042, 0.030, gold);
+    for (let c = -1; c <= 1; c++) {
+      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.020, 0.11, 6), gold);
+      claw.position.set(c0 * 0.99 - s0 * c * 0.06, Y - 0.15, s0 * 0.99 + c0 * c * 0.06);
+      claw.rotation.set(Math.PI - 0.4, 0, 0);
+      disposables.push(claw.geometry);
+      group.add(claw);
+    }
+  }
+}
+
+/* ---------------- 人物剪影（轮廓边缘光） ---------------- */
+function buildPerson() {
+  const group = new THREE.Group();
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {},
+    vertexShader: `
+      varying vec3 vN; varying vec3 vW;
+      void main(){
+        vN = normalize(normalMatrix * normal);
+        vec4 w = modelMatrix * vec4(position,1.0);
+        vW = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: `
+      varying vec3 vN; varying vec3 vW;
+      void main(){
+        vec3 N = normalize(vN);
+        vec3 V = normalize(cameraPosition - vW);
+        float fr = pow(1.0 - abs(dot(N, V)), 4.0);
+        vec3 col = vec3(0.008, 0.006, 0.010);
+        col += fr * vec3(1.20, 0.78, 0.34) * 0.36;
+        col += clamp(N.y, 0.0, 1.0) * vec3(0.03, 0.022, 0.014);
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  const add = (geo, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.scale.set(sx, sy, sz);
+    m.rotation.x = rx; m.rotation.z = rz;
+    group.add(m);
+    return m;
+  };
+  add(new THREE.CapsuleGeometry(0.155, 0.52, 6, 14), 0, 1.13, 0, 1, 1, 0.78);          // 躯干
+  add(new THREE.SphereGeometry(0.20, 16, 12), 0, 1.42, 0, 1.35, 0.62, 0.85);        // 肩
+  add(new THREE.CylinderGeometry(0.05, 0.06, 0.10, 10), 0, 1.52, 0.01);             // 颈
+  add(new THREE.SphereGeometry(0.115, 16, 14), 0, 1.66, 0.015, 1, 1.12, 1.05);     // 头
+  add(new THREE.CapsuleGeometry(0.068, 0.72, 6, 10), -0.095, 0.52, 0);            // 腿
+  add(new THREE.CapsuleGeometry(0.068, 0.72, 6, 10), 0.095, 0.52, 0);
+  add(new THREE.CapsuleGeometry(0.048, 0.50, 6, 10), -0.235, 1.08, 0.01, 1, 1, 1, 0, 0.10);  // 臂
+  add(new THREE.CapsuleGeometry(0.048, 0.50, 6, 10), 0.235, 1.08, 0.01, 1, 1, 1, 0, -0.10);
+  group.position.set(0, -4.6, 3.2);                    // 居中，画面下方约 1/5
+  group.traverse(o => { o.frustumCulled = false; });
+  return group;
+}
+const person = buildPerson();
+scene.add(person);
+
+/* 脚下淡金辉光盘 */
+{
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  const gr = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,210,120,0.85)');
+  gr.addColorStop(0.4, 'rgba(220,160,70,0.25)');
+  gr.addColorStop(1, 'rgba(200,150,60,0)');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(cv);
+  const disc = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 2.6),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.18,
+      blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.set(0, -4.585, 3.2);
+  scene.add(disc);
+}
+
+/* ---------------- 金色粒子（24000，星尘循环） ---------------- */
+const P_COUNT = 24000;
+const T_CYCLE = 20;                            // 秒：聚合 → 坍缩 → 重生
+const BANDS = [                                // 与藻井层位对应
+  { r: 0.55, y: 0.72, w: 0.12 },
+  { r: 1.33, y: 0.95, w: 0.11 },
+  { r: 1.80, y: 0.76, w: 0.11 },
+  { r: 2.32, y: 0.53, w: 0.11 },
+  { r: 2.95, y: 0.30, w: 0.12 },
+  { r: 3.55, y: 0.08, w: 0.13 },
+  { r: 4.30, y: -0.22, w: 0.11 },
+  { r: 4.85, y: -0.58, w: 0.09 },
+  { r: 5.80, y: -0.95, w: 0.03 },
+];
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(P_COUNT * 3);
+const pSize = new Float32Array(P_COUNT);
+const pAlpha = new Float32Array(P_COUNT);
+const pCol = new Float32Array(P_COUNT * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSize, 1));
+pGeo.setAttribute('aAlpha', new THREE.BufferAttribute(pAlpha, 1));
+pGeo.setAttribute('aColor', new THREE.BufferAttribute(pCol, 3));
+
+const P = {                                    // 每粒子常量
+  band: new Uint8Array(P_COUNT),
+  th0: new Float32Array(P_COUNT),
+  drift: new Float32Array(P_COUNT),
+  spinDir: new Float32Array(P_COUNT),
+  rJit: new Float32Array(P_COUNT),
+  yJit: new Float32Array(P_COUNT),
+  cR: new Float32Array(P_COUNT),               // 云态半径系数
+  cY: new Float32Array(P_COUNT),
+  a0: new Float32Array(P_COUNT),
+};
+{
+  const wSum = BANDS.reduce((s, b) => s + b.w, 0);
+  let acc = 0;
+  const cum = BANDS.map(b => (acc += b.w / wSum));
+  const col = new THREE.Color();
+  for (let i = 0; i < P_COUNT; i++) {
+    const u = Math.random();
+    let b = 0; while (b < cum.length - 1 && u > cum[b]) b++;
+    P.band[i] = b;
+    P.th0[i] = Math.random() * TAU;
+    P.drift[i] = (0.10 + Math.random() * 0.25);
+    P.spinDir[i] = Math.random() < 0.85 ? 1 : -1;
+    P.rJit[i] = 0.90 + Math.random() * 0.22;
+    P.yJit[i] = (Math.random() - 0.5) * 0.30;
+    P.cR[i] = 1.35 + Math.random() * 0.95;
+    P.cY[i] = (Math.random() - 0.35) * 2.4;
+    P.a0[i] = 0.45 + Math.random() * 0.55;
+    const warm = Math.random();
+    if (warm < 0.72) col.setHSL(0.115 + Math.random() * 0.02, 0.85, 0.60 + Math.random() * 0.14);
+    else if (warm < 0.92) col.setHSL(0.09, 0.9, 0.48 + Math.random() * 0.10);
+    else col.setHSL(0.13, 0.35, 0.82);
+    col.convertSRGBToLinear();
+    pCol[i * 3] = col.r; pCol[i * 3 + 1] = col.g; pCol[i * 3 + 2] = col.b;
+    pSize[i] = 0.5 + Math.random() * 1.0;
+  }
+}
+const pMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `
+    attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
+    varying float vA; varying vec3 vC;
+    void main(){
+      vC = aColor; vA = aAlpha;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * (250.0 / -mv.z);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vA; varying vec3 vC;
+    void main(){
+      vec2 uv = gl_PointCoord - 0.5;
+      float d = length(uv) * 2.0;
+      float a = smoothstep(1.0, 0.0, d); a *= a;
+      gl_FragColor = vec4(vC, a * vA);
+    }`
+});
+const points = new THREE.Points(pGeo, pMat);
+points.frustumCulled = false;
+
+let caisson = null;                            // { group, disposables }
+function mountCaisson(shape) {
+  const { group, disposables } = buildCaisson(shape);
+  group.add(points);
+  scene.add(group);
+  caisson = { group, disposables, shape };
+}
+function disposeCaisson(c) {
+  scene.remove(c.group);
+  c.group.traverse(o => { if (o.geometry && o.geometry !== pGeo) o.geometry.dispose(); });
+  c.disposables.forEach(m => m.dispose && m.dispose());
+}
+mountCaisson('circle');
+window.__dbg = { scene, camera, renderer, THREE, orbit, getCaisson: () => caisson,
+  state: () => ({ transT, transitioning, shapeWanted }) };
+
+/* 粒子循环相位（g ∈ [0,1)） */
+let particleG = 0.0;
+let transT = -1;                               // 形制切换进度，-1 为无切换
+let shapeWanted = 'circle';
+
+const easeInCubic = x => x * x * x;
+const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+
+/* 相位包络：返回 { pos模式参数..., alphaEnv, sizeEnv } */
+function phaseEnv(g) {
+  // 聚合 [0,.38)  坍缩 [.38,.62)  核心 [.62,.68)  重生 [.68,.86)  消散 [.86,1)
+  if (g < 0.38) return { mode: 0, t: g / 0.38 };
+  if (g < 0.62) return { mode: 1, t: (g - 0.38) / 0.24 };
+  if (g < 0.68) return { mode: 2, t: (g - 0.62) / 0.06 };
+  if (g < 0.86) return { mode: 3, t: (g - 0.68) / 0.18 };
+  return { mode: 4, t: (g - 0.86) / 0.14 };
+}
+function alphaEnvelope(g, dip) {
+  let a;
+  if (g < 0.05) a = g / 0.05;
+  else if (g < 0.38) a = 1;
+  else if (g < 0.46) a = 1 - (g - 0.38) / 0.08 * 0.55;      // 坍缩前略暗
+  else if (g < 0.62) a = 0.45;
+  else if (g < 0.68) a = 1.5;                                 // 核心闪耀
+  else if (g < 0.86) a = 1.15 - (g - 0.68) / 0.18 * 0.25;
+  else a = 0.9 * (1 - (g - 0.86) / 0.14);                    // 消散淡出
+  return a * dip;
+}
+
+const CORE_Y = 0.72;
+function updateParticles(g, time) {
+  const env = phaseEnv(g);
+  const dip = transT >= 0 ? 1 - 0.72 * Math.exp(-Math.pow((transT - 0.20) / 0.10, 2)) : 1;
+  const aggE = env.mode === 0 ? easeOutCubic(Math.min(1, env.t * 1.15)) : 0;  // 聚合系数
+  const colC = env.mode === 1 ? easeInCubic(env.t) : 0;                      // 坍缩系数
+  const rebE = env.mode === 3 ? easeOutCubic(env.t) : 0;                      // 重生系数
+  const disE = env.mode === 4 ? env.t * env.t : 0;                            // 消散系数
+  for (let i = 0; i < P_COUNT; i++) {
+    const b = BANDS[P.band[i]];
+    const th = P.th0[i] + time * P.drift[i] * 0.35 * P.spinDir[i];
+    const o = outOf(th);
+    const cx = Math.cos(th), sz = Math.sin(th);
+    const rb = b.r * o * P.rJit[i];                        // 层位半径
+    const yb = b.y + P.yJit[i];
+    const rc = b.r * P.cR[i] * o;                          // 云态半径
+    const yc = b.y + P.cY[i];
+    let x, y, z, a = 1, s = 1;
+    if (env.mode === 0) {                                  // 聚合：云 → 层位
+      x = rc + (rb - rc) * aggE;
+      y = yc + (yb - yc) * aggE;
+      z = sz * (rc + (rb - rc) * aggE);
+    } else if (env.mode === 1) {                           // 坍缩：螺旋入核
+      const th2 = th + colC * 9 * P.spinDir[i];
+      const rr = rb * (1 - colC);
+      x = rr * Math.cos(th2);
+      z = rr * Math.sin(th2);
+      y = yb + (CORE_Y - yb) * colC;
+    } else if (env.mode === 2) {                           // 核心
+      x = (Math.random() - 0.5) * 0.05;
+      y = CORE_Y + (Math.random() - 0.5) * 0.05;
+      z = (Math.random() - 0.5) * 0.05;
+      s = 1.9; a = 1.4;
+    } else if (env.mode === 3) {                           // 重生：核 → 层位
+      x = rb * cx * rebE;
+      z = rb * sz * rebE;
+      y = CORE_Y + (yb - CORE_Y) * rebE;
+      s = 1 + (1 - env.t) * 0.7;
+    } else {                                               // 消散：层位 → 云
+      x = rb + (rc - rb) * disE;
+      y = yb + (yc - yb) * disE;
+      z = sz * (rb + (rc - rb) * disE);
+    }
+    pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+    pAlpha[i] = P.a0[i] * alphaEnvelope(g, dip) * a;
+    pSize[i] = (0.5 + (i % 7) * 0.09) * s;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.aAlpha.needsUpdate = true;
+  pGeo.attributes.aSize.needsUpdate = true;
+}
+
+/* ---------------- 形制切换：粒子先坍缩，几何重组 ---------------- */
+const formBtns = [...document.querySelectorAll('#forms button')];
+const subLabel = document.getElementById('sub');
+let transitioning = false;
+
+function requestShape(shape) {
+  if (transitioning || shape === shapeWanted) return;
+  transitioning = true;
+  transT = 0;
+  shapeWanted = shape;
+  formBtns.forEach(b => b.disabled = true);
+}
+function finishShape(shape) {
+  const old = caisson;
+  mountCaisson(shape);                     // 新形制（粒子已挂入新组）
+  if (old) disposeCaisson(old);
+  subLabel.textContent = shape === 'hex' ? '六边形' : shape === 'oct' ? '八边形' : '';
+  formBtns.forEach(b => {
+    b.disabled = false;
+    b.classList.toggle('on', b.dataset.s === shape ||
+      (b.dataset.s === 'hex' && (shape === 'hex' || shape === 'oct')));
+  });
+  transitioning = false;
+}
+formBtns.forEach(b => b.addEventListener('click', () => {
+  const s = b.dataset.s;
+  requestShape(s === 'hex' ? (shapeWanted === 'hex' ? 'oct' : 'hex') : s);
+}));
+window.addEventListener('keydown', e => {
+  if (e.key === '1') requestShape('circle');
+  if (e.key === '2') requestShape('square');
+  if (e.key === '3') requestShape(shapeWanted === 'hex' ? 'oct' : 'hex');
+});
+
+/* ---------------- 自写 Bloom 后处理 ---------------- */
+function makeRT(w, h) {
+  return new THREE.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), {
+    type: isGL2 ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    samples: isGL2 ? 4 : 0,
+    depthBuffer: true
+  });
+}
+let rtScene = makeRT(window.innerWidth * pixelRatio, window.innerHeight * pixelRatio);
+let rtA = makeRT(window.innerWidth * pixelRatio >> 1, window.innerHeight * pixelRatio >> 1);
+let rtB = makeRT(window.innerWidth * pixelRatio >> 1, window.innerHeight * pixelRatio >> 1);
+let rtC = makeRT(window.innerWidth * pixelRatio >> 2, window.innerHeight * pixelRatio >> 2);
+let rtD = makeRT(window.innerWidth * pixelRatio >> 2, window.innerHeight * pixelRatio >> 2);
+rtA.depthBuffer = rtB.depthBuffer = rtC.depthBuffer = rtD.depthBuffer = false;
+
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quadScene = new THREE.Scene();
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+quadScene.add(quad);
+const VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+const matBright = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null }, threshold: { value: 0.55 }, knee: { value: 0.35 } },
+  vertexShader: VERT,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float threshold; uniform float knee;
+    varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      float w = smoothstep(threshold, threshold + knee, l);
+      gl_FragColor = vec4(c * w, 1.0);
+    }`
+});
+const matBlur = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() } },
+  vertexShader: VERT,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 dir;
+    varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb * 0.227027;
+      c += texture2D(tDiffuse, vUv + dir * 1.3846).rgb * 0.316216;
+      c += texture2D(tDiffuse, vUv - dir * 1.3846).rgb * 0.316216;
+      c += texture2D(tDiffuse, vUv + dir * 3.2308).rgb * 0.070270;
+      c += texture2D(tDiffuse, vUv - dir * 3.2308).rgb * 0.070270;
+      gl_FragColor = vec4(c, 1.0);
+    }`
+});
+const matCopy = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: VERT,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }`
+});
+let exposure = 1.02, bloomPulse = 0;
+const matComposite = new THREE.ShaderMaterial({
+  uniforms: {
+    tBase: { value: null }, tB1: { value: null }, tB2: { value: null },
+    exposure: { value: exposure }
+  },
+  vertexShader: VERT,
+  fragmentShader: `
+    uniform sampler2D tBase; uniform sampler2D tB1; uniform sampler2D tB2;
+    uniform float exposure;
+    varying vec2 vUv;
+    vec3 aces(vec3 x){
+      return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+    }
+    void main(){
+      vec3 c = texture2D(tBase, vUv).rgb;
+      c += texture2D(tB1, vUv).rgb * 0.45;
+      c += texture2D(tB2, vUv).rgb * 0.62;
+      c *= exposure;
+      c = aces(c);
+      c = pow(c, vec3(1.0 / 2.2));
+      gl_FragColor = vec4(c, 1.0);
+    }`
+});
+function runPass(mat, target) {
+  quad.material = mat;
+  renderer.setRenderTarget(target);
+  renderer.render(quadScene, quadCam);
+}
+function renderFrame() {
+  renderer.setRenderTarget(rtScene);
+  renderer.render(scene, camera);
+  const wA = rtA.width, hA = rtA.height, wC = rtC.width, hC = rtC.height;
+  matBright.uniforms.tDiffuse.value = rtScene.texture;
+  runPass(matBright, rtA);
+  matBlur.uniforms.tDiffuse.value = rtA.texture;
+  matBlur.uniforms.dir.value.set(1.4 / wA, 0); runPass(matBlur, rtB);
+  matBlur.uniforms.tDiffuse.value = rtB.texture;
+  matBlur.uniforms.dir.value.set(0, 1.4 / hA); runPass(matBlur, rtA);
+  matCopy.uniforms.tDiffuse.value = rtA.texture;
+  runPass(matCopy, rtC);
+  matBlur.uniforms.tDiffuse.value = rtC.texture;
+  matBlur.uniforms.dir.value.set(1.8 / wC, 0); runPass(matBlur, rtD);
+  matBlur.uniforms.tDiffuse.value = rtD.texture;
+  matBlur.uniforms.dir.value.set(0, 1.8 / hC); runPass(matBlur, rtC);
+  matComposite.uniforms.tBase.value = rtScene.texture;
+  matComposite.uniforms.tB1.value = rtA.texture;
+  matComposite.uniforms.tB2.value = rtC.texture;
+  matComposite.uniforms.exposure.value = exposure * (1 + bloomPulse * 0.55);
+  runPass(matComposite, null);
+}
+
+/* ---------------- 结尾文字 ---------------- */
+const endingEl = document.getElementById('ending');
+const vignetteEl = document.getElementById('vignette');
+let endingShown = false;
+
+/* ---------------- 主循环 ---------------- */
+const clock = new THREE.Clock();
+let prevG = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  window.__probeFrames = (window.__probeFrames || 0) + 1;
+
+  // 粒子循环相位
+  if (transT >= 0) {
+    window.__probeT = (window.__probeT || 0) + 1;
+    window.__probeDt = dt;
+    transT += dt / 2.4;
+    if (transT < 0.55) particleG = 0.40 + 0.22 * (transT / 0.55);        // 强制坍缩
+    else if (transT < 1) particleG = 0.62 + 0.26 * ((transT - 0.55) / 0.45); // 核心→重生
+    if (transT >= 0.5 && caisson.shape !== shapeWanted) finishShape(shapeWanted);
+    if (transT >= 1) { transT = -1; }
+  } else {
+    particleG = (particleG + dt / T_CYCLE) % 1;
+  }
+  // 重生瞬间曝光脉冲
+  if (prevG < 0.68 && particleG >= 0.68) bloomPulse = 1;
+  prevG = particleG;
+  bloomPulse *= Math.exp(-dt * 2.2);
+
+  // 藻井缓转
+  if (caisson) caisson.group.rotation.y += dt * 0.02;
+  // 人物呼吸
+  person.scale.y = 1 + Math.sin(t * 1.4) * 0.006;
+
+  updateParticles(particleG, t);
+  orbit.update(dt);
+  renderFrame();
+
+  // 结尾：首次重生完成后淡入
+  if (!endingShown && t > 15.8) {
+    endingShown = true;
+    endingEl.classList.add('show');
+    vignetteEl.classList.add('strong');
+  }
+  window.__booted = true;
+}
+animate();
+
+/* ---------------- 自适应 ---------------- */
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  rtScene.dispose(); rtA.dispose(); rtB.dispose(); rtC.dispose(); rtD.dispose();
+  rtScene = makeRT(w * pixelRatio, h * pixelRatio);
+  rtA = makeRT(w * pixelRatio >> 1, h * pixelRatio >> 1);
+  rtB = makeRT(w * pixelRatio >> 1, h * pixelRatio >> 1);
+  rtC = makeRT(w * pixelRatio >> 2, h * pixelRatio >> 2);
+  rtD = makeRT(w * pixelRatio >> 2, h * pixelRatio >> 2);
+  rtA.depthBuffer = rtB.depthBuffer = rtC.depthBuffer = rtD.depthBuffer = false;
+});
+</script>
+</body>
+</html>

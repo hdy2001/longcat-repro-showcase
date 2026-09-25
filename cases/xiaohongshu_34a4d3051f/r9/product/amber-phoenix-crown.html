@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>琥珀金凤冠 · 交互式 3D</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0906;
+    font-family:"Songti SC","STSong","SimSun","Noto Serif CJK SC",serif;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+  #title{position:fixed;top:22px;left:28px;color:#e8cf9e;pointer-events:none;z-index:5;}
+  #title h1{margin:0;font-size:27px;font-weight:600;letter-spacing:3px;
+    background:linear-gradient(135deg,#f6e2ae 10%,#dfa14e 55%,#a86f24 90%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    text-shadow:0 2px 18px rgba(224,164,78,.15);}
+  #title p{margin:6px 0 0 2px;font-size:12px;letter-spacing:2px;color:rgba(232,207,158,.55);}
+  #badge{position:fixed;top:26px;right:26px;z-index:5;pointer-events:none;
+    font-size:11px;letter-spacing:2px;color:rgba(232,207,158,.75);
+    border:1px solid rgba(224,164,78,.35);border-radius:999px;padding:5px 14px;
+    background:rgba(24,16,8,.55);backdrop-filter:blur(6px);}
+  #panel{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:6;
+    display:flex;align-items:center;gap:18px;padding:11px 20px;border-radius:14px;
+    background:rgba(20,14,7,.78);border:1px solid rgba(224,164,78,.30);
+    box-shadow:0 8px 30px rgba(0,0,0,.5);backdrop-filter:blur(10px);
+    color:#e8cf9e;font-size:13px;white-space:nowrap;}
+  #panel .row{display:flex;align-items:center;gap:10px;}
+  #panel label{letter-spacing:1px;}
+  #explode{width:170px;accent-color:#e0a44e;cursor:pointer;}
+  #explodeVal{min-width:38px;color:#f0d9a8;font-variant-numeric:tabular-nums;}
+  #panel .chk{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  #panel .chk input{accent-color:#e0a44e;cursor:pointer;}
+  #reset{cursor:pointer;font-family:inherit;font-size:12px;letter-spacing:1px;
+    color:#f0d9a8;background:rgba(224,164,78,.14);border:1px solid rgba(224,164,78,.45);
+    border-radius:8px;padding:5px 13px;transition:background .2s;}
+  #reset:hover{background:rgba(224,164,78,.30);}
+  #hint{position:fixed;right:20px;bottom:20px;z-index:5;pointer-events:none;
+    font-size:11px;letter-spacing:1px;color:rgba(232,207,158,.45);}
+  .overlay{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;background:#0b0906;}
+  .overlay.hide{display:none;}
+  .spinner{width:38px;height:38px;border-radius:50%;
+    border:2px solid rgba(224,164,78,.18);border-top-color:#e0a44e;
+    animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .overlay p{margin:0;font-size:13px;letter-spacing:3px;color:rgba(232,207,158,.7);}
+  #err{border:1px solid rgba(220,90,60,.5);}
+  #err p{color:#e8a58e;}
+  @media (max-width:640px){
+    #title h1{font-size:20px;}
+    #badge{display:none;}
+    #panel{flex-wrap:wrap;white-space:normal;justify-content:center;max-width:92vw;gap:10px;}
+    #hint{display:none;}
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script>
+  window.addEventListener('error', function(e){
+    var el = document.getElementById('err');
+    if (el) { el.classList.remove('hide'); el.querySelector('p').textContent =
+      '加载出错：' + (e.message || '资源加载失败，请检查网络后刷新'); }
+  }, true);
+  setTimeout(function(){
+    if (!window.__crown || !window.__crown.ready) {
+      var el = document.getElementById('err');
+      if (el) { el.classList.remove('hide'); el.querySelector('p').textContent =
+        '加载超时：本页面需从 CDN 加载 three.js，请检查网络后刷新'; }
+    }
+  }, 12000);
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="title">
+  <h1>琥珀金凤冠</h1>
+  <p>中式大婚 · 镂空缠枝 · 半透明树脂</p>
+</div>
+<div id="badge">3D 打印设计 · 拖拽查看</div>
+<div id="panel">
+  <div class="row">
+    <label for="explode">爆炸视图</label>
+    <input type="range" id="explode" min="0" max="100" value="0">
+    <span id="explodeVal">0%</span>
+  </div>
+  <div class="row">
+    <label class="chk"><input type="checkbox" id="spin" checked>自动旋转</label>
+    <button id="reset">重置视角</button>
+  </div>
+</div>
+<div id="hint">左键旋转 · 滚轮缩放 · 右键平移 · 双击切换爆炸</div>
+<div id="loading" class="overlay"><div class="spinner"></div><p>正在加载 3D 场景…</p></div>
+<div id="err" class="overlay hide"><p></p></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------- 基础 ----------
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+const CAM0 = new THREE.Vector3(3.1, 2.35, 4.35);
+const TGT0 = new THREE.Vector3(0, 1.32, 0);
+camera.position.copy(CAM0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(TGT0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 2.0;
+controls.maxDistance = 14;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.9;
+
+// 深色渐变背景
+(function makeBackground() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(256, 190, 30, 256, 256, 380);
+  grad.addColorStop(0, '#4a3421');
+  grad.addColorStop(0.45, '#231a11');
+  grad.addColorStop(1, '#0a0806');
+  g.fillStyle = grad; g.fillRect(0, 0, 512, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+})();
+
+// 环境反射（程序化房间环境，无外部资源）
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+// ---------- 灯光 ----------
+scene.add(new THREE.HemisphereLight(0xffe2b8, 0x1c1008, 0.55));
+const keyLight = new THREE.DirectionalLight(0xffd9a6, 1.35);
+keyLight.position.set(3.5, 5.5, 4.0);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0xff9e50, 0.55);
+rimLight.position.set(-4.5, 2.5, -3.5);
+scene.add(rimLight);
+const fillLight = new THREE.PointLight(0xffc06a, 22, 25, 1.8);
+fillLight.position.set(0, 1.6, 3.2);
+scene.add(fillLight);
+
+// ---------- 材质（统一琥珀金半透明树脂） ----------
+const MAT = {
+  honey: new THREE.MeshPhysicalMaterial({
+    color: 0xdd9430, roughness: 0.16, metalness: 0.0,
+    transmission: 0.72, thickness: 0.35, ior: 1.46,
+    attenuationColor: new THREE.Color(0x9a5208), attenuationDistance: 0.85,
+    clearcoat: 0.55, clearcoatRoughness: 0.3,
+    emissive: 0x241203, emissiveIntensity: 0.5,
+    envMapIntensity: 0.75, side: THREE.DoubleSide
+  }),
+  deep: new THREE.MeshPhysicalMaterial({
+    color: 0xc07a1a, roughness: 0.20, metalness: 0.0,
+    transmission: 0.66, thickness: 0.4, ior: 1.46,
+    attenuationColor: new THREE.Color(0x7a3f06), attenuationDistance: 0.7,
+    clearcoat: 0.5, clearcoatRoughness: 0.35,
+    emissive: 0x1c0e02, emissiveIntensity: 0.5,
+    envMapIntensity: 0.7, side: THREE.DoubleSide
+  }),
+  pale: new THREE.MeshPhysicalMaterial({
+    color: 0xf3c268, roughness: 0.10, metalness: 0.0,
+    transmission: 0.82, thickness: 0.18, ior: 1.45,
+    attenuationColor: new THREE.Color(0xb06a10), attenuationDistance: 1.1,
+    clearcoat: 0.7, clearcoatRoughness: 0.2,
+    emissive: 0x2a1804, emissiveIntensity: 0.5,
+    envMapIntensity: 0.9, side: THREE.DoubleSide
+  }),
+  scale: new THREE.MeshStandardMaterial({
+    color: 0xd88f2c, roughness: 0.25, metalness: 0.15, envMapIntensity: 0.6
+  }),
+  eye: new THREE.MeshPhysicalMaterial({
+    color: 0x140a04, roughness: 0.15, clearcoat: 1.0,
+    emissive: 0x300a00, emissiveIntensity: 0.6
+  }),
+  faint: new THREE.MeshPhysicalMaterial({
+    color: 0xe0a040, transparent: true, opacity: 0.10,
+    roughness: 0.08, metalness: 0.0, side: THREE.DoubleSide, depthWrite: false
+  })
+};
+
+// ---------- 工具 ----------
+const UP = new THREE.Vector3(0, 1, 0);
+const XAXIS = new THREE.Vector3(1, 0, 0);
+const ZAXIS = new THREE.Vector3(0, 0, 1);
+const _q = new THREE.Quaternion();
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function M4(px, py, pz, q, s) {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(px, py, pz),
+    q || new THREE.Quaternion(),
+    s || new THREE.Vector3(1, 1, 1));
+}
+function yawQ(a) { return new THREE.Quaternion().setFromAxisAngle(UP, a); }
+
+// 弧带表面坐标（拱形发箍参数化）
+const R_IN = 1.10, R_OUT = 1.56, TH0 = -0.14, TH1 = Math.PI + 0.14;
+function bandPoint(th, r, z) {
+  return new THREE.Vector3(r * Math.cos(th), r * Math.sin(th), z);
+}
+function tangentAt(th) { return new THREE.Vector3(-Math.sin(th), Math.cos(th), 0); }
+function radialAt(th) { return new THREE.Vector3(Math.cos(th), Math.sin(th), 0); }
+
+// 平行传输标架（避免 S 形曲线 Frenet 翻转）
+function computeFrames(curve, segments) {
+  const pts = [], tans = [], nors = [], bins = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    pts.push(curve.getPointAt(t));
+    tans.push(curve.getTangentAt(t).normalize());
+  }
+  const t0 = tans[0];
+  let n0 = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(t0.dot(n0)) > 0.9) n0.set(1, 0, 0);
+  n0.sub(t0.clone().multiplyScalar(n0.dot(t0))).normalize();
+  let nPrev = n0;
+  for (let i = 0; i <= segments; i++) {
+    if (i > 0) {
+      _q.setFromUnitVectors(tans[i - 1], tans[i]);
+      nPrev.applyQuaternion(_q);
+      nPrev.sub(tans[i].clone().multiplyScalar(nPrev.dot(tans[i]))).normalize();
+    }
+    nors.push(nPrev.clone());
+    bins.push(new THREE.Vector3().crossVectors(tans[i], nPrev).normalize());
+  }
+  return { pts, tans, nors, bins };
+}
+
+// 变半径圆管（龙身/龙须/角等）
+function taperedTube(curve, radiusFn, tubularSegments, radialSegments, capEnds) {
+  tubularSegments = tubularSegments || 48;
+  radialSegments = radialSegments || 8;
+  const { pts, nors, bins } = computeFrames(curve, tubularSegments);
+  const positions = [], uvs = [], indices = [];
+  const ringStart = [];
+  for (let i = 0; i <= tubularSegments; i++) {
+    const r = radiusFn(i / tubularSegments);
+    ringStart.push(positions.length / 3);
+    for (let j = 0; j <= radialSegments; j++) {
+      const a = j / radialSegments * Math.PI * 2;
+      const c = Math.cos(a) * r, s = Math.sin(a) * r;
+      positions.push(
+        pts[i].x + nors[i].x * c + bins[i].x * s,
+        pts[i].y + nors[i].y * c + bins[i].y * s,
+        pts[i].z + nors[i].z * c + bins[i].z * s);
+      uvs.push(j / radialSegments, i / tubularSegments);
+    }
+  }
+  for (let i = 0; i < tubularSegments; i++) {
+    for (let j = 0; j < radialSegments; j++) {
+      const a = ringStart[i] + j, b = ringStart[i] + j + 1;
+      const c = ringStart[i + 1] + j, d = ringStart[i + 1] + j + 1;
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+  if (capEnds !== false) {
+    for (const i of [0, tubularSegments]) {
+      const ci = positions.length / 3;
+      positions.push(pts[i].x, pts[i].y, pts[i].z); uvs.push(0.5, 0.5);
+      for (let j = 0; j < radialSegments; j++) {
+        if (i === 0) indices.push(ci, ringStart[i] + j + 1, ringStart[i] + j);
+        else indices.push(ci, ringStart[i] + j, ringStart[i] + j + 1);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  return g;
+}
+
+// 螺旋卷草管
+function spiralGeo(center, tHat, rHat, r0, r1, turns, phase, tubeR, zJit, rand, segs) {
+  segs = segs || 40;
+  const pts = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const a = phase + t * turns * Math.PI * 2;
+    const rr = r0 + (r1 - r0) * t;
+    const p = center.clone()
+      .addScaledVector(tHat, Math.cos(a) * rr)
+      .addScaledVector(rHat, Math.sin(a) * rr);
+    p.z += (rand() - 0.5) * zJit;
+    pts.push(p);
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), segs, tubeR, 5);
+}
+
+// 羽毛片（尖端带切口，可弯曲）
+function featherGeo(len, wid, opt) {
+  opt = opt || {};
+  const notches = opt.notches !== false;
+  const bend = opt.bend || 0;
+  const h = wid / 2;
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(h * 1.15, len * 0.16, h * 1.02, len * 0.42, h * 0.66, len * 0.70);
+  if (notches) {
+    s.lineTo(h * 0.50, len * 0.88);
+    s.lineTo(h * 0.32, len * 0.80);
+    s.lineTo(h * 0.16, len * 1.00);
+    s.lineTo(-h * 0.02, len * 0.84);
+    s.lineTo(-h * 0.16, len * 1.00);
+    s.lineTo(-h * 0.32, len * 0.80);
+    s.lineTo(-h * 0.50, len * 0.88);
+    s.lineTo(-h * 0.66, len * 0.70);
+  } else {
+    s.bezierCurveTo(-h * 1.02, len * 0.42, -h * 1.15, len * 0.16, 0, 0);
+    s.closePath();
+  }
+  if (notches) {
+    s.bezierCurveTo(-h * 1.02, len * 0.42, -h * 1.15, len * 0.16, 0, 0);
+    s.closePath();
+  }
+  const g = new THREE.ExtrudeGeometry(s, {
+    depth: 0.016, bevelEnabled: true, bevelThickness: 0.005,
+    bevelSize: 0.005, bevelSegments: 2, curveSegments: 5
+  });
+  g.translate(0, 0, -0.008);
+  if (bend !== 0) {
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      pos.setZ(i, pos.getZ(i) + bend * Math.pow(Math.max(0, y) / len, 2));
+    }
+    g.computeVertexNormals();
+  }
+  return g;
+}
+
+// 层叠花片（花团基本单元）
+function rosetteGeosAt(cx, cy, cz, r, layers, geos, paleGeos) {
+  const n = 6;
+  for (let L = 0; L < layers; L++) {
+    const lr = r * (1 - L * 0.24);
+    const z = cz + L * 0.016;
+    const pal = (L === layers - 1);
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2 + L * (Math.PI / n);
+      const pr = lr * 0.62;
+      const g = new THREE.SphereGeometry(pr, 7, 5);
+      g.scale(1.15, 0.55, 0.30);
+      const q = yawQ(a).multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.5));
+      g.applyMatrix4(M4(cx + Math.cos(a) * lr * 0.52, cy + Math.sin(a) * lr * 0.52, z, q));
+      (pal ? paleGeos : geos).push(g);
+    }
+    const cb = new THREE.SphereGeometry(r * 0.22, 7, 5);
+    cb.applyMatrix4(M4(cx, cy, z));
+    paleGeos.push(cb);
+  }
+}
+
+// 合并工具：统一转非索引并补 uv
+function mergeAll(geos) {
+  if (!geos.length) return null;
+  const list = geos.map(g => {
+    let out = g.index ? g.toNonIndexed() : g;
+    if (!out.attributes.uv) {
+      const n = out.attributes.position.count;
+      out.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+    }
+    return out;
+  });
+  return mergeGeometries(list, false);
+}
+
+// ---------- 冠壁：三层镂空缠枝卷草（前/中/后，可透光） ----------
+function buildVineLayer(z, rand) {
+  const geos = [], paleGeos = [];
+  // 三条连续缠枝主茎（波浪穿绕整个拱带）
+  const stemRows = [[1.17, 0.040, 0.0], [1.35, 0.052, 2.2], [1.50, 0.036, 4.3]];
+  for (const [rB, amp, ph] of stemRows) {
+    const pts = [];
+    for (let i = 0; i <= 72; i++) {
+      const th = TH0 + (TH1 - TH0) * i / 72;
+      const r = rB + amp * Math.sin(th * 2.15 + ph);
+      pts.push(bandPoint(th, r, z));
+    }
+    geos.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 100, 0.0155, 5));
+  }
+  // 茎上叶片
+  for (let i = 0; i < 46; i++) {
+    const th = TH0 + 0.06 + (TH1 - TH0 - 0.12) * rand();
+    const rB = stemRows[i % 3][0];
+    const r = rB + (rand() - 0.5) * 0.07;
+    const c = bandPoint(th, r, z);
+    const q = new THREE.Quaternion().setFromUnitVectors(UP, tangentAt(th))
+      .multiply(new THREE.Quaternion().setFromAxisAngle(ZAXIS, (rand() - 0.5) * 1.2));
+    const ls = 0.05 + rand() * 0.035;
+    const leaf = new THREE.SphereGeometry(1, 6, 4);
+    leaf.scale(ls, ls * 0.42, ls * 0.62);
+    leaf.applyMatrix4(M4(c.x, c.y, c.z, q));
+    geos.push(leaf);
+  }
+  // 卷草纹样：大双旋 / 中旋+叶 / 小旋+珠
+  const rows = [1.17, 1.35, 1.50];
+  const n = 30;
+  for (let i = 0; i < n; i++) {
+    const th = TH0 + 0.09 + (TH1 - TH0 - 0.18) * ((i + 0.15 + rand() * 0.7) / n);
+    const row = rows[i % 3];
+    const r = row + (rand() - 0.5) * 0.05;
+    const c = bandPoint(th, r, z);
+    const tH = tangentAt(th), rH = radialAt(th);
+    const kind = rand();
+    if (kind < 0.42) {
+      const rr = 0.085 + rand() * 0.035;
+      geos.push(spiralGeo(c, tH, rH, 0.012, rr, 1.9, rand() * 6.28, 0.0145, 0.02, rand));
+      const c2 = c.clone().addScaledVector(tH, (rand() < 0.5 ? -1 : 1) * rr * 1.5);
+      geos.push(spiralGeo(c2, tH, rH, 0.010, rr * 0.72, 1.7, rand() * 6.28, 0.0135, 0.02, rand));
+    } else if (kind < 0.72) {
+      const rr = 0.055 + rand() * 0.02;
+      geos.push(spiralGeo(c, tH, rH, 0.009, rr, 1.7, rand() * 6.28, 0.013, 0.02, rand));
+      for (const sd of [-1, 1]) {
+        const lc = c.clone().addScaledVector(tH, sd * rr * 1.3);
+        const q = new THREE.Quaternion().setFromAxisAngle(ZAXIS, sd * 0.7);
+        const ls = 0.045 + rand() * 0.025;
+        const leaf = new THREE.SphereGeometry(1, 6, 4);
+        leaf.scale(ls, ls * 0.42, ls * 0.62);
+        leaf.applyMatrix4(M4(lc.x, lc.y, lc.z, q));
+        geos.push(leaf);
+      }
+    } else {
+      const rr = 0.045 + rand() * 0.02;
+      geos.push(spiralGeo(c, tH, rH, 0.008, rr, 1.6, rand() * 6.28, 0.012, 0.02, rand));
+      const dot = new THREE.SphereGeometry(0.02, 6, 5);
+      const dp = c.clone().addScaledVector(tH, rr * 1.4); dp.z += 0.005;
+      dot.applyMatrix4(M4(dp.x, dp.y, dp.z));
+      paleGeos.push(dot);
+    }
+  }
+  // 点缀小花
+  for (let i = 0; i < 6; i++) {
+    const th = TH0 + 0.12 + (TH1 - TH0 - 0.24) * ((i + 0.5) / 6);
+    const r = rows[(i + 1) % 3] + (rand() - 0.5) * 0.05;
+    const bp = bandPoint(th, r, z + 0.004);
+    rosetteGeosAt(bp.x, bp.y, bp.z, 0.045, 2, paleGeos, geos);
+  }
+  return { honey: mergeAll(geos), pale: mergeAll(paleGeos) };
+}
+
+// 拱带薄壳（若隐若现的树脂胎体）
+function arcShell(rIn, rOut, th0, th1, z0, z1, seg) {
+  const pos = [], idx = [];
+  function grid(rA, rB, za, zb, flip) {
+    const base = pos.length / 3;
+    for (let i = 0; i <= seg; i++) {
+      const th = th0 + (th1 - th0) * i / seg;
+      const c = Math.cos(th), s = Math.sin(th);
+      pos.push(rA * c, rA * s, za, rB * c, rB * s, zb);
+    }
+    for (let i = 0; i < seg; i++) {
+      const a = base + i * 2, b = base + i * 2 + 1, c = base + i * 2 + 2, d = base + i * 2 + 3;
+      if (!flip) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
+    }
+  }
+  grid(rIn, rOut, z1, z1, false);
+  grid(rIn, rOut, z0, z0, true);
+  grid(rIn, rIn, z0, z1, false);
+  grid(rOut, rOut, z1, z0, true);
+  for (const th of [th0, th1]) {
+    const base = pos.length / 3, c = Math.cos(th), s = Math.sin(th);
+    pos.push(rIn * c, rIn * s, z0, rOut * c, rOut * s, z0, rOut * c, rOut * s, z1, rIn * c, rIn * s, z1);
+    if (th === th0) idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    else idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// 冠壁核心：薄壳 + 上下沿栏杆 + 珠串
+function buildCore(rand) {
+  const sheet = new THREE.Mesh(arcShell(R_IN, R_OUT, TH0, TH1, -0.05, 0.05, 72), MAT.faint);
+  const geos = [];
+  for (const [r, tr] of [[1.615, 0.030], [1.085, 0.026]]) {
+    const pts = [];
+    for (let i = 0; i <= 80; i++) pts.push(bandPoint(TH0 + (TH1 - TH0) * i / 80, r, 0));
+    geos.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 100, tr, 7));
+  }
+  for (let i = 0; i < 38; i++) {
+    const th = TH0 + (TH1 - TH0) * (i + 0.5) / 38;
+    const b = new THREE.SphereGeometry(0.024, 7, 5);
+    b.applyMatrix4(M4(1.675 * Math.cos(th), 1.675 * Math.sin(th), 0));
+    geos.push(b);
+  }
+  const core = new THREE.Mesh(mergeAll(geos), MAT.honey);
+  return { sheet, core };
+}
+
+// 冠脚卷草钩
+function buildFoot(s, rand) {
+  const geos = [];
+  const thEnd = s > 0 ? TH0 : TH1;
+  const c = bandPoint(thEnd, 1.33, 0);
+  const cc = new THREE.Vector3(c.x + s * 0.06, c.y - 0.005, 0);
+  const pts = [];
+  const turns = 1.55, r0 = 0.10;
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const a = t * turns * Math.PI * 2 + (s > 0 ? 0 : Math.PI);
+    const rr = r0 * (1 - t) + 0.012;
+    pts.push(new THREE.Vector3(cc.x + Math.cos(a) * rr, cc.y + Math.sin(a) * rr * 0.9, 0));
+  }
+  geos.push(taperedTube(new THREE.CatmullRomCurve3(pts), t => 0.030 * (1 - t) + 0.008, 40, 6));
+  const bead = new THREE.SphereGeometry(0.034, 8, 6);
+  bead.applyMatrix4(M4(cc.x, cc.y, 0));
+  geos.push(bead);
+  rosetteGeosAt(c.x - s * 0.02, c.y - 0.075, 0, 0.075, 2, geos, []);
+  return new THREE.Mesh(mergeAll(geos), MAT.honey);
+}
+
+// ---------- 中央尖柱 ----------
+function buildColumn(rand) {
+  const geos = [], paleGeos = [];
+  for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2;
+    const q = yawQ(a).multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.9));
+    const p = new THREE.SphereGeometry(1, 7, 5);
+    p.scale(0.055, 0.022, 0.034);
+    p.applyMatrix4(M4(Math.cos(a) * 0.105, 1.38, Math.sin(a) * 0.105, q));
+    geos.push(p);
+  }
+  const shaft = new THREE.CylinderGeometry(0.068, 0.078, 0.80, 14);
+  shaft.translate(0, 1.80, 0); geos.push(shaft);
+  for (const y of [1.56, 1.80, 2.04]) {
+    const t = new THREE.TorusGeometry(0.086, 0.018, 7, 20);
+    t.rotateX(Math.PI / 2); t.translate(0, y, 0); geos.push(t);
+  }
+  for (let k = 0; k < 6; k++) {
+    const a = k / 6 * Math.PI * 2 + 0.26;
+    const f = new THREE.CylinderGeometry(0.010, 0.010, 0.62, 5);
+    f.translate(Math.cos(a) * 0.070, 1.80, Math.sin(a) * 0.070); geos.push(f);
+  }
+  const cup = new THREE.CylinderGeometry(0.055, 0.105, 0.09, 14);
+  cup.translate(0, 2.20, 0); geos.push(cup);
+  const rimT = new THREE.TorusGeometry(0.062, 0.014, 6, 18);
+  rimT.rotateX(Math.PI / 2); rimT.translate(0, 2.245, 0); geos.push(rimT);
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    const b = new THREE.SphereGeometry(0.018, 6, 5);
+    b.applyMatrix4(M4(Math.cos(a) * 0.082, 1.66, Math.sin(a) * 0.082));
+    paleGeos.push(b);
+  }
+  for (let k = 0; k < 4; k++) {
+    const a = k / 4 * Math.PI * 2 + 0.4;
+    geos.push(spiralGeo(
+      new THREE.Vector3(Math.cos(a) * 0.075, 1.90, Math.sin(a) * 0.075),
+      new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), new THREE.Vector3(0, 1, 0),
+      0.008, 0.045, 1.6, a, 0.011, 0.015, rand, 32));
+  }
+  return { honey: mergeAll(geos), pale: mergeAll(paleGeos) };
+}
+
+// ---------- 凤凰翅膀：多层带羽毛切口的曲面片 ----------
+function buildWing(s, rand) {
+  const geos = [], paleGeos = [];
+  const root = new THREE.Vector3(s * 0.055, 0.135, 0);
+  const armPts = [root.clone(),
+    new THREE.Vector3(s * 0.16, 0.16, 0.01),
+    new THREE.Vector3(s * 0.26, 0.22, 0.02)];
+  geos.push(taperedTube(new THREE.CatmullRomCurve3(armPts), t => 0.045 - 0.02 * t, 12, 7));
+  // 初级飞羽（长、带切口、微弯）5 片
+  const primA = [-0.70, -0.39, -0.07, 0.24, 0.55];
+  for (let i = 0; i < primA.length; i++) {
+    const a = s > 0 ? primA[i] : -primA[i];
+    const len = 0.44 + 0.09 * (1 - Math.abs(primA[i] + 0.08) / 0.78);
+    const f = featherGeo(len, 0.062, { notches: true, bend: -0.06 });
+    const q = new THREE.Quaternion().setFromAxisAngle(ZAXIS, a)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.12));
+    f.applyMatrix4(M4(root.x + s * i * 0.014, root.y + i * 0.004, 0, q));
+    geos.push(f);
+  }
+  // 次级飞羽 6 片（浅色、层叠）
+  const secA = [-0.55, -0.34, -0.12, 0.10, 0.30, 0.44];
+  for (let i = 0; i < secA.length; i++) {
+    const a = s > 0 ? secA[i] : -secA[i];
+    const f = featherGeo(0.33, 0.055, { notches: false });
+    const q = new THREE.Quaternion().setFromAxisAngle(ZAXIS, a)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.10));
+    f.applyMatrix4(M4(root.x + s * i * 0.011, root.y + 0.01 + i * 0.003, 0.022, q));
+    paleGeos.push(f);
+  }
+  // 覆羽 7 片（短圆、最上层）
+  for (let i = 0; i < 7; i++) {
+    const a = (s > 0 ? 1 : -1) * (-0.72 + i * 0.20);
+    const f = featherGeo(0.165, 0.05, { notches: false });
+    const q = new THREE.Quaternion().setFromAxisAngle(ZAXIS, a)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.16));
+    f.applyMatrix4(M4(root.x + s * 0.03 + s * i * 0.011, root.y + 0.02, 0.040, q));
+    paleGeos.push(f);
+  }
+  return { honey: mergeAll(geos), pale: mergeAll(paleGeos) };
+}
+
+// ---------- 柱顶凤凰 ----------
+function buildPhoenix(rand) {
+  const grp = new THREE.Group();
+  const deep = [], pale = [];
+  const prof = [[0.012, -0.30], [0.050, -0.27], [0.086, -0.19], [0.104, -0.08], [0.098, 0.04],
+    [0.080, 0.14], [0.060, 0.22], [0.052, 0.27], [0.055, 0.30]].map(p => new THREE.Vector2(p[0], p[1]));
+  const body = new THREE.LatheGeometry(prof, 26);
+  body.scale(1, 1, 1.12);
+  deep.push(body);
+  const head = new THREE.SphereGeometry(0.058, 14, 10);
+  head.scale(1, 0.95, 1.05); head.translate(0, 0.345, 0.008);
+  deep.push(head);
+  const beak = new THREE.ConeGeometry(0.020, 0.075, 8);
+  beak.rotateX(Math.PI / 2); beak.translate(0, 0.335, 0.070);
+  deep.push(beak);
+  // 冠羽
+  for (const [spread, tilt] of [[0, 1.02], [0.38, 0.88], [-0.38, 0.88]]) {
+    const f = featherGeo(0.14, 0.055, { notches: false });
+    const q = new THREE.Quaternion().setFromAxisAngle(XAXIS, -tilt)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(ZAXIS, spread));
+    f.applyMatrix4(M4(spread * 0.02, 0.385, -0.012, q));
+    pale.push(f);
+  }
+  // 长尾羽：扁平渐细管 + 眼斑
+  const plumes = [
+    [[0, -0.27, -0.02], [0.015, -0.44, -0.10], [0.0, -0.60, -0.20], [0.02, -0.70, -0.30]],
+    [[0, -0.27, -0.02], [-0.07, -0.42, -0.10], [-0.10, -0.58, -0.22], [-0.12, -0.68, -0.34]],
+    [[0, -0.27, -0.02], [0.08, -0.44, -0.12], [0.12, -0.62, -0.26], [0.15, -0.74, -0.40]],
+    [[0, -0.27, -0.02], [-0.04, -0.50, -0.14], [-0.06, -0.72, -0.30]],
+    [[0, -0.27, -0.02], [0.05, -0.52, -0.16], [0.08, -0.78, -0.36]]
+  ];
+  for (const pts of plumes) {
+    const v = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+    const g = taperedTube(new THREE.CatmullRomCurve3(v), t => 0.030 * (1 - t) + 0.007, 24, 7);
+    g.scale(1, 1, 0.42);
+    deep.push(g);
+    const e = pts[pts.length - 1];
+    const tip = new THREE.Vector3(e[0], e[1], e[2]);
+    const tan = new THREE.Vector3(e[0], e[1], e[2])
+      .sub(new THREE.Vector3(pts[pts.length - 2][0], pts[pts.length - 2][1], pts[pts.length - 2][2])).normalize();
+    const sp = new THREE.SphereGeometry(0.028, 8, 6);
+    sp.scale(1, 1.6, 0.5);
+    sp.applyMatrix4(M4(tip.x, tip.y, tip.z, new THREE.Quaternion().setFromUnitVectors(UP, tan)));
+    pale.push(sp);
+  }
+  // 足
+  for (const sd of [-1, 1]) {
+    const leg = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sd * 0.03, -0.27, 0.03), new THREE.Vector3(sd * 0.045, -0.335, 0.05)]),
+      t => 0.012 - 0.003 * t, 8, 6);
+    deep.push(leg);
+  }
+  grp.add(new THREE.Mesh(mergeAll(deep), MAT.deep));
+  const wingR = buildWing(1, rand), wingL = buildWing(-1, rand);
+  grp.add(new THREE.Mesh(wingR.honey, MAT.honey));
+  if (wingR.pale) grp.add(new THREE.Mesh(wingR.pale, MAT.pale));
+  grp.add(new THREE.Mesh(wingL.honey, MAT.honey));
+  if (wingL.pale) grp.add(new THREE.Mesh(wingL.pale, MAT.pale));
+  // 眼
+  for (const sd of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.0135, 10, 8), MAT.eye);
+    eye.position.set(sd * 0.034, 0.362, 0.048);
+    grp.add(eye);
+  }
+  // 中央垂珠（凤凰口下，垂于柱前）
+  const beads = [];
+  const ring0 = new THREE.TorusGeometry(0.02, 0.007, 6, 14);
+  ring0.applyMatrix4(M4(0, -0.05, 0.10));
+  beads.push(ring0);
+  for (let i = 0; i < 6; i++) {
+    const b = new THREE.SphereGeometry(0.021, 8, 6);
+    b.applyMatrix4(M4(0, -0.12 - i * 0.062, 0.115));
+    beads.push(b);
+    if (i % 2 === 1) {
+      const r2 = new THREE.TorusGeometry(0.014, 0.005, 5, 12);
+      r2.applyMatrix4(M4(0, -0.155 - i * 0.062, 0.115));
+      beads.push(r2);
+    }
+  }
+  grp.add(new THREE.Mesh(mergeAll(beads), MAT.pale));
+  grp.position.set(0, 2.62, 0);
+  return grp;
+}
+
+// ---------- 双龙：大体量 S 形蜿蜒攀爬 ----------
+function buildDragon(s, rand) {
+  const grp = new THREE.Group();
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(s * 1.06, 1.36, 0.02),
+    new THREE.Vector3(s * 1.36, 1.34, 0.10),
+    new THREE.Vector3(s * 1.54, 1.55, 0.04),
+    new THREE.Vector3(s * 1.47, 1.80, -0.06),
+    new THREE.Vector3(s * 1.22, 1.98, 0.02),
+    new THREE.Vector3(s * 1.06, 2.26, 0.05),
+    new THREE.Vector3(s * 0.98, 2.44, 0.03)
+  ], false, 'centripetal');
+  const radiusFn = t => t < 0.7
+    ? 0.05 + (0.135 - 0.05) * (t / 0.7)
+    : 0.135 - (0.135 - 0.085) * ((t - 0.7) / 0.3);
+  grp.add(new THREE.Mesh(taperedTube(curve, radiusFn, 72, 10), MAT.deep));
+
+  // 鳞片（实例化，双排交错）
+  const SEG = 72;
+  const { pts, tans, nors, bins } = computeFrames(curve, SEG);
+  const M = 26, per = 8;
+  const dome = new THREE.SphereGeometry(0.03, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.scale(1, 0.8, 0.6);
+  const inst = new THREE.InstancedMesh(dome, MAT.scale, M * per);
+  let idx = 0;
+  const m4 = new THREE.Matrix4(), one = new THREE.Vector3(1, 1, 1);
+  const dir = new THREE.Vector3(), pos = new THREE.Vector3(), qq = new THREE.Quaternion();
+  const tiltQ = new THREE.Quaternion();
+  for (let i = 0; i < M; i++) {
+    const t = 0.15 + 0.73 * i / (M - 1);
+    const fi = Math.round(t * SEG);
+    const r = radiusFn(t);
+    for (let k = 0; k < per; k++) {
+      const a = k / per * Math.PI * 2 + (i % 2) * Math.PI / per;
+      dir.set(0, 0, 0)
+        .addScaledVector(nors[fi], Math.cos(a))
+        .addScaledVector(bins[fi], Math.sin(a)).normalize();
+      pos.copy(pts[fi]).addScaledVector(dir, r * 0.88);
+      tiltQ.setFromAxisAngle(XAXIS, -0.55);
+      qq.setFromUnitVectors(UP, dir).multiply(tiltQ);
+      const sc = 0.030 * (0.5 + r);
+      m4.compose(pos, qq, new THREE.Vector3(sc, sc, sc));
+      inst.setMatrixAt(idx++, m4);
+    }
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  grp.add(inst);
+
+  // 脊背鬃刺（沿 S 形外凸侧）
+  const trim = [];
+  for (let i = 4; i < SEG - 4; i += 3) {
+    const t = i / SEG;
+    if (t < 0.18 || t > 0.88) continue;
+    const cur = tans[i + 2].clone().sub(tans[i - 2]).normalize();
+    const convex = cur.multiplyScalar(-1).add(tans[i].clone().multiplyScalar(-cur.dot(tans[i]))).normalize();
+    const fin = featherGeo(0.085, 0.05, { notches: false });
+    const r = radiusFn(t);
+    const q = new THREE.Quaternion().setFromUnitVectors(UP, convex)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.9));
+    fin.applyMatrix4(M4(pts[i].x + convex.x * r * 0.96, pts[i].y + convex.y * r * 0.96, pts[i].z + convex.z * r * 0.96, q));
+    trim.push(fin);
+  }
+
+  // 龙首（朝上，有角有须）
+  const head = new THREE.Group();
+  head.position.copy(curve.getPointAt(1));
+  head.quaternion.setFromUnitVectors(UP, curve.getTangentAt(1));
+  head.rotateX(0.25);
+  const hg = [];
+  const cranium = new THREE.SphereGeometry(0.085, 14, 10);
+  cranium.scale(1, 0.85, 1.05); cranium.translate(0, 0.02, 0);
+  hg.push(cranium);
+  const snout = new THREE.BoxGeometry(0.11, 0.16, 0.12);
+  snout.translate(0, 0.12, 0.01);
+  hg.push(snout);
+  const nose = new THREE.SphereGeometry(0.05, 10, 8);
+  nose.scale(1.1, 0.7, 0.9); nose.translate(0, 0.205, 0.01);
+  hg.push(nose);
+  const jaw = new THREE.BoxGeometry(0.085, 0.11, 0.085);
+  jaw.translate(0, 0.045, 0.0);
+  hg.push(jaw);
+  const mouth = new THREE.BoxGeometry(0.085, 0.10, 0.10);
+  mouth.translate(0, 0.105, 0.005);
+  hg.push(mouth);
+  for (const sd of [-1, 1]) {
+    const ear = new THREE.SphereGeometry(0.045, 8, 6);
+    ear.scale(1.2, 0.5, 0.8); ear.translate(sd * 0.062, 0.03, -0.05);
+    hg.push(ear);
+  }
+  // 鹿角（主干 + 分叉）
+  for (const sd of [-1, 1]) {
+    const beam = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sd * 0.035, 0.08, -0.01),
+      new THREE.Vector3(sd * 0.075, 0.15, -0.03),
+      new THREE.Vector3(sd * 0.055, 0.22, -0.07),
+      new THREE.Vector3(sd * 0.02, 0.24, -0.10)]),
+      t => 0.017 * (1 - t) + 0.006, 16, 6);
+    hg.push(beam);
+    const tine1 = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sd * 0.058, 0.125, -0.025),
+      new THREE.Vector3(sd * 0.10, 0.16, -0.04)]),
+      t => 0.009 * (1 - t) + 0.003, 8, 5);
+    hg.push(tine1);
+    const tine2 = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sd * 0.048, 0.185, -0.055),
+      new THREE.Vector3(sd * 0.075, 0.225, -0.08)]),
+      t => 0.008 * (1 - t) + 0.003, 8, 5);
+    hg.push(tine2);
+  }
+  // 长须（飘逸卷曲）
+  for (const sd of [-1, 1]) {
+    const w = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sd * 0.045, 0.10, 0.03),
+      new THREE.Vector3(sd * 0.11, 0.14, 0.05),
+      new THREE.Vector3(sd * 0.18, 0.09, 0.07),
+      new THREE.Vector3(sd * 0.21, 0.0, 0.08)]),
+      t => 0.007 * (1 - t) + 0.002, 24, 5);
+    hg.push(w);
+  }
+  // 脑后鬃
+  for (const [rz, spread] of [[-2.42, 0.4], [-2.55, 0.0], [-2.42, -0.4]]) {
+    const f = featherGeo(0.13, 0.06, { notches: false });
+    const q = new THREE.Quaternion().setFromAxisAngle(XAXIS, rz)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(ZAXIS, spread));
+    f.applyMatrix4(M4(0, 0.07, -0.075, q));
+    hg.push(f);
+  }
+  head.add(new THREE.Mesh(mergeAll(hg), MAT.honey));
+  for (const sd of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), MAT.eye);
+    eye.position.set(sd * 0.056, 0.075, 0.030);
+    head.add(eye);
+  }
+  grp.add(head);
+  const trimMerged = mergeAll(trim);
+  if (trimMerged) grp.add(new THREE.Mesh(trimMerged, MAT.honey));
+
+  // 四肢 + 三趾爪
+  const legs = [];
+  function leg(t0, reach, down) {
+    const p0 = curve.getPointAt(t0);
+    const p1 = p0.clone().add(new THREE.Vector3(s * reach * 0.55, -down * 0.55, 0.07));
+    const p2 = p0.clone().add(new THREE.Vector3(s * reach, -down, 0.12));
+    legs.push(taperedTube(new THREE.CatmullRomCurve3([p0, p1, p2]), t => 0.034 * (1 - t) + 0.020, 12, 7));
+    const paw = new THREE.SphereGeometry(0.040, 10, 8);
+    paw.scale(1, 0.8, 1.1); paw.translate(p2.x, p2.y, p2.z);
+    legs.push(paw);
+    for (let k = -1; k <= 1; k++) {
+      const claw = taperedTube(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(p2.x, p2.y - 0.01, p2.z + 0.02),
+        new THREE.Vector3(p2.x + s * 0.015, p2.y - 0.035, p2.z + 0.045 + k * 0.014),
+        new THREE.Vector3(p2.x + s * 0.030, p2.y - 0.045, p2.z + 0.055 + k * 0.020)]),
+        t => 0.009 * (1 - t) + 0.0025, 8, 5);
+      legs.push(claw);
+    }
+  }
+  leg(0.55, -0.16, 0.24);  // 前肢攀柱
+  leg(0.30, 0.14, 0.20);   // 后肢蹬花团
+  grp.add(new THREE.Mesh(mergeAll(legs), MAT.honey));
+  return grp;
+}
+
+// ---------- 卷草蔓须 ----------
+function tendrilGeo(angle, r0, len, curl, tubeR, rand) {
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const px = -dy, py = dx;
+  const pts = [];
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    const r = r0 + len * t;
+    const w = Math.sin(t * Math.PI) * 0.05 * (1 - t);
+    let x = dx * r + px * w, y = dy * r + py * w;
+    if (t > 0.7) {
+      const ct = (t - 0.7) / 0.7 * 0.3 + 0.7;
+      const base_r = r0 + len * 0.7;
+      const bx = dx * base_r, by = dy * base_r;
+      const ca = (t - 0.7) / 0.3 * curl;
+      const cs = Math.cos(ca), sn = Math.sin(ca);
+      const ox = x - bx, oy = y - by;
+      x = bx + ox * cs - oy * sn; y = by + ox * sn + oy * cs;
+    }
+    pts.push(new THREE.Vector3(x, y, (rand() - 0.5) * 0.02));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 40, tubeR, 5);
+}
+
+// ---------- 尖柱根部镂空龙凤花团 ----------
+function buildCluster(s, rand) {
+  const geos = [], paleGeos = [];
+  // 中心大花
+  rosetteGeosAt(0, 0, 0, 0.14, 3, geos, paleGeos);
+  // 环绕卷草旋
+  for (let k = 0; k < 6; k++) {
+    const a = k / 6 * Math.PI * 2 + 0.26;
+    const c = new THREE.Vector3(Math.cos(a) * 0.185, Math.sin(a) * 0.185, 0.005);
+    geos.push(spiralGeo(c, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0),
+      0.012, 0.058, 1.8, a, 0.013, 0.018, rand, 34));
+  }
+  // 间位小花
+  for (let k = 0; k < 6; k++) {
+    const a = k / 6 * Math.PI * 2 + 0.26 + Math.PI / 6;
+    rosetteGeosAt(Math.cos(a) * 0.28, Math.sin(a) * 0.28, 0.004, 0.052, 2, geos, paleGeos);
+  }
+  // 叶片
+  for (let k = 0; k < 10; k++) {
+    const a = rand() * Math.PI * 2, r = 0.20 + rand() * 0.13;
+    const ls = 0.040 + rand() * 0.030;
+    const leaf = new THREE.SphereGeometry(1, 6, 4);
+    leaf.scale(ls, ls * 0.42, ls * 0.62);
+    const q = yawQ(a).multiply(new THREE.Quaternion().setFromAxisAngle(ZAXIS, (rand() - 0.5)));
+    leaf.applyMatrix4(M4(Math.cos(a) * r, Math.sin(a) * r, 0.002, q));
+    geos.push(leaf);
+  }
+  // 外展蔓须（向上连龙身、向下覆冠肩）
+  geos.push(tendrilGeo(Math.PI / 2 - 0.15 * s, 0.16, 0.30, 1.2 * s, 0.013, rand));
+  geos.push(tendrilGeo(-Math.PI / 2 + 0.3, 0.14, 0.30, -1.4 * s, 0.012, rand));
+  geos.push(tendrilGeo(Math.PI / 2 + 0.7, 0.12, 0.24, 1.8 * s, 0.011, rand));
+  geos.push(tendrilGeo(Math.PI / 2 - 0.75, 0.12, 0.24, -1.1 * s, 0.011, rand));
+  // 小花珠
+  for (let k = 0; k < 8; k++) {
+    const a = rand() * Math.PI * 2, r = 0.16 + rand() * 0.22;
+    const d = new THREE.SphereGeometry(0.016, 6, 5);
+    d.applyMatrix4(M4(Math.cos(a) * r, Math.sin(a) * r, 0.006));
+    paleGeos.push(d);
+  }
+  // 团中小龙（蜷曲 S 形 + 小首）
+  const md = [];
+  const mCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.02, -0.10, 0.02), new THREE.Vector3(0.10, -0.02, 0.04),
+    new THREE.Vector3(0.06, 0.08, 0.02), new THREE.Vector3(-0.02, 0.14, 0.0),
+    new THREE.Vector3(-0.10, 0.20, -0.02)]);
+  md.push(taperedTube(mCurve, t => 0.024 - 0.016 * t, 24, 7));
+  const mHead = new THREE.SphereGeometry(0.030, 10, 8);
+  mHead.scale(1, 0.85, 1.1); mHead.translate(-0.10, 0.215, -0.02);
+  md.push(mHead);
+  const mSnout = new THREE.ConeGeometry(0.014, 0.045, 6);
+  mSnout.rotateX(Math.PI / 2 - 0.3); mSnout.translate(-0.10, 0.20, 0.03);
+  md.push(mSnout);
+  for (const sd of [-1, 1]) {
+    const horn = new THREE.ConeGeometry(0.007, 0.045, 5);
+    horn.translate(-0.10 + sd * 0.018, 0.245, -0.03);
+    horn.rotateZ(sd * 0.5);
+    md.push(horn);
+    const eye = new THREE.SphereGeometry(0.006, 6, 5);
+    eye.translate(-0.10 + sd * 0.022, 0.22, 0.0);
+    md.push(eye);
+  }
+  md.push(spiralGeo(new THREE.Vector3(0.02, -0.10, 0.02),
+    new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), 0.006, 0.026, 1.4, 2.0, 0.008, 0.012, rand, 20));
+  geos.push(mergeAll(md));
+  // 团中小凤（三羽扇 + 身形）
+  const mp = [];
+  const mBody = new THREE.SphereGeometry(1, 8, 6);
+  mBody.scale(0.026, 0.048, 0.020); mBody.translate(-0.13, -0.14, 0.02);
+  mp.push(mBody);
+  for (let k = -1; k <= 1; k++) {
+    const f = featherGeo(0.085, 0.045, { notches: false });
+    const q = new THREE.Quaternion().setFromAxisAngle(XAXIS, -0.7)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(ZAXIS, k * 0.45));
+    f.applyMatrix4(M4(-0.13 + k * 0.012, -0.11, 0.02, q));
+    mp.push(f);
+  }
+  const mBeak = new THREE.ConeGeometry(0.008, 0.03, 6);
+  mBeak.rotateX(Math.PI / 2); mBeak.translate(-0.13, -0.10, 0.055);
+  mp.push(mBeak);
+  geos.push(mergeAll(mp));
+
+  const grp = new THREE.Group();
+  const honeyMerged = mergeAll(geos);
+  if (honeyMerged) grp.add(new THREE.Mesh(honeyMerged, MAT.honey));
+  if (paleGeos.length) grp.add(new THREE.Mesh(mergeAll(paleGeos), MAT.pale));
+  grp.position.set(s * 1.037, 1.329, 0);
+  grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(s * 0.94, 0.34, 0).normalize());
+  return grp;
+}
+
+// ---------- 两侧坠饰长串（花片渐大、层数渐多、垂坠感） ----------
+function buildTassel(s, th, z, len, rand) {
+  const grp = new THREE.Group();
+  const anchor = bandPoint(th, 1.58, z);
+  const bow = 0.10 + rand() * 0.06;
+  const pts = [
+    anchor.clone(),
+    anchor.clone().add(new THREE.Vector3(s * 0.05, -0.14, 0)),
+    anchor.clone().add(new THREE.Vector3(s * bow, -0.32, 0.01)),
+    anchor.clone().add(new THREE.Vector3(s * (bow + 0.06), -0.55, 0.015)),
+    anchor.clone().add(new THREE.Vector3(s * (bow + 0.10), -0.55 - len, 0.02))];
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  const face = new THREE.Vector3(s * 0.45, -0.1, 0.89).normalize();
+  const fq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), face);
+  const pale = [], honey = [];
+  // 顶部连接环
+  const ring0 = new THREE.TorusGeometry(0.030, 0.009, 6, 16);
+  ring0.applyMatrix4(M4(anchor.x, anchor.y, anchor.z, fq));
+  honey.push(ring0);
+  const link = (t) => {
+    const p = curve.getPointAt(t);
+    const ring = new THREE.TorusGeometry(0.026, 0.007, 5, 14);
+    ring.applyMatrix4(M4(p.x, p.y, p.z, fq));
+    honey.push(ring);
+  };
+  const rosetteAt = (t, r, layers) => {
+    const p = curve.getPointAt(t);
+    const h0 = honey.length, p0 = pale.length;
+    rosetteGeosAt(0, 0, 0, r, layers, honey, pale);
+    for (let i = h0; i < honey.length; i++) {
+      const g = honey[i].clone();
+      g.applyMatrix4(M4(p.x, p.y, p.z, fq));
+      honey[i] = g;
+    }
+    for (let i = p0; i < pale.length; i++) {
+      const g = pale[i].clone();
+      g.applyMatrix4(M4(p.x, p.y, p.z, fq));
+      pale[i] = g;
+    }
+  };
+  const cloudAt = (t, r) => {
+    const p = curve.getPointAt(t);
+    const c = spiralGeo(new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0),
+      0.006, r, 1.7, t * 5, 0.012, 0.015, rand, 26);
+    c.applyMatrix4(M4(p.x, p.y, p.z, fq));
+    honey.push(c);
+  };
+  // 七节：花片与卷云交替，越往下越大、层数越多
+  link(0.05); rosetteAt(0.10, 0.055, 1);
+  link(0.20); cloudAt(0.26, 0.062);
+  link(0.33); rosetteAt(0.39, 0.070, 2);
+  link(0.46); cloudAt(0.52, 0.078);
+  link(0.58); rosetteAt(0.64, 0.085, 2);
+  link(0.71); cloudAt(0.77, 0.092);
+  link(0.82); rosetteAt(0.88, 0.100, 3);
+  // 末端大坠：三层大花 + 水滴坠 + 珠滴
+  const end = curve.getPointAt(0.985);
+  const h0 = honey.length, p0 = pale.length;
+  rosetteGeosAt(0, 0, 0, 0.115, 3, honey, pale);
+  for (let i = h0; i < honey.length; i++) {
+    const g = honey[i].clone();
+    g.applyMatrix4(M4(end.x, end.y, end.z, fq));
+    honey[i] = g;
+  }
+  for (let i = p0; i < pale.length; i++) {
+    const g = pale[i].clone();
+    g.applyMatrix4(M4(end.x, end.y, end.z, fq));
+    pale[i] = g;
+  }
+  const dropPts = [[0.001, 0], [0.030, 0.012], [0.042, 0.05], [0.030, 0.09], [0.001, 0.115]]
+    .map(p => new THREE.Vector2(p[0], p[1]));
+  const drop = new THREE.LatheGeometry(dropPts, 14);
+  drop.rotateZ(Math.PI);
+  drop.translate(end.x, end.y - 0.115, end.z);
+  pale.push(drop);
+  for (let k = -1; k <= 1; k++) {
+    const str = taperedTube(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(end.x, end.y - 0.06, end.z),
+      new THREE.Vector3(end.x + k * 0.030, end.y - 0.13, end.z + 0.01)]),
+      t => 0.004, 6, 4, false);
+    honey.push(str);
+    const bd = new THREE.SphereGeometry(0.015, 7, 5);
+    bd.applyMatrix4(M4(end.x + k * 0.034, end.y - 0.145, end.z + 0.012));
+    pale.push(bd);
+  }
+  grp.add(new THREE.Mesh(mergeAll(honey), MAT.honey));
+  if (pale.length) grp.add(new THREE.Mesh(mergeAll(pale), MAT.pale));
+  return grp;
+}
+
+// ---------- 组装 ----------
+const rand = mulberry32(20240925);
+const explodeParts = [];
+function reg(obj, dir, dist) {
+  explodeParts.push({
+    obj, base: obj.position.clone(),
+    dir: new THREE.Vector3(dir[0], dir[1], dir[2]).normalize(), dist
+  });
+}
+function addMerged(grp, part, mat) {
+  if (part) grp.add(new THREE.Mesh(part, mat || MAT.honey));
+}
+
+// 冠壁三层（前 / 胎体 / 后）
+const layerF = buildVineLayer(0.085, mulberry32(11));
+const layerB = buildVineLayer(-0.085, mulberry32(23));
+const gFront = new THREE.Group(), gBack = new THREE.Group();
+addMerged(gFront, layerF.honey, MAT.honey); addMerged(gFront, layerF.pale, MAT.pale);
+addMerged(gBack, layerB.honey, MAT.honey); addMerged(gBack, layerB.pale, MAT.pale);
+const coreParts = buildCore(rand);
+const gCore = new THREE.Group();
+gCore.add(coreParts.sheet); gCore.add(coreParts.core);
+reg(gFront, [0, 0, 1], 0.55);
+reg(gBack, [0, 0, -1], 0.55);
+scene.add(gFront, gBack, gCore);
+
+// 冠脚
+const footR = buildFoot(1, rand), footL = buildFoot(-1, rand);
+reg(footR, [0.85, -0.3, 0], 0.4);
+reg(footL, [-0.85, -0.3, 0], 0.4);
+scene.add(footR, footL);
+
+// 中央尖柱
+const col = buildColumn(rand);
+const gColumn = new THREE.Group();
+addMerged(gColumn, col.honey); addMerged(gColumn, col.pale, MAT.pale);
+reg(gColumn, [0, 1, 0], 0.35);
+scene.add(gColumn);
+
+// 柱顶凤凰
+const phoenix = buildPhoenix(rand);
+reg(phoenix, [0, 1, 0], 0.9);
+scene.add(phoenix);
+
+// 双龙 + 根部龙凤花团
+const dragonR = buildDragon(1, rand), dragonL = buildDragon(-1, rand);
+const clusterR = buildCluster(1, rand), clusterL = buildCluster(-1, rand);
+reg(dragonR, [0.55, 0.5, 0.12], 0.8);
+reg(dragonL, [-0.55, 0.5, 0.12], 0.8);
+reg(clusterR, [1, 0.25, 0], 0.85);
+reg(clusterL, [-1, 0.25, 0], 0.85);
+scene.add(dragonR, dragonL, clusterR, clusterL);
+
+// 两侧坠饰长串（每侧三串：两长一短）
+const tasselSpecs = [
+  [1, 0.209, 0.13, 0.50], [1, 0.454, -0.13, 0.50], [1, 0.698, 0.0, 0.42],
+  [-1, Math.PI - 0.209, -0.13, 0.50], [-1, Math.PI - 0.454, 0.13, 0.50], [-1, Math.PI - 0.698, 0.0, 0.42]
+];
+for (const [s, th, z, len] of tasselSpecs) {
+  const t = buildTassel(s, th, z, len, rand);
+  reg(t, [s * 0.5, -0.55, 0], 0.85);
+  scene.add(t);
+}
+
+// ---------- UI 交互 ----------
+const explodeSlider = document.getElementById('explode');
+const explodeVal = document.getElementById('explodeVal');
+let explodeTarget = 0, explodeCur = 0;
+function setExplode(v) {
+  explodeTarget = v;
+  explodeSlider.value = Math.round(v * 100);
+  explodeVal.textContent = Math.round(v * 100) + '%';
+}
+explodeSlider.addEventListener('input', () => setExplode(explodeSlider.value / 100));
+renderer.domElement.addEventListener('dblclick', () => setExplode(explodeTarget > 0.5 ? 0 : 1));
+document.getElementById('spin').addEventListener('change', e => {
+  controls.autoRotate = e.target.checked;
+});
+document.getElementById('reset').addEventListener('click', () => {
+  camera.position.copy(CAM0);
+  controls.target.copy(TGT0);
+  controls.update();
+});
+
+// ---------- 渲染循环 ----------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  controls.update();
+  explodeCur += (explodeTarget - explodeCur) * Math.min(1, dt * 6);
+  for (const p of explodeParts) {
+    p.obj.position.copy(p.base).addScaledVector(p.dir, explodeCur * p.dist);
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+document.getElementById('loading').classList.add('hide');
+window.__crown = {
+  ready: true, scene, camera, controls, renderer,
+  setView(az, pol, d) {
+    controls.autoRotate = false;
+    camera.position.set(
+      TGT0.x + d * Math.sin(pol) * Math.sin(az),
+      TGT0.y + d * Math.cos(pol),
+      TGT0.z + d * Math.sin(pol) * Math.cos(az));
+    controls.target.copy(TGT0);
+    controls.update();
+  },
+  setExplode
+};
+</script>
+</body>
+</html>

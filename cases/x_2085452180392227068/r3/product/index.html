@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Furious Birds — Slingshot Siege</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-container">
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-pill" id="hud-level">LEVEL 1</div>
+    <div class="hud-pill hud-score" id="hud-score">SCORE&nbsp;<span id="score-val">0</span></div>
+    <div class="hud-buttons">
+      <button type="button" class="icon-btn" id="btn-mute" title="Sound on/off">
+        <svg viewBox="0 0 24 24" class="ic-on"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 24" class="ic-off"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/><path d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-restart" title="Restart level">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1.5L6.5 7 12 12.5V9a6 6 0 1 1-6 6H3.5A8.5 8.5 0 1 0 12 5z" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-pause" title="Pause">
+        <svg viewBox="0 0 24 24"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Title screen -->
+  <div id="overlay-title" class="overlay">
+    <div class="panel title-panel">
+      <div class="logo">
+        <span class="lg l1">F</span><span class="lg l2">U</span><span class="lg l3">R</span><span class="lg l4">I</span><span class="lg l5">O</span><span class="lg l6">U</span><span class="lg l7">S</span>
+        <div class="logo-sub"><span class="lg b1">B</span><span class="lg b2">I</span><span class="lg b3">R</span><span class="lg b4">D</span><span class="lg b5">S</span></div>
+      </div>
+      <p class="tagline">The pigs stole your eggs. They built forts. Big mistake.</p>
+      <button type="button" class="btn btn-big btn-green" id="btn-play">▶&nbsp; PLAY</button>
+      <button type="button" class="btn btn-orange" id="btn-levels">LEVEL SELECT</button>
+      <p class="hint">Drag the slingshot to aim · release to launch · tap mid-flight to trigger bird powers</p>
+    </div>
+  </div>
+
+  <!-- Level select -->
+  <div id="overlay-levels" class="overlay hidden">
+    <div class="panel">
+      <h2 class="panel-title">SELECT LEVEL</h2>
+      <div id="level-grid" class="level-grid"></div>
+      <button type="button" class="btn btn-orange" id="btn-levels-back">← BACK</button>
+    </div>
+  </div>
+
+  <!-- Level complete -->
+  <div id="overlay-complete" class="overlay hidden">
+    <div class="panel">
+      <h2 class="panel-title" id="complete-title">LEVEL COMPLETE!</h2>
+      <div class="stars-row">
+        <svg class="star" id="star1" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6 1-4.8 4.6 1.2 6.6L12 17.8 6.1 20.5l1.2-6.6L2.5 9.3l6.6-1z"/></svg>
+        <svg class="star star-big" id="star2" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6 1-4.8 4.6 1.2 6.6L12 17.8 6.1 20.5l1.2-6.6L2.5 9.3l6.6-1z"/></svg>
+        <svg class="star" id="star3" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6 1-4.8 4.6 1.2 6.6L12 17.8 6.1 20.5l1.2-6.6L2.5 9.3l6.6-1z"/></svg>
+      </div>
+      <div class="score-lines">
+        <div class="score-line">PIGS &amp; BLOCKS <span id="complete-score">0</span></div>
+        <div class="score-line">BIRD BONUS <span id="complete-bonus">+0</span></div>
+        <div class="score-line total">TOTAL <span id="complete-total">0</span></div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-orange" id="btn-complete-menu">MENU</button>
+        <button type="button" class="btn btn-blue" id="btn-complete-replay">REPLAY</button>
+        <button type="button" class="btn btn-big btn-green" id="btn-complete-next">NEXT ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="overlay-gameover" class="overlay hidden">
+    <div class="panel">
+      <h2 class="panel-title">OUT OF BIRDS!</h2>
+      <p class="panel-sub">The pigs are still standing…</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-orange" id="btn-gameover-menu">MENU</button>
+        <button type="button" class="btn btn-big btn-green" id="btn-gameover-retry">↻ TRY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="panel">
+      <h2 class="panel-title">PAUSED</h2>
+      <div class="btn-col">
+        <button type="button" class="btn btn-big btn-green" id="btn-resume">RESUME</button>
+        <button type="button" class="btn btn-blue" id="btn-pause-restart">RESTART LEVEL</button>
+        <button type="button" class="btn btn-orange" id="btn-pause-menu">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

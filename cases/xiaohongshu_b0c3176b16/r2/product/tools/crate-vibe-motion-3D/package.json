@@ -1,0 +1,11 @@
+{
+  "name": "crate-vibe-motion-3d",
+  "version": "1.0.0",
+  "description": "Vibe Motion 3D — 用无头浏览器把 Three.js/ WebGL 3D 场景录制成 9:16 竖屏解说动画（含配音合成）",
+  "type": "module",
+  "bin": {
+    "crate-vibe-motion-3D": "cli.js"
+  },
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

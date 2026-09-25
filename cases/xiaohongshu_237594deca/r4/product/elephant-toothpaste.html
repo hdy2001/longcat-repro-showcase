@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大象牙膏 · 3D 化学实验演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #101219;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  #app, #app canvas { position: fixed; inset: 0; display: block; }
+
+  .title {
+    position: fixed; top: 24px; left: 28px; z-index: 5;
+    color: #fff; pointer-events: none; user-select: none;
+  }
+  .title h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: 3px;
+    text-shadow: 0 2px 16px rgba(255, 46, 150, .45);
+  }
+  .title h1 em { font-style: normal; color: #ff4aa8; }
+  .title p {
+    margin-top: 7px; font-size: 12px; letter-spacing: 2px;
+    color: rgba(255, 255, 255, .5);
+  }
+
+  footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 16px 16px 22px;
+    pointer-events: none;
+  }
+  #eruptBtn {
+    pointer-events: auto; cursor: pointer;
+    border: none; outline: none; font-family: inherit;
+    padding: 14px 44px; font-size: 17px; font-weight: 600; letter-spacing: 3px;
+    color: #fff; border-radius: 999px;
+    background: linear-gradient(135deg, #ff2e96, #ff6fb5);
+    box-shadow: 0 0 26px rgba(255, 46, 150, .55), inset 0 1px 0 rgba(255, 255, 255, .35);
+    transition: transform .15s ease, box-shadow .15s ease, opacity .25s ease;
+  }
+  #eruptBtn:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 0 40px rgba(255, 46, 150, .85), inset 0 1px 0 rgba(255, 255, 255, .4);
+  }
+  #eruptBtn:active:not(:disabled) { transform: translateY(0) scale(.99); }
+  #eruptBtn:disabled { opacity: .55; cursor: wait; }
+  .hint { font-size: 12px; letter-spacing: 2px; color: rgba(255, 255, 255, .38); user-select: none; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<header class="title">
+  <h1><em>大象牙膏</em> · Elephant's Toothpaste</h1>
+  <p>3D 化学实验演示 &nbsp;|&nbsp; 过氧化氢 + 碘化钾 + 洗洁精</p>
+</header>
+
+<footer>
+  <button id="eruptBtn">🪥 开始喷发</button>
+  <p class="hint">拖拽旋转 · 滚轮缩放</p>
+</footer>
+
+<script>
+  window.addEventListener('error', function (e) {
+    document.title = 'ERR: ' + (e.message || 'unknown');
+  });
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= 基础渲染器 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOG_COLOR = 0x101219;
+scene.fog = new THREE.Fog(FOG_COLOR, 55, 240);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(11, 8, 21);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 5.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 10;
+controls.maxDistance = 140;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.55;
+
+/* 环境反射：自制柔和摄影棚（比 RoomEnvironment 暗，玻璃更通透） */
+function makeEnvScene() {
+  const s = new THREE.Scene();
+  s.background = new THREE.Color(0x0b0d12);
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mk = (r, g, b, i, x, y, z, sx, sy, sz) => {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: new THREE.Color(r * i, g * i, b * i)
+    }));
+    m.position.set(x, y, z);
+    m.scale.set(sx, sy, sz);
+    s.add(m);
+  };
+  mk(1, 1, 1, 3.2, 0, 9, 0, 7, 0.6, 7);        // 顶部柔光箱
+  mk(0.75, 0.85, 1, 1.1, -9, 4, -5, 0.6, 7, 9); // 冷色侧光
+  mk(1, 0.85, 0.7, 0.8, 9, 3, 5, 0.6, 5, 7);   // 暖色侧光
+  return s;
+}
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(makeEnvScene(), 0.06).texture;
+
+/* ================= 无缝背景：穹顶渐变 + 雾 ================= */
+const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(480, 32, 24),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      vertexShader: `
+        varying vec3 vP;
+        void main() {
+          vP = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vP;
+        void main() {
+          float h = normalize(vP).y;
+          vec3 top = vec3(0.090, 0.110, 0.170);
+          vec3 mid = vec3(0.016, 0.020, 0.032);
+          vec3 bot = vec3(0.0052, 0.0060, 0.0097); /* == 雾色 0x101219 的线性值 */
+          vec3 c = h < 0.28
+            ? mix(bot, mid, smoothstep(-0.6, 0.28, h))
+            : mix(mid, top, pow(smoothstep(0.28, 0.9, h), 0.7));
+          gl_FragColor = vec4(c, 1.0);
+        }`
+    })
+  );
+dome.renderOrder = -10;
+dome.frustumCulled = false;
+scene.add(dome);
+
+/* ================= 灯光 ================= */
+scene.add(new THREE.HemisphereLight(0xcfd8ea, 0x2a2620, 0.55));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+keyLight.position.set(18, 30, 14);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -30;
+keyLight.shadow.camera.right = 30;
+keyLight.shadow.camera.top = 42;
+keyLight.shadow.camera.bottom = -10;
+keyLight.shadow.camera.near = 5;
+keyLight.shadow.camera.far = 90;
+keyLight.shadow.bias = -0.0004;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x9fb4ff, 0.35);
+fillLight.position.set(-20, 12, -18);
+scene.add(fillLight);
+
+/* 反应时烧瓶内的粉色辉光 */
+const flaskLight = new THREE.PointLight(0xff4aa8, 0, 26, 2);
+flaskLight.position.set(0, 4.5, 0);
+scene.add(flaskLight);
+
+/* ================= 地面：1000x1000 灰色反光平面 ================= */
+const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(1000, 1000),
+  new THREE.MeshStandardMaterial({
+    color: 0x565b64, roughness: 0.45, metalness: 0.18, envMapIntensity: 0.3
+  })
+);
+plane.rotation.x = -Math.PI / 2;
+plane.receiveShadow = true;
+scene.add(plane);
+
+/* 烧瓶底部接触阴影（柔和渐变贴片） */
+{
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(128, 128, 8, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(0.55, 'rgba(0,0,0,0.26)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const blob = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 14),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
+  );
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.02;
+  scene.add(blob);
+}
+
+/* ================= 三角烧瓶（车削成型：扁底 + 圆锥瓶身 + 圆柱颈 + 瓶口翻边） ================= */
+const flaskPts = [
+  [0.00, 0.00], [3.55, 0.00], [4.15, 0.10], [4.28, 0.45],  // 扁平底部 + 微倒角
+  [4.05, 1.20], [3.40, 2.20], [2.55, 4.20],                 // 圆锥瓶身（向下逐渐变宽）
+  [1.85, 6.00], [1.45, 7.20], [1.28, 7.65],                 // 锥颈过渡圆弧
+  [1.25, 9.30],                                               // 圆柱形瓶颈
+  [1.42, 9.80], [1.52, 10.05], [1.30, 10.08], [1.16, 9.55]   // 瓶口外翻边 + 内壁折返
+].map(p => new THREE.Vector2(p[0], p[1]));
+
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.9,
+  roughness: 0.05,
+  metalness: 0.35,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.03,
+  transmission: 0.95,
+  ior: 1.5,
+  side: THREE.DoubleSide,
+  depthWrite: false,          // 关键：不写入深度，保证瓶内液体/泡沫清晰可见
+  envMapIntensity: 0.9,
+  specularIntensity: 1.0
+});
+const flask = new THREE.Mesh(new THREE.LatheGeometry(flaskPts, 96), glassMat);
+flask.renderOrder = 10;        // 玻璃最后渲染，高于液体
+scene.add(flask);
+
+/* ================= 瓶内液体：约 1/3 高度荧光粉，贴合内壁 ================= */
+const LIQUID_Y = 3.4;
+const liquidPts = [
+  [0.00, 0.03], [3.50, 0.03], [4.00, 0.14], [4.08, 0.55],
+  [3.28, 2.20], [2.77, LIQUID_Y], [0.00, LIQUID_Y]            // 顶面平整收拢到轴线
+].map(p => new THREE.Vector2(p[0], p[1]));
+
+const liquidMat = new THREE.MeshPhysicalMaterial({
+  color: 0xff3d9e,
+  roughness: 0.15,
+  metalness: 0.0,
+  clearcoat: 0.8,
+  clearcoatRoughness: 0.25,
+  emissive: 0xff2e96,
+  emissiveIntensity: 0.55,
+  envMapIntensity: 0.6
+});
+const liquid = new THREE.Mesh(new THREE.LatheGeometry(liquidPts, 72), liquidMat);
+liquid.renderOrder = 5;
+liquid.castShadow = true;
+scene.add(liquid);
+
+/* 喷发时瓶内液面上方涌起的泡沫帽 */
+const capMat = new THREE.MeshPhysicalMaterial({
+  color: 0xff5fb0, roughness: 0.45,
+  emissive: 0xff2e96, emissiveIntensity: 0.7,
+  clearcoat: 0.4, envMapIntensity: 0.5
+});
+const cap = new THREE.Mesh(new THREE.SphereGeometry(2.55, 40, 24), capMat);
+cap.position.y = LIQUID_Y + 0.05;
+cap.scale.set(0.001, 0.3, 0.001);
+scene.add(cap);
+
+/* ================= 泡沫粒子系统（Points + 自定义着色器） ================= */
+const MAXP = 18000;
+const MOUTH_Y = 10.05;
+const MAX_FRONT = 30;          // 泡沫柱高度 ≥ 烧瓶高度(10) 的 3 倍
+const ERUPT_DUR = 6.5;
+
+const foamGeo = new THREE.BufferGeometry();
+const posArr = new Float32Array(MAXP * 3);
+const aScale = new Float32Array(MAXP);
+const aRand = new Float32Array(MAXP);
+const aAlpha = new Float32Array(MAXP);
+for (let i = 0; i < MAXP; i++) posArr[i * 3 + 1] = -999;
+foamGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+foamGeo.setAttribute('aScale', new THREE.BufferAttribute(aScale, 1));
+foamGeo.setAttribute('aRand', new THREE.BufferAttribute(aRand, 1));
+foamGeo.setAttribute('aAlpha', new THREE.BufferAttribute(aAlpha, 1));
+
+const foamUniforms = {
+  uScaleFactor: { value: 1000 },
+  uMaxSize: { value: 1024 },
+  uColorA: { value: new THREE.Color(0xff2e96) },   // 荧光粉（深）
+  uColorB: { value: new THREE.Color(0xff8fd0) },   // 荧光粉（浅）
+  uGlow: { value: 0.55 },
+  uFade: { value: 1.0 }
+};
+
+const foamMat = new THREE.ShaderMaterial({
+  uniforms: foamUniforms,
+  transparent: true,
+  depthWrite: false,
+  vertexShader: `
+    attribute float aScale;
+    attribute float aRand;
+    attribute float aAlpha;
+    varying float vRand;
+    varying float vAlpha;
+    uniform float uScaleFactor;
+    uniform float uMaxSize;
+    void main() {
+      vRand = aRand;
+      vAlpha = aAlpha;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      float ps = aScale * uScaleFactor / max(0.1, -mv.z);
+      gl_PointSize = min(ps, uMaxSize);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vRand;
+    varying float vAlpha;
+    uniform vec3 uColorA;
+    uniform vec3 uColorB;
+    uniform float uGlow;
+    uniform float uFade;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    void main() {
+      vec2 p = gl_PointCoord * 2.0 - 1.0;
+      float r2 = dot(p, p);
+      if (r2 > 1.0) discard;
+      /* 噪声扰动的柔和边缘 —— 蓬松不规则，而非孤立硬边小球 */
+      float nz = hash(floor((gl_PointCoord + vRand * 13.7) * 7.0));
+      float edge = 1.0 - smoothstep(0.45, 1.0, r2 + (nz - 0.5) * 0.55);
+      if (edge < 0.01) discard;
+      /* 伪球面光照：让每颗粒子有体积感，叠加后相互融合 */
+      vec3 n = vec3(p.x, -p.y, sqrt(max(0.0, 1.0 - r2)));
+      vec3 L = normalize(vec3(0.45, 0.8, 0.55));
+      float wrap = pow(clamp(dot(n, L) * 0.5 + 0.5, 0.0, 1.0), 1.6);
+      float rim = pow(1.0 - n.z, 2.0);
+      vec3 base = mix(uColorA, uColorB, vRand);
+      vec3 col = base * (0.38 + 0.75 * wrap);
+      col += base * rim * 0.5;
+      col += uGlow * base * (0.55 + 0.45 * wrap);   // 自发光
+      gl_FragColor = vec4(col, edge * vAlpha * uFade);
+    }`
+});
+const foam = new THREE.Points(foamGeo, foamMat);
+foam.renderOrder = 20;
+foam.frustumCulled = false;
+scene.add(foam);
+
+/* 粒子 CPU 端数据 */
+const vel = new Float32Array(MAXP * 3);
+const tgt = new Float32Array(MAXP * 3);
+const alpha = new Float32Array(MAXP);
+const alphaT = new Float32Array(MAXP);
+const seedA = new Float32Array(MAXP);
+const mode = new Uint8Array(MAXP);   // 0=未激活 1=柱体 2=飞溅
+let cursor = 0;
+
+function emitColumn() {
+  const i = cursor; cursor = (cursor + 1) % MAXP;
+  const i3 = i * 3;
+  const s = frontH * Math.pow(Math.random(), 0.8);   // 底部更密
+  const sd = Math.random();
+  const ang = Math.random() * Math.PI * 2;
+  let prof = 2.5 + 0.35 * Math.sin(s * 0.5 + sd * 6.283) + (Math.random() - 0.5) * 0.9;
+  prof += 1.25 * Math.exp(-s * 0.55);                  // 瓶口处向外翻涌的泡沫堆
+  prof = THREE.MathUtils.clamp(prof, 1.5, 3.9);
+  tgt[i3]     = Math.cos(ang) * prof + (Math.random() - 0.5) * 0.6;
+  tgt[i3 + 1] = MOUTH_Y + s;
+  tgt[i3 + 2] = Math.sin(ang) * prof + (Math.random() - 0.5) * 0.6;
+  posArr[i3]     = Math.cos(ang) * 0.9;
+  posArr[i3 + 1] = MOUTH_Y + 0.2;
+  posArr[i3 + 2] = Math.sin(ang) * 0.9;
+  vel[i3]     = (Math.random() - 0.5) * 2.5;
+  vel[i3 + 1] = 5 + Math.random() * 5;                // 初始上冲
+  vel[i3 + 2] = (Math.random() - 0.5) * 2.5;
+  seedA[i] = sd;
+  mode[i] = 1;
+  aScale[i] = 1.15 + Math.random() * 1.25 + (1 - Math.min(s / MAX_FRONT, 1)) * 0.5;
+  aRand[i] = Math.random();
+  alphaT[i] = 0.55 + Math.random() * 0.35;
+  alpha[i] = 0;
+}
+
+function emitSpray() {
+  const i = cursor; cursor = (cursor + 1) % MAXP;
+  const i3 = i * 3;
+  const ang = Math.random() * Math.PI * 2;
+  const out = 1.2 + Math.random() * 2.6;
+  posArr[i3] = Math.cos(ang) * 0.8; posArr[i3 + 1] = MOUTH_Y + 0.3; posArr[i3 + 2] = Math.sin(ang) * 0.8;
+  vel[i3] = Math.cos(ang) * out; vel[i3 + 1] = 8 + Math.random() * 8; vel[i3 + 2] = Math.sin(ang) * out;
+  mode[i] = 2;
+  aScale[i] = 0.8 + Math.random() * 0.9;
+  aRand[i] = Math.random();
+  alphaT[i] = 0.5 + Math.random() * 0.3;
+  alpha[i] = 0;
+}
+
+const posAttr = foamGeo.attributes.position;
+const alphaAttr = foamGeo.attributes.aAlpha;
+
+function updateFoam(dt, t) {
+  const k = 7.5;
+  const damp = Math.exp(-3.0 * dt);
+  for (let i = 0; i < MAXP; i++) {
+    const m = mode[i];
+    if (!m) continue;
+    const i3 = i * 3;
+    if (m === 1) {
+      /* 弹簧吸附到柱体槽位 → 柱状稳定不散落 */
+      vel[i3]     += (tgt[i3]     - posArr[i3])     * k * dt;
+      vel[i3 + 1] += (tgt[i3 + 1] - posArr[i3 + 1]) * k * dt;
+      vel[i3 + 2] += (tgt[i3 + 2] - posArr[i3 + 2]) * k * dt;
+      vel[i3] *= damp; vel[i3 + 1] *= damp; vel[i3 + 2] *= damp;
+      posArr[i3] += vel[i3] * dt; posArr[i3 + 1] += vel[i3 + 1] * dt; posArr[i3 + 2] += vel[i3 + 2] * dt;
+      alpha[i] += (alphaT[i] - alpha[i]) * Math.min(1, 8 * dt);
+      /* 表面蠕动：轮廓起伏凹凸 */
+      const sd = seedA[i];
+      const wob = 0.24;
+      posArr[i3]     += Math.sin(t * 1.9 + sd * 43.7) * wob;
+      posArr[i3 + 1] += Math.sin(t * 2.3 + sd * 17.1) * wob * 0.6;
+      posArr[i3 + 2] += Math.cos(t * 1.6 + sd * 29.3) * wob;
+    } else {
+      /* 飞溅液滴：抛物线散落 */
+      vel[i3 + 1] -= 20 * dt;
+      posArr[i3] += vel[i3] * dt; posArr[i3 + 1] += vel[i3 + 1] * dt; posArr[i3 + 2] += vel[i3 + 2] * dt;
+      alpha[i] += (alphaT[i] - alpha[i]) * Math.min(1, 6 * dt);
+      if (posArr[i3 + 1] < 0.5 || alpha[i] <= 0.01) {
+        mode[i] = 0; alpha[i] = 0; posArr[i3 + 1] = -999;
+      }
+    }
+    alphaAttr.array[i] = alpha[i];
+  }
+  posAttr.needsUpdate = true;
+  alphaAttr.needsUpdate = true;
+}
+
+/* ================= 状态机 & 镜头 ================= */
+let state = 'idle';           // idle | erupting | holding | resetting
+let eruptT = 0;
+let frontH = 0;
+let fade = 1;
+let emitAcc = 0, sprayAcc = 0;
+let camTween = null;
+
+const IDLE_POS = new THREE.Vector3(11, 8, 21);
+const IDLE_TGT = new THREE.Vector3(0, 5.2, 0);
+const ERUPT_POS = new THREE.Vector3(24, 21.5, 59.5);
+const ERUPT_TGT = new THREE.Vector3(0, 18.5, 0);
+
+const btn = document.getElementById('eruptBtn');
+
+function tweenCam(toPos, toTgt, dur) {
+  camTween = {
+    t: 0, dur,
+    p0: camera.position.clone(), p1: toPos.clone(),
+    t0: controls.target.clone(), t1: toTgt.clone()
+  };
+  controls.enabled = false;
+}
+
+function startEruption() {
+  state = 'erupting';
+  eruptT = 0;
+  frontH = 0;
+  controls.autoRotate = false;
+  tweenCam(ERUPT_POS, ERUPT_TGT, 3.0);
+  btn.disabled = true;
+  btn.textContent = '喷发中…';
+}
+
+function resetDemo() {
+  state = 'resetting';
+  controls.autoRotate = false;
+  btn.disabled = true;
+  btn.textContent = '重置中…';
+  tweenCam(IDLE_POS, IDLE_TGT, 2.5);
+}
+
+btn.addEventListener('click', () => {
+  if (state === 'idle') startEruption();
+  else if (state === 'holding') resetDemo();
+});
+
+/* ================= 后期：辉光 ================= */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.4, 0.85);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+/* ================= 主循环 ================= */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  /* --- 喷发状态机 --- */
+  if (state === 'erupting') {
+    eruptT += dt;
+    const k = Math.min(eruptT / ERUPT_DUR, 1);
+    frontH = MAX_FRONT * (1 - Math.pow(1 - k, 3));   // easeOutCubic：先冲后稳
+    if (eruptT > 0.35) {
+      emitAcc += dt * 2400;
+      while (emitAcc >= 1) { emitAcc -= 1; emitColumn(); }
+    }
+    if (eruptT < 2.6) {
+      sprayAcc += dt * 500;
+      while (sprayAcc >= 1) { sprayAcc -= 1; emitSpray(); }
+    }
+    if (eruptT > ERUPT_DUR + 0.6) {
+      state = 'holding';
+      btn.disabled = false;
+      btn.textContent = '↺ 重置演示';
+    }
+  }
+
+  if (state === 'resetting') {
+    fade = Math.max(0, fade - dt * 1.4);
+    foamUniforms.uFade.value = fade;
+    cap.scale.multiplyScalar(Math.max(0, 1 - dt * 3));
+    flaskLight.intensity = Math.max(0, flaskLight.intensity - dt * 40);
+    liquidMat.emissiveIntensity = Math.max(0.55, liquidMat.emissiveIntensity - dt);
+    if (fade <= 0) {
+      for (let i = 0; i < MAXP; i++) { mode[i] = 0; alpha[i] = 0; posArr[i * 3 + 1] = -999; }
+      posAttr.needsUpdate = true;
+      alphaAttr.needsUpdate = true;
+      cap.scale.set(0.001, 0.3, 0.001);
+      foamUniforms.uFade.value = 1;
+      fade = 1;
+      frontH = 0;
+      state = 'idle';
+      btn.disabled = false;
+      btn.textContent = '🪥 开始喷发';
+      controls.autoRotate = true;
+    }
+  }
+
+  /* --- 反应辉光 --- */
+  if (state === 'erupting' || state === 'holding') {
+    const ck = Math.min(eruptT / 2.2, 1);
+    const e = 1 - Math.pow(1 - ck, 3);
+    const pulse = 1 + Math.sin(t * 9) * 0.04;
+    cap.scale.set(Math.max(0.001, e * pulse), 0.3 + e * 0.22, Math.max(0.001, e * pulse));
+    capMat.emissiveIntensity = 0.7 + Math.sin(t * 31) * 0.25 + Math.sin(t * 17) * 0.15;
+    flaskLight.intensity = 16 + Math.sin(t * 37) * 6 + Math.sin(t * 23) * 5;
+    liquidMat.emissiveIntensity = 0.55 + Math.sin(t * 29) * 0.3;
+  }
+
+  updateFoam(dt, t);
+
+  /* --- 镜头补间 --- */
+  if (camTween) {
+    camTween.t += dt;
+    const k = Math.min(camTween.t / camTween.dur, 1);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+    controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+    if (k >= 1) { camTween = null; controls.enabled = true; }
+  }
+  controls.update();
+
+  /* 粒子尺寸换算系数（随分辨率/FOV 更新） */
+  foamUniforms.uScaleFactor.value =
+    renderer.domElement.height * 0.5 / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+
+  composer.render();
+}
+animate();
+
+/* 调试钩子 */
+window.demo = {
+  get state() { return state; },
+  get frontH() { return frontH; },
+  get activeParticles() { let n = 0; for (let i = 0; i < MAXP; i++) if (mode[i]) n++; return n; },
+  erupt: startEruption,
+  reset: resetDemo
+};
+window.__scene = scene;
+window.__dome = dome;
+</script>
+</body>
+</html>

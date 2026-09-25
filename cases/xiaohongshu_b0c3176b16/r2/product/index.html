@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>故宫 · 夜游 — Forbidden City Night</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05070f; }
+  #view { position: fixed; inset: 0; display: block; touch-action: none; cursor: grab; }
+  #view:active { cursor: grabbing; }
+
+  .ui { position: fixed; z-index: 10; color: #e8dfc8; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; user-select: none; }
+
+  #title {
+    top: 22px; left: 26px; pointer-events: none;
+  }
+  #title h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: 6px;
+    color: #f0e6cc; text-shadow: 0 0 18px rgba(255, 190, 90, .55), 0 2px 6px rgba(0,0,0,.8);
+  }
+  #title p {
+    margin-top: 4px; font-size: 12px; letter-spacing: 3px; color: rgba(232, 223, 200, .55);
+  }
+  #title .seal {
+    display: inline-block; margin-left: 8px; padding: 1px 6px; font-size: 11px;
+    border: 1px solid rgba(255, 190, 90, .6); border-radius: 3px; color: #ffc76a; vertical-align: 2px;
+  }
+
+  #compass {
+    top: 24px; right: 26px; width: 64px; height: 64px; pointer-events: none; opacity: .9;
+  }
+
+  #panel {
+    bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: center;
+  }
+  .btn {
+    padding: 10px 18px; font-size: 14px; letter-spacing: 2px; color: #f0e2c0;
+    background: rgba(16, 20, 34, .72); border: 1px solid rgba(255, 199, 106, .45);
+    border-radius: 24px; cursor: pointer; backdrop-filter: blur(6px);
+    transition: all .2s; font-family: inherit;
+  }
+  .btn:hover { background: rgba(50, 40, 24, .8); border-color: #ffc76a; box-shadow: 0 0 16px rgba(255, 190, 90, .35); }
+  .btn.primary { background: rgba(96, 62, 20, .8); border-color: #ffc76a; }
+
+  #tour-state {
+    bottom: 76px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; letter-spacing: 2px; color: rgba(240, 226, 192, .75);
+    text-shadow: 0 1px 4px rgba(0,0,0,.9); transition: opacity .4s;
+  }
+  #tour-state.on { color: #ffd98a; }
+
+  #hint {
+    bottom: 24px; left: 24px; font-size: 12px; line-height: 1.9; letter-spacing: 1px;
+    color: rgba(232, 223, 200, .66); background: rgba(10, 13, 24, .55);
+    padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255, 199, 106, .22);
+    transition: opacity 1.2s; pointer-events: none; backdrop-filter: blur(4px);
+  }
+  #hint.fade { opacity: 0; }
+  #hint b { color: #ffc76a; font-weight: 600; }
+
+  @media (max-width: 720px) {
+    #title h1 { font-size: 19px; letter-spacing: 3px; }
+    #hint { display: none; }
+    .btn { padding: 8px 13px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div class="ui" id="title">
+  <h1>故宫 · 夜游<span class="seal">三维重建</span></h1>
+  <p>FORBIDDEN CITY · NIGHT VISION-TO-CAD</p>
+</div>
+
+<div class="ui" id="compass">
+  <svg viewBox="0 0 64 64" width="64" height="64">
+    <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,199,106,.5)" stroke-width="1.5"/>
+    <circle cx="32" cy="32" r="22" fill="none" stroke="rgba(255,199,106,.25)" stroke-width="1"/>
+    <path d="M32 8 L37 32 L32 56 L27 32 Z" fill="rgba(255,199,106,.85)"/>
+    <path d="M8 32 L32 27 L56 32 L32 37 Z" fill="rgba(255,199,106,.4)"/>
+    <text x="32" y="16" text-anchor="middle" fill="#ffc76a" font-size="10" font-family="sans-serif">北</text>
+  </svg>
+</div>
+
+<div class="ui" id="tour-state">自由游览</div>
+
+<div class="ui" id="panel">
+  <button class="btn primary" id="btn-tour">▶ 中轴自动巡游</button>
+  <button class="btn" id="btn-reset">⌂ 重置视角</button>
+  <button class="btn" id="btn-speed">速度 ×1</button>
+</div>
+
+<div class="ui" id="hint">
+  <b>拖拽</b> 环视 · <b>滚轮/双指</b> 推拉 · <b>W A S D</b> 飞行<br>
+  <b>Q/E</b> 升降 · <b>Shift</b> 加速 ×4 · <b>T</b> 自动巡游 · <b>R</b> 复位
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./node_modules/three/build/three.module.js",
+    "three/addons/": "./node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
