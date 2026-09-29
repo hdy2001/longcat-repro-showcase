@@ -162,6 +162,9 @@ ul.flaws{margin:0;padding-left:18px;font-size:14px}
 .toast.on{opacity:1}
 .chip.bench{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--panel));color:var(--ink);font-weight:600}
 .bench-list{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.refs{margin-top:14px;padding:12px;border:1px dashed var(--accent);border-radius:10px;display:flex;flex-direction:column;gap:6px}
+.refs figure{margin:0;flex:none;display:flex;flex-direction:column;gap:3px;max-width:160px}
+.refs figcaption{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .figlink{color:inherit}.figlink:hover{text-decoration:none}.figlink span{color:var(--link)}
 .extras{padding-block:10px 20px;border-top:1px solid var(--line)}
 .extras>h2{font-size:21px;font-weight:700;margin:22px 0 16px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
@@ -240,7 +243,7 @@ function card(c){
     <div class="shot">${c.shot?`<img src="${esc(c.shot)}" alt="" loading="lazy">`:'<div class="noimg">无截图</div>'}
       ${c.manual ? '<div class="score"><span class="small">手动案例</span></div>' : `<div class="score"><b class="v-${esc(c.verdict)}">${fmt(c.total)}</b><span class="small muted">R${c.best_round}</span></div>`}</div>
     <div class="body">
-      <div class="meta">${c.manual?'':`<span class="chip">${esc(c.platform)}</span>`}<span class="chip">${TYPE[c.task_type]||esc(c.task_type)}</span>${c.manual ? (c.model ? `<span class="chip mono">${esc(c.model)}</span>` : '') : vchip(c.verdict)}</div>
+      <div class="meta">${c.manual?'':`<span class="chip">${esc(c.platform)}</span>`}<span class="chip">${TYPE[c.task_type]||esc(c.task_type)}</span>${c.refs?`<span class="chip">参考图 ${c.refs}</span>`:''}${c.manual ? (c.model ? `<span class="chip mono">${esc(c.model)}</span>` : '') : vchip(c.verdict)}</div>
       <div class="hl">${esc(c.highlight)}</div>
       <div class="q">› ${esc(c.query)}</div>
     </div></a>`;
@@ -260,6 +263,7 @@ function renderPost(c){
     <div class="txt">${esc(p.text) || '<span class="muted">（无正文）</span>'}</div>
     ${media.length?`<div class="thumbs" style="margin-top:12px">${media.map(u=>`<img src="${esc(u)}" alt="" loading="lazy" onclick="zoom(this.src)">`).join('')}</div>
       ${p.frames&&p.frames.length?`<div class="small muted" style="margin-top:4px">${p.images.length?`${p.images.length} 张图片 + `:''}${p.frames.length} 张视频截帧</div>`:''}`:''}
+    ${refsBlock(c.refs)}
     <dl class="kv">
       <dt>亮点</dt><dd><b>${esc(c.highlight)}</b></dd>
       <dt>对标模型</dt><dd>${renderBench(c.benchmark)}</dd>
@@ -269,6 +273,12 @@ function renderPost(c){
       <dt>预期产出</dt><dd class="small">${esc(c.expected_output)}</dd>
       <dt>达标标准</dt><dd><ol class="small" style="margin:0;padding-left:18px">${(c.criteria||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></dd>
     </dl></div>`;
+}
+function refsBlock(refs){
+  if (!(refs||[]).length) return '';
+  return `<div class="refs"><div class="label">参考图片 · ${refs.length} 张</div>
+    <div class="small muted">复现时放在工作目录 inputs/ 下，随 query 一起交给 LongCat</div>
+    <div class="thumbs">${refs.map(r=>`<figure><img src="${esc(r.src)}" alt="${esc(r.name)}" loading="lazy" onclick="zoom(this.src)"><figcaption class="mono">${esc(r.name)}</figcaption></figure>`).join('')}</div></div>`;
 }
 function renderBench(b){
   if (!b || !Object.keys(b).length) return '<span class="muted small">未分析</span>';
@@ -299,6 +309,7 @@ function renderRound(c, r){
   const crit = j.criteria||[];
   return `
     <div class="query"><span class="qlabel">第 ${r.round} 轮 query</span><span class="qtext">${esc(r.query)}</span><button class="btn" onclick="copy(CUR.rounds.find(x=>x.round===${r.round}).query,this)">复制</button></div>
+    ${(c.refs||[]).length?`<div class="small muted" style="margin-top:8px">随 query 附上 ${c.refs.length} 张参考图片（见上方「原帖」里的参考图片）</div>`:''}
     ${!r.judge ? `<div class="note" style="margin-top:18px">这一轮跑出了产出，但评审没有完成（评审模型调用失败），所以没有分数，也不参与最佳轮次的评选。</div>
       <div style="margin-top:18px">${renderProduct(c, r)}</div>` : `<div class="cols">
       <div>
